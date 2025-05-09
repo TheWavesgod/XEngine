@@ -4,6 +4,10 @@
 
 namespace VK
 {
+    /**
+     * Fence is used to sync between CPU side and Queues
+     * Only have two states, singaled and unsingaled
+     */
     class Fence
     {
         VkFence handle = VK_NULL_HANDLE;
@@ -85,6 +89,8 @@ namespace VK
 
     /*
      * Used to synchronize between queues
+     * It has two types, binary one and time linear
+     * 
      */
     class Semaphore
     {

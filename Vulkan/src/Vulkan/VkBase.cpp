@@ -673,7 +673,7 @@ VkResult VK::VkBase::RecreateSwapchain()
 
     VkResult result = vkQueueWaitIdle(queue_graphics);
     //仅在等待图形队列成功，且图形与呈现所用队列不同时等待呈现队列
-    if (!result && queue_graphics != queue_presentation)
+    if (result == VK_SUCCESS && queue_graphics != queue_presentation)
     {
         result = vkQueueWaitIdle(queue_presentation);
     }

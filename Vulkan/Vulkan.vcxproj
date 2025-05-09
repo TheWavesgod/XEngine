@@ -27,10 +27,10 @@
       <Optimization>Disabled</Optimization>
       <SupportJustMyCode>true</SupportJustMyCode>
       <AssemblerOutput>NoListing</AssemblerOutput>
-      <AssemblerListingLocation>E:\Project\C++\Renderer\bin\Vulkan_x64\Debug\</AssemblerListingLocation>
+      <AssemblerListingLocation>D:\Project\Renderer\bin\Vulkan_x64\Debug\</AssemblerListingLocation>
       <UndefineAllPreprocessorDefinitions>false</UndefineAllPreprocessorDefinitions>
       <BrowseInformation>false</BrowseInformation>
-      <BrowseInformationFile>E:\Project\C++\Renderer\bin\Vulkan_x64\Debug\</BrowseInformationFile>
+      <BrowseInformationFile>D:\Project\Renderer\bin\Vulkan_x64\Debug\</BrowseInformationFile>
       <CompileAs>Default</CompileAs>
       <ConformanceMode>true</ConformanceMode>
       <DiagnosticsFormat>Column</DiagnosticsFormat>
@@ -53,37 +53,37 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>Default</LanguageStandard_C>
       <MinimalRebuild>false</MinimalRebuild>
-      <ModuleDependenciesFile>E:\Project\C++\Renderer\bin\Vulkan_x64\Debug\</ModuleDependenciesFile>
-      <ModuleOutputFile>E:\Project\C++\Renderer\bin\Vulkan_x64\Debug\</ModuleOutputFile>
+      <ModuleDependenciesFile>D:\Project\Renderer\bin\Vulkan_x64\Debug\</ModuleDependenciesFile>
+      <ModuleOutputFile>D:\Project\Renderer\bin\Vulkan_x64\Debug\</ModuleOutputFile>
       <OmitDefaultLibName>false</OmitDefaultLibName>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <ObjectFileName>E:\Project\C++\Renderer\bin\Vulkan_x64\Debug\</ObjectFileName>
+      <ObjectFileName>D:\Project\Renderer\bin\Vulkan_x64\Debug\</ObjectFileName>
       <CallingConvention>Cdecl</CallingConvention>
-      <ProgramDataBaseFileName>E:\Project\C++\Renderer\bin\Vulkan_x64\Debug\vc143.pdb</ProgramDataBaseFileName>
+      <ProgramDataBaseFileName>D:\Project\Renderer\bin\Vulkan_x64\Debug\vc143.pdb</ProgramDataBaseFileName>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderOutputFile>E:\Project\C++\Renderer\bin\Vulkan_x64\Debug\Vulkan.pch</PrecompiledHeaderOutputFile>
+      <PrecompiledHeaderOutputFile>D:\Project\Renderer\bin\Vulkan_x64\Debug\Vulkan.pch</PrecompiledHeaderOutputFile>
       <PreprocessToFile>false</PreprocessToFile>
       <PreprocessKeepComments>false</PreprocessKeepComments>
       <PreprocessSuppressLineNumbers>false</PreprocessSuppressLineNumbers>
       <RemoveUnreferencedCodeData>true</RemoveUnreferencedCodeData>
       <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
       <ShowIncludes>false</ShowIncludes>
-      <SourceDependenciesFile>E:\Project\C++\Renderer\bin\Vulkan_x64\Debug\</SourceDependenciesFile>
+      <SourceDependenciesFile>D:\Project\Renderer\bin\Vulkan_x64\Debug\</SourceDependenciesFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <SmallerTypeCheck>false</SmallerTypeCheck>
       <SpectreMitigation>false</SpectreMitigation>
       <StructMemberAlignment>Default</StructMemberAlignment>
-      <TrackerLogDirectory>E:\Project\C++\Renderer\bin\Vulkan_x64\Debug\Vulkan.tlog\</TrackerLogDirectory>
+      <TrackerLogDirectory>D:\Project\Renderer\bin\Vulkan_x64\Debug\Vulkan.tlog\</TrackerLogDirectory>
       <TranslateIncludes>false</TranslateIncludes>
       <MinimalRebuildFromTracking>true</MinimalRebuildFromTracking>
       <TreatWarningAsError>false</TreatWarningAsError>
       <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
       <UseFullPaths>true</UseFullPaths>
       <WarningLevel>Level3</WarningLevel>
-      <XMLDocumentationFileName>E:\Project\C++\Renderer\bin\Vulkan_x64\Debug\</XMLDocumentationFileName>
+      <XMLDocumentationFileName>D:\Project\Renderer\bin\Vulkan_x64\Debug\</XMLDocumentationFileName>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <IntelJCCErratum>false</IntelJCCErratum>
       <BuildStlModules>false</BuildStlModules>
@@ -97,10 +97,13 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Vulkan\Framebuffer.h" />
+    <ClInclude Include="src\Vulkan\RenderPass.h" />
     <ClInclude Include="src\Renderer\Renderer.h" />
     <ClInclude Include="src\Vulkan\Command.h" />
     <ClInclude Include="src\Vulkan\EasyVulkan.hpp" />
     <ClInclude Include="src\Vulkan\GlfwGeneral.hpp" />
+    <ClInclude Include="src\Vulkan\Shader.h" />
     <ClInclude Include="src\Vulkan\Synchronization.h" />
     <ClInclude Include="src\Vulkan\VkBase+.h" />
     <ClInclude Include="src\Vulkan\VkBase.h" />
@@ -161,7 +164,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LibraryPath>$(LibraryPath)</LibraryPath>
-    <OutDir>$(SolutionDir)$(ProjectName)_$(Platform)\$(Configuration)</OutDir>
+    <OutDir>$(SolutionDir)$(ProjectName)_$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)bin\$(ProjectName)_$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(SolutionDir)Dependency\Vulkan\Include;$(SolutionDir)Dependency\GLFW\include;$(SolutionDir)Dependency\glm;$(SolutionDir)Dependency;$(IncludePath)</IncludePath>
   </PropertyGroup>
@@ -173,7 +176,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LibraryPath>$(LibraryPath)</LibraryPath>
-    <OutDir>$(SolutionDir)$(ProjectName)_$(Platform)\$(Configuration)</OutDir>
+    <OutDir>$(SolutionDir)$(ProjectName)_$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)bin\$(ProjectName)_$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(SolutionDir)Dependency\Vulkan\Include;$(SolutionDir)Dependency\GLFW\include;$(SolutionDir)Dependency\glm;$(SolutionDir)Dependency;$(IncludePath)</IncludePath>
   </PropertyGroup>

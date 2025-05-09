@@ -2,6 +2,7 @@
 #include "Vulkan/Synchronization.h"
 #include "Vulkan/Command.h"
 #include "Vulkan/EasyVulkan.hpp"
+#include "Vulkan/Pipeline.h"
 
 using namespace VK;
 

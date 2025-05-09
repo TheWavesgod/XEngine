@@ -4,6 +4,9 @@
 
 namespace VK
 {
+    /**
+     *    
+     */
     class CommandBuffer 
     {
         friend class CommandPool;

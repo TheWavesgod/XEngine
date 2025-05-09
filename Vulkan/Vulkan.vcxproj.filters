@@ -21,18 +21,48 @@
     <ClCompile Include="src\main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="src\VKBase.cpp">
-      <Filter>Base</Filter>
+    <ClCompile Include="src\Renderer\Renderer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vulkan\VkBase.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\VKEasyHearder.h">
+    <ClInclude Include="src\Renderer\Renderer.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\VKBase.h">
-      <Filter>Base</Filter>
+    <ClInclude Include="src\Vulkan\Command.h">
+      <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\GlfwGeneral.hpp">
+    <ClInclude Include="src\Vulkan\EasyVulkan.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\GlfwGeneral.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\Synchronization.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\VkBase+.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\VkBase.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\VKEasyHearder.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\VKFormat.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\RenderPass.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\Framebuffer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\Shader.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

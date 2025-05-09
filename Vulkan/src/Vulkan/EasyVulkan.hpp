@@ -2,6 +2,10 @@
 
 #include "VkBase+.h"
 
+#include "RenderPass.h"
+#include "Framebuffer.h"
+#include "Shader.h"
+
 using namespace VK;
 
 inline const VkExtent2D& windowSize = VkBase::Base().SwapchainCreateInfo().imageExtent;
