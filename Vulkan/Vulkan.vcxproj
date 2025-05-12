@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\Vulkan\Device.cpp" />
     <ClCompile Include="src\Vulkan\Instance.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Renderer\Renderer.cpp" />
@@ -97,8 +98,11 @@
       <SDLCheck>true</SDLCheck>
       <LinkCompiled>true</LinkCompiled>
     </ClCompile>
+    <ClCompile Include="src\Vulkan\Surface.cpp" />
+    <ClCompile Include="src\Vulkan\Swapchain.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Vulkan\Device.h" />
     <ClInclude Include="src\Vulkan\Instance.h" />
     <ClInclude Include="src\Vulkan\Framebuffer.h" />
     <ClInclude Include="src\Vulkan\Image.h" />
@@ -117,6 +121,8 @@
     <ClInclude Include="src\Vulkan\VkBase.h" />
     <ClInclude Include="src\Vulkan\VKEasyHearder.h" />
     <ClInclude Include="src\Vulkan\VKFormat.h" />
+    <ClInclude Include="src\Vulkan\Surface.h" />
+    <ClInclude Include="src\Vulkan\Swapchain.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Instance.h"
+#include "Surface.h"
 
 namespace VK
 {
@@ -40,9 +41,7 @@ namespace VK
 	public:
 		Instance& Instance() { return instance; }
 
-		/**
-		 * Surface
-		 **/
+	/** Surface **/
 	private:
 		VkSurfaceKHR surface;
 		
