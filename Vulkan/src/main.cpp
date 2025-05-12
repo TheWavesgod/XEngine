@@ -9,6 +9,9 @@ using namespace VK;
 PipelineLayout pipelineLayout_triangle;
 Pipeline pipeline_triangle;
 
+//DescriptorSetLayout descriptorSetLayout_texture;
+PipelineLayout pipelineLayout_texture;
+
 struct vertex
 {
     glm::vec2 position;
@@ -22,7 +25,26 @@ const auto& RenderPassAndFramebuffers()
 }
 
 void CreateLayout()
-{
+{ 
+    VkDescriptorSetLayoutBinding descriptorSetLayoutBinding_texture = {
+        .binding = 0,                                                
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 
+        .descriptorCount = 1,                                        
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT                   
+    };
+
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo_texture = {
+        .bindingCount = 1,
+        .pBindings = &descriptorSetLayoutBinding_texture
+    };
+    //descriptorSetLayout_texture.Create(descriptorSetLayoutCreateInfo_texture);
+
+    /*VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
+        .setLayoutCount = 1,
+        .pSetLayouts = descriptorSetLayout_texture.Address()
+    };
+    pipelineLayout_texture.Create(pipelineLayoutCreateInfo);*/
+
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
     pipelineLayout_triangle.Create(pipelineLayoutCreateInfo);
 }
@@ -76,6 +98,9 @@ int main()
 {
     if (!InitializeWindow({1280, 720})) return -1;
 
+    //EasyVulkan::BootScreen("", VK_FORMAT_R8G8B8A8_UNORM);
+    //std::this_thread::sleep_for(std::chrono::seconds(1));//需要#include <thread>
+
     const auto& [renderPass, framebuffers] = EasyVulkan::CreateRpwf_Screen();
     CreateLayout();
     CreatePipeline();
@@ -105,6 +130,9 @@ int main()
     };
     IndexBuffer indexBuffer(sizeof indices);
     indexBuffer.TransferData(indices);
+
+    VkSamplerCreateInfo samplerCreatInfo = Texture::MakeSamplerCreateInfo();
+    Sampler sampler(samplerCreatInfo);
 
     while (!glfwWindowShouldClose(pWindow))
     {

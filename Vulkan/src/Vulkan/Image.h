@@ -75,7 +75,7 @@ namespace VK
 		}
 	};
 
-	class ImageMemory :Image, DeviceMemory
+	class ImageMemory : Image, DeviceMemory
 	{
 	public:
 		ImageMemory() = default;

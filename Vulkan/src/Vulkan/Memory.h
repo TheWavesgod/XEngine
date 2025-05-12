@@ -152,7 +152,7 @@ namespace VK
 		}
 	};
 
-	class  Buffer
+	class Buffer
 	{
 		VkBuffer handle = VK_NULL_HANDLE;
 

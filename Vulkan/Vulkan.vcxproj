@@ -19,8 +19,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\Vulkan\Instance.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Renderer\Renderer.cpp" />
+    <ClCompile Include="src\Vulkan\Command.cpp" />
     <ClCompile Include="src\Vulkan\VkBase.cpp">
       <RuntimeLibrary>MultiThreadedDebugDll</RuntimeLibrary>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -97,14 +99,17 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Vulkan\Instance.h" />
     <ClInclude Include="src\Vulkan\Framebuffer.h" />
     <ClInclude Include="src\Vulkan\Image.h" />
     <ClInclude Include="src\Vulkan\Memory.h" />
+    <ClInclude Include="src\Vulkan\Pipeline.h" />
     <ClInclude Include="src\Vulkan\RenderPass.h" />
     <ClInclude Include="src\Renderer\Renderer.h" />
     <ClInclude Include="src\Vulkan\Command.h" />
     <ClInclude Include="src\Vulkan\EasyVulkan.hpp" />
     <ClInclude Include="src\Vulkan\GlfwGeneral.hpp" />
+    <ClInclude Include="src\Vulkan\Sampler.h" />
     <ClInclude Include="src\Vulkan\Shader.h" />
     <ClInclude Include="src\Vulkan\Synchronization.h" />
     <ClInclude Include="src\Vulkan\Texture.h" />

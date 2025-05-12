@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VKEasyHearder.h"
+#include "Instance.h"
 
 namespace VK
 {
@@ -23,7 +23,6 @@ namespace VK
 
 		void Terminate() {
 			this->~VkBase();
-			instance = VK_NULL_HANDLE;
 			physicalDevice = VK_NULL_HANDLE;
 			device = VK_NULL_HANDLE;
 			surface = VK_NULL_HANDLE;
@@ -31,63 +30,15 @@ namespace VK
 			swapchainImages.resize(0);
 			swapchainImageViews.resize(0);
 			swapchainCreateInfo = {};
-			debugMessenger = VK_NULL_HANDLE;
 		}
 
 
 	/** Instance **/
 	private:
-		VkInstance instance;
-
-		std::vector<const char*> instanceLayers;
-		std::vector<const char*> instanceExtensions;
-
-		VkDebugUtilsMessengerEXT debugMessenger;
-
-		static void AddLayerOrExtension( std::vector<const char*>& container, const char* name)
-		{
-			for (auto& i : container)
-				if (!strcmp(name, i))
-					return;          
-			container.push_back(name);
-		}
-
-		VkResult CreateDebugMessenger();
+		Instance instance;
 
 	public:
-		VkInstance Instance() const {
-			return instance;
-		}
-		const std::vector<const char*>& InstanceLayers() const {
-			return instanceLayers;
-		}
-		const std::vector<const char*>& InstanceExtensions() const {
-			return instanceExtensions;
-		}
-
-		// Function used before create instance
-		void AddInstanceLayer(const char* layerName) {
-			AddLayerOrExtension(instanceLayers, layerName);
-		}
-		void AddInstanceExtension(const char* extensionName) {
-			AddLayerOrExtension(instanceExtensions, extensionName);
-		}
-		
-		VkResult CreateInstance(VkInstanceCreateFlags flags = 0);
-		
-		// Check after failed to create instance
-		VkResult CheckInstanceLayers(std::span<const char*> layersToCheck);
-		
-		void InstanceLayers(const std::vector<const char*>& layerNames) {
-			instanceLayers = layerNames;
-		}
-		VkResult CheckInstanceExtensions(std::span<const char*> extensionsToCheck, const char* layerName = nullptr) const;
-		
-		void InstanceExtensions(const std::vector<const char*>& extensionNames) {
-			instanceExtensions = extensionNames;
-		}
-
-		
+		Instance& Instance() { return instance; }
 
 		/**
 		 * Surface

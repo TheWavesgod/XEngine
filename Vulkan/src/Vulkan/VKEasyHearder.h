@@ -16,12 +16,11 @@
 #include <numeric>
 #include <numbers>
 
+#include <thread>
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm.hpp>
 #include <gtc/matrix_transform.hpp>
-
-#include <stb_image.h>
 
 // Vulkan
 #ifdef _WIN32
@@ -113,6 +112,16 @@ public:
     //禁止复制/移动赋值
     arrayRef& operator=(const arrayRef&) = delete;
 };
+
+static void AddLayerOrExtension(std::vector<const char*>& container, const char* name)
+{
+    for (auto& i : container)
+    {
+        if (!strcmp(name, i)) return;
+    }
+
+    container.push_back(name);
+}
 
 #ifndef NDEBUG
 #define ENABLE_DEBUG_MESSENGER true

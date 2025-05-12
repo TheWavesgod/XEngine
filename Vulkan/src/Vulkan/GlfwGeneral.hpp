@@ -38,7 +38,7 @@ inline bool InitializeWindow(VkExtent2D size, bool fullScreen = false, bool isRe
 	}
 	for (size_t i = 0; i < extensionCount; i++)
 	{
-		VK::VkBase::Base().AddInstanceExtension(extensionNames[i]);
+		VK::VkBase::Base().Instance().AddExtension(extensionNames[i]);
 	}
 
 	pMonitor = glfwGetPrimaryMonitor();
@@ -57,8 +57,8 @@ inline bool InitializeWindow(VkExtent2D size, bool fullScreen = false, bool isRe
 	}
 
 #ifdef _WIN32
-	VK::VkBase::Base().AddInstanceExtension(VK_KHR_SURFACE_EXTENSION_NAME);
-	VK::VkBase::Base().AddInstanceExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);                                                    
+	VK::VkBase::Base().Instance().AddExtension(VK_KHR_SURFACE_EXTENSION_NAME);
+	VK::VkBase::Base().Instance().AddExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);                                                    
 #else
 	uint32_t extensionCount = 0;
 	const char** extensionNames;
@@ -70,12 +70,12 @@ inline bool InitializeWindow(VkExtent2D size, bool fullScreen = false, bool isRe
 	}
 	for (size_t i = 0; i < extensionCount; i++)
 	{
-		VK::VkBase::Base().AddInstanceExtension(extensionNames[i]);
+		VK::VkBase::Base().Instance().AddExtension(extensionNames[i]);
 	}
 #endif
 	VK::VkBase::Base().AddDeviceExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 	VK::VkBase::Base().UseLatestApiVersion();
-	if (VK::VkBase::Base().CreateInstance()) return false;
+	if (VK::VkBase::Base().Instance().Create()) return false;
 
 	VkSurfaceKHR surface = VK_NULL_HANDLE;
 	if (VkResult result = glfwCreateWindowSurface(VK::VkBase::Base().Instance(), pWindow, nullptr, &surface))

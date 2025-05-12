@@ -27,6 +27,12 @@
     <ClCompile Include="src\Vulkan\VkBase.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\Vulkan\Command.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vulkan\Instance.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Renderer\Renderer.h">
@@ -72,6 +78,15 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\Vulkan\Texture.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\Pipeline.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\Sampler.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\Instance.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
