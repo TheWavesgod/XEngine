@@ -65,7 +65,13 @@
     <ClInclude Include="src\Vulkan\Shader.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\Vulkan\Pipeline.h">
+    <ClInclude Include="src\Vulkan\Memory.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\Image.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vulkan\Texture.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

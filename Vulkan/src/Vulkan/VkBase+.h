@@ -3,6 +3,9 @@
 #include "VkBase.h"
 #include "VKFormat.h"
 
+#include "Memory.h"
+#include "Image.h"
+
 namespace VK
 {
     struct GraphicsPipelineCreateInfoPack

@@ -98,7 +98,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Vulkan\Framebuffer.h" />
-    <ClInclude Include="src\Vulkan\Pipeline.h" />
+    <ClInclude Include="src\Vulkan\Image.h" />
+    <ClInclude Include="src\Vulkan\Memory.h" />
     <ClInclude Include="src\Vulkan\RenderPass.h" />
     <ClInclude Include="src\Renderer\Renderer.h" />
     <ClInclude Include="src\Vulkan\Command.h" />
@@ -106,6 +107,7 @@
     <ClInclude Include="src\Vulkan\GlfwGeneral.hpp" />
     <ClInclude Include="src\Vulkan\Shader.h" />
     <ClInclude Include="src\Vulkan\Synchronization.h" />
+    <ClInclude Include="src\Vulkan\Texture.h" />
     <ClInclude Include="src\Vulkan\VkBase+.h" />
     <ClInclude Include="src\Vulkan\VkBase.h" />
     <ClInclude Include="src\Vulkan\VKEasyHearder.h" />
