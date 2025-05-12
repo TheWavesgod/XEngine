@@ -98,6 +98,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Vulkan\Framebuffer.h" />
+    <ClInclude Include="src\Vulkan\Pipeline.h" />
     <ClInclude Include="src\Vulkan\RenderPass.h" />
     <ClInclude Include="src\Renderer\Renderer.h" />
     <ClInclude Include="src\Vulkan\Command.h" />
