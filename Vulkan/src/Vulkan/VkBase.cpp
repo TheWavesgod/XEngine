@@ -89,34 +89,6 @@ VkResult VK::VkBase::UseLatestApiVersion()
     return VK_SUCCESS;
 }
 
-result_t VK::VkBase::SwapImage(VkSemaphore semaphore_imageIsAvailable)
-{
-    if (swapchain.SwapchainCreateInfo().oldSwapchain &&
-        swapchain.SwapchainCreateInfo().oldSwapchain != swapchain)
-    {
-        vkDestroySwapchainKHR(device, swapchain.SwapchainCreateInfo().oldSwapchain, nullptr);
-        swapchain.SwapchainCreateInfo().oldSwapchain = VK_NULL_HANDLE;
-    }
-
-    while(VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, semaphore_imageIsAvailable, VK_NULL_HANDLE, &currentImageIndex))
-    {
-        switch (result)
-        {
-        case VK_SUBOPTIMAL_KHR:
-            
-        case VK_ERROR_OUT_OF_DATE_KHR:
-            if (VkResult result = swapchain.ReBuild()) return result;
-            break; //注意重建交换链后仍需要获取图像，通过break递归，再次执行while的条件判定语句
-            
-        default:
-            outStream << std::format("[ VkBase ] ERROR\nFailed to acquire the next image!\nError code: {}\n", int32_t(result));
-            return result;
-        }
-    }
-
-    return VK_SUCCESS;
-}
-
 result_t VK::VkBase::SubmitCommandBuffer_Graphics(VkSubmitInfo& submitInfo, VkFence fence) const
 {
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -176,38 +148,6 @@ result_t VK::VkBase::SubmitCommandBuffer_Compute(VkCommandBuffer commandBuffer, 
         .pCommandBuffers = &commandBuffer
     };
     return SubmitCommandBuffer_Compute(submitInfo, fence);
-}
-
-result_t VK::VkBase::PresentImage(VkPresentInfoKHR& presentInfo)
-{
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    switch (VkResult result = vkQueuePresentKHR(device.Queue_Presentation(), &presentInfo))
-    {
-    case VK_SUCCESS:
-        return VK_SUCCESS;
-    case VK_SUBOPTIMAL_KHR:
-    case VK_ERROR_OUT_OF_DATE_KHR:
-        return swapchain.ReBuild();
-    default:
-        outStream << std::format("[ VkBase ] ERROR\nFailed to queue the image for presentation!\nError code: {}\n", int32_t(result));
-        return result;
-    }
-}
-
-result_t VK::VkBase::PresentImage(VkSemaphore semaphore_renderingIsOver)
-{
-    VkPresentInfoKHR presentInfo = {
-        .swapchainCount = 1,
-        .pSwapchains = &swapchain.Ref(),
-        .pImageIndices = &currentImageIndex
-    };
-    
-    if (semaphore_renderingIsOver)
-    {
-        presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &semaphore_renderingIsOver;
-    }
-    return PresentImage(presentInfo);
 }
 
 

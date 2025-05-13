@@ -138,8 +138,8 @@ int main()
     {
         while (glfwGetWindowAttrib(pWindow, GLFW_ICONIFIED)) glfwWaitEvents();
         
-        VkBase::Base().SwapImage(semaphore_imageIsAvailable);
-        uint32_t i = VkBase::Base().CurrentImageIndex();
+        VkBase::Base().Swapchain().SwapImage(semaphore_imageIsAvailable);
+        uint32_t i = VkBase::Base().Swapchain().CurrentImageIndex();
 
         
         commandBuffer.Begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -157,7 +157,7 @@ int main()
         commandBuffer.End();
 
         VkBase::Base().SubmitCommandBuffer_Graphics(commandBuffer, semaphore_imageIsAvailable, semaphore_renderingIsOver, fence);
-        VkBase::Base().PresentImage(semaphore_renderingIsOver);
+        VkBase::Base().Swapchain().PresentImage(semaphore_renderingIsOver);
 
         TitleFps();
         glfwPollEvents();

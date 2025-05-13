@@ -44,15 +44,9 @@ namespace VK
 
 		Surface Surface() { return surface; }
 
-		inline uint32_t QueueFamilyIndex_Graphics() const {
-			return queueFamilyIndex_graphics;
-		}
-		inline uint32_t QueueFamilyIndex_Presentation() const {
-			return queueFamilyIndex_presentation;
-		}
-		inline uint32_t QueueFamilyIndex_Compute() const {
-			return queueFamilyIndex_compute;
-		}
+		inline uint32_t QueueFamilyIndex_Graphics() const { return queueFamilyIndex_graphics; }
+		inline uint32_t QueueFamilyIndex_Presentation() const { return queueFamilyIndex_presentation; }
+		inline uint32_t QueueFamilyIndex_Compute() const { return queueFamilyIndex_compute; }
 
 	private:
 		result_t AquireAvailablePhysicalDevices(Instance& instance);

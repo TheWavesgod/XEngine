@@ -42,6 +42,9 @@
     <ClCompile Include="src\Vulkan\Swapchain.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\Vulkan\Synchronization.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Renderer\Renderer.h">

@@ -112,14 +112,6 @@ namespace VK
 
 		VkResult UseLatestApiVersion();
 
-	private:
-		uint32_t currentImageIndex = 0;
-		
-	public:
-		//Getter
-		uint32_t CurrentImageIndex() const { return currentImageIndex; }
-
-		result_t SwapImage(VkSemaphore semaphore_imageIsAvailable);
 
 		// 该函数用于将命令缓冲区提交到用于图形的队列
 		result_t SubmitCommandBuffer_Graphics(VkSubmitInfo& submitInfo, VkFence fence = VK_NULL_HANDLE) const;
@@ -137,10 +129,6 @@ namespace VK
 
 		//该函数用于将命令缓冲区提交到用于计算的队列，且只使用栅栏的常见情形
 		result_t SubmitCommandBuffer_Compute(VkCommandBuffer commandBuffer, VkFence fence = VK_NULL_HANDLE) const;
-
-		result_t PresentImage(VkPresentInfoKHR& presentInfo);
-
-		result_t PresentImage(VkSemaphore semaphore_renderingIsOver = VK_NULL_HANDLE);
 
 		// VKBase+
 	private:

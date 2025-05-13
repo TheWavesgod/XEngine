@@ -160,6 +160,70 @@ namespace VK
         vkDestroySwapchainKHR(*p_device, handle, nullptr);
     }
 
+    result_t Swapchain::SwapImage(VkSemaphore semaphore_imageIsAvailable)
+    {
+        if (swapchainCreateInfo.oldSwapchain &&
+            swapchainCreateInfo.oldSwapchain != handle)
+        {
+			vkDestroySwapchainKHR(*p_device, swapchainCreateInfo.oldSwapchain, nullptr);
+            swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
+        }
+
+		while (VkResult result = vkAcquireNextImageKHR(*p_device, handle, UINT64_MAX, semaphore_imageIsAvailable, VK_NULL_HANDLE, &currentImageIndex))
+		{
+			switch (result)
+			{
+			case VK_SUBOPTIMAL_KHR:
+
+			case VK_ERROR_OUT_OF_DATE_KHR:
+				if (VkResult result = ReBuild()) return result;
+				break; 
+                // Note that after the swapchain is reconstructed, 
+                // it is still necessary to obtain the image. 
+                // Through the break recursion, the condition judgment statement of the while loop is executed again.
+
+			default:
+				outStream << std::format("[ VkBase ] ERROR\nFailed to acquire the next image!\nError code: {}\n", int32_t(result));
+				return result;
+			}
+		}
+
+		return VK_SUCCESS;
+    }
+
+    result_t Swapchain::PresentImage(VkPresentInfoKHR& presentInfo)
+    {
+		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		switch (VkResult result = vkQueuePresentKHR(p_device->Queue_Presentation(), &presentInfo))
+		{
+		case VK_SUCCESS:
+			return VK_SUCCESS;
+		case VK_SUBOPTIMAL_KHR:
+		case VK_ERROR_OUT_OF_DATE_KHR:
+			return ReBuild();
+		default:
+			outStream << std::format("[ VkBase ] ERROR\nFailed to queue the image for presentation!\nError code: {}\n", int32_t(result));
+			return result;
+		}
+    }
+
+    result_t Swapchain::PresentImage(VkSemaphore semaphore_renderingIsOver)
+    {
+		VkPresentInfoKHR presentInfo = {
+		.swapchainCount = 1,
+		.pSwapchains = &handle,
+		.pImageIndices = &currentImageIndex
+		};
+
+		if (semaphore_renderingIsOver)
+		{
+			presentInfo.waitSemaphoreCount = 1;
+			presentInfo.pWaitSemaphores = &semaphore_renderingIsOver;
+		}
+
+		return PresentImage(presentInfo);
+    }
+
 	result_t Swapchain::Build_Internal()
 	{
         if (VkResult result = vkCreateSwapchainKHR(*p_device, &swapchainCreateInfo, nullptr, &handle))
@@ -216,7 +280,6 @@ namespace VK
                     break;
                 }
             }
-
         }
         else
         {

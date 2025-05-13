@@ -113,7 +113,7 @@ namespace EasyVulkan
         VkBase::Plus().CommandPool_Graphics().AllocateBuffers(commandBuffer);
 
         // Acquire the swapchain images
-        VkBase::Base().SwapImage(semaphore_imageIsAvailable);
+        VkBase::Base().Swapchain().SwapImage(semaphore_imageIsAvailable);
 
         // record command buffer
         commandBuffer.Begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -183,7 +183,7 @@ namespace EasyVulkan
 
                 ImageOperation::CmdBlitImage(commandBuffer,
                     image,
-                    VkBase::Base().SwapchainImage(VkBase::Base().CurrentImageIndex()),
+                    VkBase::Base().SwapchainImage(VkBase::Base().Swapchain().CurrentImageIndex()),
                     region_blit,
                     { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED },
                     { VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR }, VK_FILTER_LINEAR
@@ -198,7 +198,7 @@ namespace EasyVulkan
 
                 ImageOperation::CmdCopyBufferToImage(commandBuffer,
                     StagingBuffer::Buffer_MainThread(),
-                    VkBase::Base().SwapchainImage(VkBase::Base().CurrentImageIndex()),
+                    VkBase::Base().SwapchainImage(VkBase::Base().Swapchain().CurrentImageIndex()),
                     region_copy,
                     { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED },
                     { VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR }
@@ -221,8 +221,8 @@ namespace EasyVulkan
         VkBase::Base().SubmitCommandBuffer_Graphics(submitInfo, fence);
         // wait until the commands is completed
         fence.WaitAndReset();
-        // present the iamge
-        VkBase::Base().PresentImage();
+        // present the image
+        VkBase::Base().Swapchain().PresentImage();
 
         // don't forget to release the command buffer
         VkBase::Plus().CommandPool_Graphics().FreeBuffers(commandBuffer);

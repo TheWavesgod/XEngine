@@ -20,6 +20,8 @@ namespace VK
 		PhysicalDevice* p_physicalDevice = nullptr;
 		LogicalDevice* p_device = nullptr;
 
+		uint32_t currentImageIndex = 0;
+
 	public:
 		Swapchain() = default;
 
@@ -32,6 +34,12 @@ namespace VK
 
 		void Destroy();
 
+		result_t SwapImage(VkSemaphore semaphore_imageIsAvailable);
+
+		result_t PresentImage(VkPresentInfoKHR& presentInfo);
+
+		result_t PresentImage(VkSemaphore semaphore_renderingIsOver = VK_NULL_HANDLE);
+
 		// Getter
 		DefineHandleTypeOperator;
 		DefineAddressFunction;
@@ -42,6 +50,8 @@ namespace VK
 
 		const std::vector<VkImage>& Images() const { return swapchainImages; }
 		std::vector<VkImageView>& ImageViews() { return swapchainImageViews; } 
+
+		uint32_t CurrentImageIndex() const { return currentImageIndex; }
 
 	private:
 		result_t Build_Internal();
