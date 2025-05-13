@@ -174,7 +174,7 @@ namespace VK
 				.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 				.mipLodBias = 0.f,
 				.anisotropyEnable = VK_TRUE,
-				.maxAnisotropy = VkBase::Base().PhysicalDeviceProperties().limits.maxSamplerAnisotropy,
+				.maxAnisotropy = VkBase::Base().PhysicalDevice().Properties().limits.maxSamplerAnisotropy,
 				.compareEnable = VK_FALSE,
 				.compareOp = VK_COMPARE_OP_ALWAYS,
 				.minLod = 0.f,

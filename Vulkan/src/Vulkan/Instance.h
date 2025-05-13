@@ -13,8 +13,6 @@ namespace VK
 
 		VkDebugUtilsMessengerEXT debugMessenger;
 
-		uint32_t apiVersion = VK_API_VERSION_1_0;
-
 	public:
 		Instance() = default;
 
@@ -22,7 +20,7 @@ namespace VK
 		void AddLayer(const char* layerName) { AddLayerOrExtension(instanceLayers, layerName); }
 		void AddExtension(const char* extensionName) { AddLayerOrExtension(instanceExtensions, extensionName); }
 
-		VkResult Create(VkInstanceCreateFlags flags = 0);
+		VkResult Create(uint32_t apiVersion, VkInstanceCreateFlags flags = 0);
 		void Destroy();
 
 		// Getter

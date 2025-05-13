@@ -1,6 +1,249 @@
 #include "Swapchain.h"
+#include "Device.h"
 
 namespace VK
 {
+	result_t Swapchain::Build(PhysicalDevice& physicalDevice, LogicalDevice& device, bool limitFrameRate, VkSwapchainCreateFlagsKHR flags)
+	{
+        p_physicalDevice = &physicalDevice;
+        p_device = &device;
 
+        const VkSurfaceCapabilitiesKHR& surfaceCapabilities = physicalDevice.SurfaceCapabilities();
+        const std::vector<VkSurfaceFormatKHR>& availableSurfaceFormats = physicalDevice.AvailableSurfaceFormats();
+        const std::vector<VkPresentModeKHR>& surfacePresentModes = physicalDevice.SurfacePresentModes();
+
+
+        swapchainCreateInfo.minImageCount = surfaceCapabilities.minImageCount + (surfaceCapabilities.maxImageCount > surfaceCapabilities.minImageCount);
+        swapchainCreateInfo.imageExtent =
+            surfaceCapabilities.currentExtent.width == -1 ?
+            VkExtent2D{
+                glm::clamp(defaultWindowSize.width, surfaceCapabilities.minImageExtent.width, surfaceCapabilities.maxImageExtent.width),
+                glm::clamp(defaultWindowSize.height, surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.height) } :
+                surfaceCapabilities.currentExtent;
+        swapchainCreateInfo.imageArrayLayers = 1;
+        swapchainCreateInfo.preTransform = surfaceCapabilities.currentTransform;
+
+        if (surfaceCapabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR)
+        {
+            swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+        }
+        else
+        {
+            for (size_t i = 0; i < 4; ++i)
+            {
+                if (surfaceCapabilities.supportedCompositeAlpha & 1 << i)
+                {
+                    swapchainCreateInfo.compositeAlpha = VkCompositeAlphaFlagBitsKHR(surfaceCapabilities.supportedCompositeAlpha & 1 << i);
+                    break;
+                }
+            }
+        }
+
+        swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        if (surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+        {
+            swapchainCreateInfo.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        }
+        if (surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+        {
+            swapchainCreateInfo.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        }
+        else
+        {
+            std::cout << std::format("[ VkBase ] WARNING\nVK_IMAGE_USAGE_TRANSFER_DST_BIT isn't supported!\n");
+        }
+
+        
+        if (!swapchainCreateInfo.imageFormat)
+        {
+            if (SetSurfaceFormat({ VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR }, availableSurfaceFormats) &&
+                SetSurfaceFormat({ VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR }, availableSurfaceFormats))
+            {
+                swapchainCreateInfo.imageFormat = availableSurfaceFormats[0].format;
+                swapchainCreateInfo.imageColorSpace = availableSurfaceFormats[0].colorSpace;
+                std::cout << std::format("[ VkBase ] WARNING\nFailed to select a four-component UNORM surface format!\n");
+            }
+        }
+
+   
+        swapchainCreateInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+        if (!limitFrameRate)
+        {
+            for (size_t i = 0; i < surfacePresentModes.size(); i++)
+            {
+                if (surfacePresentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
+                {
+                    swapchainCreateInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+                    break;
+                }
+            }
+        }
+
+        swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        swapchainCreateInfo.flags = flags;
+        swapchainCreateInfo.surface = physicalDevice.Surface();
+        swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        swapchainCreateInfo.clipped = VK_TRUE;
+
+        if (VkResult result = Build_Internal())
+        {
+            return result;
+        }
+
+        /*for (auto& callback : callbacks_createSwapchain)
+        {
+            callback();
+        }*/
+
+        return VK_SUCCESS;
+	}
+
+    result_t Swapchain::ReBuild()
+    {
+        // TODO: Check pointer
+        const VkSurfaceCapabilitiesKHR& surfaceCapabilities = p_physicalDevice->SurfaceCapabilities();
+        if (surfaceCapabilities.currentExtent.width == 0 || surfaceCapabilities.currentExtent.height == 0)
+        {
+            return VK_SUBOPTIMAL_KHR;
+        }
+        swapchainCreateInfo.imageExtent = surfaceCapabilities.currentExtent;
+        swapchainCreateInfo.oldSwapchain = handle;
+
+        VkResult result = vkQueueWaitIdle(p_device->Queue_Graphics());
+        
+        if (result == VK_SUCCESS && p_device->Queue_Graphics() != p_device->Queue_Presentation())
+        {
+            result = vkQueueWaitIdle(p_device->Queue_Presentation());
+        }
+        if (result)
+        {
+            std::cout << std::format("[ VkBase ] ERROR\nFailed to wait for the queue to be idle!\nError code: {}\n", int32_t(result));
+            return result;
+        }
+
+        /*for (auto& callback : callbacks_destroySwapchain)
+        {
+            callback();
+        }*/
+
+        for (VkImageView& imageView : swapchainImageViews)
+        {
+            if (imageView)
+            {
+                vkDestroyImageView(*p_device, imageView, nullptr);
+            }
+        }
+        swapchainImageViews.resize(0);
+
+        if (result = Build_Internal())
+        {
+            return result;
+        }
+
+       /* for (const auto& callback : callbacks_createSwapchain)
+        {
+            callback();
+        }*/
+
+        return VK_SUCCESS;
+    }
+
+    void Swapchain::Destroy()
+    {
+        //for (auto& callback : callbacks_destroySwapchain) callback();
+
+        for (VkImageView& imageView : swapchainImageViews)
+        {
+            if (imageView) vkDestroyImageView(*p_device, imageView, nullptr);
+        }
+
+        vkDestroySwapchainKHR(*p_device, handle, nullptr);
+    }
+
+	result_t Swapchain::Build_Internal()
+	{
+        if (VkResult result = vkCreateSwapchainKHR(*p_device, &swapchainCreateInfo, nullptr, &handle))
+        {
+            std::cout << std::format("[ VkBase ] ERROR\nFailed to create a swapchain!\nError code: {}\n", int32_t(result));
+            return result;
+        }
+
+        uint32_t swapchainImageCount;
+        if (VkResult result = vkGetSwapchainImagesKHR(*p_device, handle, &swapchainImageCount, nullptr))
+        {
+            std::cout << std::format("[ VkBase ] ERROR\nFailed to get the count of swapchain images!\nError code: {}\n", int32_t(result));
+            return result;
+        }
+
+        swapchainImages.resize(swapchainImageCount);
+        if (VkResult result = vkGetSwapchainImagesKHR(*p_device, handle, &swapchainImageCount, swapchainImages.data()))
+        {
+            std::cout << std::format("[ VkBase ] ERROR\nFailed to get swapchain images!\nError code: {}\n", int32_t(result));
+            return result;
+        }
+
+        swapchainImageViews.resize(swapchainImageCount);
+        VkImageViewCreateInfo imageViewCreateInfo = {};
+        imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        imageViewCreateInfo.format = swapchainCreateInfo.imageFormat;
+        imageViewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+        for (size_t i = 0; i < swapchainImageCount; ++i)
+        {
+            imageViewCreateInfo.image = swapchainImages[i];
+            if (VkResult result = vkCreateImageView(*p_device, &imageViewCreateInfo, nullptr, &swapchainImageViews[i]))
+            {
+                std::cout << std::format("[ VkBase ] ERROR\nFailed to create a swapchain image view!\nError code: {}\n", int32_t(result));
+                return result;
+            }
+        }
+        return VK_SUCCESS;
+	}
+
+    result_t Swapchain::SetSurfaceFormat(VkSurfaceFormatKHR surfaceFormat, const std::vector<VkSurfaceFormatKHR>& availableSurfaceFormats)
+    {
+        bool formatIsAvailable = false;
+        if (!surfaceFormat.format)
+        {
+            // if does not specify format, only match the color space, format use what we have
+            for (const VkSurfaceFormatKHR& i : availableSurfaceFormats)
+            {
+                if (i.colorSpace == surfaceFormat.colorSpace)
+                {
+                    swapchainCreateInfo.imageFormat = i.format;
+                    swapchainCreateInfo.imageColorSpace = i.colorSpace;
+                    formatIsAvailable = true;
+                    break;
+                }
+            }
+
+        }
+        else
+        {
+            // otherwise both need to match
+            for (auto& i : availableSurfaceFormats)
+            {
+                if (i.format == surfaceFormat.format && i.colorSpace == surfaceFormat.colorSpace)
+                {
+                    swapchainCreateInfo.imageFormat = i.format;
+                    swapchainCreateInfo.imageColorSpace = i.colorSpace;
+                    formatIsAvailable = true;
+                    break;
+                }
+            }
+        }
+
+        if (!formatIsAvailable)
+        {
+            return VK_ERROR_FORMAT_NOT_SUPPORTED;
+        }
+       
+        // If swapchain already exist, rebuild
+        if (handle)
+        {
+            //return RecreateSwapchain();
+        }
+
+        return VK_SUCCESS;
+    }
 }

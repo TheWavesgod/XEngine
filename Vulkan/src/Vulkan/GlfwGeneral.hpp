@@ -73,28 +73,26 @@ inline bool InitializeWindow(VkExtent2D size, bool fullScreen = false, bool isRe
 		VK::VkBase::Base().Instance().AddExtension(extensionNames[i]);
 	}
 #endif
-	VK::VkBase::Base().AddDeviceExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 	VK::VkBase::Base().UseLatestApiVersion();
-	if (VK::VkBase::Base().Instance().Create()) return false;
+	if (VK::VkBase::Base().CreateInstance()) return false;
 
-	VkSurfaceKHR surface = VK_NULL_HANDLE;
-	if (VkResult result = glfwCreateWindowSurface(VK::VkBase::Base().Instance(), pWindow, nullptr, &surface))
+	if (VkResult result = glfwCreateWindowSurface(VK::VkBase::Base().Instance(), pWindow, nullptr, &VK::VkBase::Base().SurfaceRef()))
 	{
 		std::cout << std::format("[ InitializeWindow ] ERROR\nFailed to create a window surface!\nError code: {}\n", int32_t(result));
 		glfwTerminate();
 		return false;
 	}
-	VK::VkBase::Base().Surface(surface);
+
+	VK::VkBase::Base().Device().AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
 	if (
-		VK::VkBase::Base().GetPhysicalDevices() ||
-		VK::VkBase::Base().DeterminePhysicalDevice(0, true, false) ||
+		VK::VkBase::Base().GetPhysicalDevice(true, false) ||
 		VK::VkBase::Base().CreateDevice()) 
 	{
 		return false;
 	}
 
-	if (VK::VkBase::Base().CreateSwapchain(limitFrameRate)) return false;
+	if (VK::VkBase::Base().BuildSwapchain(limitFrameRate)) return false;
 	
 	return true;
 }

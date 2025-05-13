@@ -138,3 +138,5 @@ static void AddLayerOrExtension(std::vector<const char*>& container, const char*
 #define ExecuteOnce(...) { static bool executed = false; if (executed) return __VA_ARGS__; executed = true; }
 
 inline auto& outStream = std::cout; //不是constexpr，因为std::cout具有外部链接
+
+constexpr VkExtent2D defaultWindowSize = { 1280, 720 };

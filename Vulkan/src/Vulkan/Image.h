@@ -32,7 +32,7 @@ namespace VK
 
 			auto GetMemoryTypeIndex = [](uint32_t memoryTypeBits, VkMemoryPropertyFlags desiredMemoryProperties)->size_t
 				{
-					auto& physicalDeviceMemoryProperties = VkBase::Base().PhysicalDeviceMemoryProperties();
+					auto& physicalDeviceMemoryProperties = VkBase::Base().PhysicalDevice().MemoryProperties();
 					for (size_t i = 0; i < physicalDeviceMemoryProperties.memoryTypeCount; i++)
 						if (memoryTypeBits & 1 << i &&
 							(physicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & desiredMemoryProperties) == desiredMemoryProperties)
@@ -106,7 +106,7 @@ namespace VK
 		result_t AllocateMemory(VkMemoryPropertyFlags desiredMemoryProperties)
 		{
 			VkMemoryAllocateInfo allocateInfo = MemoryAllocateInfo(desiredMemoryProperties);
-			if (allocateInfo.memoryTypeIndex >= VkBase::Base().PhysicalDeviceMemoryProperties().memoryTypeCount)
+			if (allocateInfo.memoryTypeIndex >= VkBase::Base().PhysicalDevice().MemoryProperties().memoryTypeCount)
 			{
 				return VK_RESULT_MAX_ENUM; //没有合适的错误代码，别用VK_ERROR_UNKNOWN
 			}

@@ -2,11 +2,11 @@
 
 #include "Instance.h"
 #include "Surface.h"
+#include "Device.h"
+#include "Swapchain.h"
 
 namespace VK
 {
-	constexpr VkExtent2D defaultWindowSize = { 1280, 720 };
-	
 	class VkBase
 	{
 		static VkBase VKSingleton;
@@ -22,130 +22,49 @@ namespace VK
 			return VKSingleton;
 		}
 
-		void Terminate() {
-			this->~VkBase();
-			physicalDevice = VK_NULL_HANDLE;
-			device = VK_NULL_HANDLE;
-			surface = VK_NULL_HANDLE;
-			swapchain = VK_NULL_HANDLE;
-			swapchainImages.resize(0);
-			swapchainImageViews.resize(0);
-			swapchainCreateInfo = {};
-		}
-
-
 	/** Instance **/
 	private:
 		Instance instance;
 
 	public:
 		Instance& Instance() { return instance; }
+		VkResult CreateInstance() { return instance.Create(apiVersion); }
 
 	/** Surface **/
 	private:
-		VkSurfaceKHR surface;
+		Surface surface;
 		
 	public:
-		VkSurfaceKHR Surface() const { return surface; }
-		
-		void Surface(VkSurfaceKHR newSurface) {																		
-			if (!this->surface)
-				this->surface = newSurface;
-		}
+		Surface Surface() const { return surface; }
+		VkSurfaceKHR& SurfaceRef() { return surface.Ref(); }
 
 		/**
-		 * physicalDevice
+		 * Device
 		 **/
 	private:
-		VkPhysicalDevice physicalDevice;
-		VkPhysicalDeviceProperties physicalDeviceProperties;
-		VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties;
-		std::vector<VkPhysicalDevice> availablePhysicalDevices;
-
-		VkDevice device;
-		//有效的索引从0开始，因此使用特殊值VK_QUEUE_FAMILY_IGNORED（为UINT32_MAX）为队列族索引的默认值
-		uint32_t queueFamilyIndex_graphics = VK_QUEUE_FAMILY_IGNORED;
-		uint32_t queueFamilyIndex_presentation = VK_QUEUE_FAMILY_IGNORED;
-		uint32_t queueFamilyIndex_compute = VK_QUEUE_FAMILY_IGNORED;
-		VkQueue queue_graphics;
-		VkQueue queue_presentation;
-		VkQueue queue_compute;
-
-		std::vector<const char*> deviceExtensions;
-
-		//该函数被DeterminePhysicalDevice(...)调用，用于检查物理设备是否满足所需的队列族类型，并将对应的队列族索引返回到queueFamilyIndices，执行成功时直接将索引写入相应成员变量
-		VkResult GetQueueFamilyIndices(VkPhysicalDevice physicalDevice, bool enableGraphicsQueue, bool enableComputeQueue, uint32_t (&queueFamilyIndices)[3]);
+		PhysicalDevice physicalDevice;
+	
+		LogicalDevice device;
 
 	public:
 		//Getter
-		VkPhysicalDevice PhysicalDevice() const { return physicalDevice; }
+		PhysicalDevice& PhysicalDevice() { return physicalDevice; }
+		LogicalDevice& Device() { return device; }
 
-		const VkPhysicalDeviceProperties& PhysicalDeviceProperties() const { return physicalDeviceProperties; }
-		const VkPhysicalDeviceMemoryProperties& PhysicalDeviceMemoryProperties() const { return physicalDeviceMemoryProperties; }
+		/*VkPhysicalDevice AvailablePhysicalDevice(uint32_t index) const { return availablePhysicalDevices[index]; }
+		uint32_t AvailablePhysicalDeviceCount() const { return uint32_t(availablePhysicalDevices.size()); }*/
 		
-		VkPhysicalDevice AvailablePhysicalDevice(uint32_t index) const { return availablePhysicalDevices[index]; }
-		uint32_t AvailablePhysicalDeviceCount() const { return uint32_t(availablePhysicalDevices.size()); }
+		result_t GetPhysicalDevice(bool enableGraphicsQueue, bool enableComputeQueue);
+		result_t CreateDevice();
 
-		VkDevice Device() const { return device; }
-		
-		uint32_t QueueFamilyIndex_Graphics() const {
-		    return queueFamilyIndex_graphics;
-		}
-		uint32_t QueueFamilyIndex_Presentation() const {
-		    return queueFamilyIndex_presentation;
-		}
-		uint32_t QueueFamilyIndex_Compute() const {
-		    return queueFamilyIndex_compute;
-		}
-		VkQueue Queue_Graphics() const {
-		    return queue_graphics;
-		}
-		VkQueue Queue_Presentation() const {
-		    return queue_presentation;
-		}
-		VkQueue Queue_Compute() const {
-		    return queue_compute;
-		}
-
-		const std::vector<const char*>& DeviceExtensions() const {
-		    return deviceExtensions;
-		}
-
-		//该函数用于创建逻辑设备前
-		void AddDeviceExtension(const char* extensionName) {
-		    AddLayerOrExtension(deviceExtensions, extensionName);
-		}
-		
-		//该函数用于获取物理设备
-		VkResult GetPhysicalDevices();
-		
-		//该函数用于指定所用物理设备并调用GetQueueFamilyIndices(...)取得队列族索引
-		VkResult DeterminePhysicalDevice(uint32_t deviceIndex = 0, bool enableGraphicsQueue = true, bool enableComputeQueue = true);
-		
-		//该函数用于创建逻辑设备，并取得队列
-		VkResult CreateDevice(VkDeviceCreateFlags flags = 0);
-		
 		//以下函数用于创建逻辑设备失败后
 		VkResult CheckDeviceExtensions(std::span<const char*> extensionsToCheck, const char* layerName = nullptr) const;
-		
-		void DeviceExtensions(const std::vector<const char*>& extensionNames) {
-		    deviceExtensions = extensionNames;
-		}
 
 		/**
 		 * Swap Chain
 		 **/
 	private:
-		std::vector <VkSurfaceFormatKHR> availableSurfaceFormats;
-
-		VkSwapchainKHR swapchain;
-		std::vector <VkImage> swapchainImages;
-		std::vector <VkImageView> swapchainImageViews;
-		// In order to rebuild the swapchain conveniently, save the createInfo of swapchain 
-		VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
-
-		//该函数被CreateSwapchain(...)和RecreateSwapchain()调用
-		VkResult CreateSwapchain_Internal();
+		Swapchain swapchain;
 
 		// Callback functions container
 		std::vector<void(*)()> callbacks_createSwapchain;
@@ -155,8 +74,10 @@ namespace VK
 		std::vector<void(*)()> callbacks_destroyDevice;
 
 	public:
+		result_t BuildSwapchain(bool limitFrameRate = true);
+
 		//Getter
-		const VkFormat& AvailableSurfaceFormat(uint32_t index) const {
+		/*const VkFormat& AvailableSurfaceFormat(uint32_t index) const {
 			return availableSurfaceFormats[index].format;
 		}
 		const VkColorSpaceKHR& AvailableSurfaceColorSpace(uint32_t index) const {
@@ -164,33 +85,14 @@ namespace VK
 		}
 		uint32_t AvailableSurfaceFormatCount() const {
 			return uint32_t(availableSurfaceFormats.size());
-		}
+		}*/
 
-		VkSwapchainKHR Swapchain() const {
-			return swapchain;
-		}
-		VkImage SwapchainImage(uint32_t index) const {
-			return swapchainImages[index];
-		}
-		VkImageView SwapchainImageView(uint32_t index) const {
-			return swapchainImageViews[index];
-		}
-		uint32_t SwapchainImageCount() const {
-			return uint32_t(swapchainImages.size());
-		}
-		const VkSwapchainCreateInfoKHR& SwapchainCreateInfo() const {
-			return swapchainCreateInfo;
-		}
+		Swapchain& Swapchain() { return swapchain; }
 
-		VkResult GetSurfaceFormats();
-
-		VkResult SetSurfaceFormat(VkSurfaceFormatKHR surfaceFormat);
-		
-		//该函数用于创建交换链
-		VkResult CreateSwapchain(bool limitFrameRate = true, VkSwapchainCreateFlagsKHR flags = 0);
-			
-		//该函数用于重建交换链
-		VkResult RecreateSwapchain();
+		VkImage SwapchainImage(uint32_t index) const { return swapchain.Images()[index]; }
+		VkImageView SwapchainImageView(uint32_t index) { return swapchain.ImageViews()[index]; }
+		uint32_t SwapchainImageCount() const { return uint32_t(swapchain.Images().size()); }
+		VkSwapchainCreateInfoKHR& SwapchainCreateInfo() { return swapchain.SwapchainCreateInfo(); }
 
 		VkResult RecreateDevice(VkDeviceCreateFlags flags = 0);
 

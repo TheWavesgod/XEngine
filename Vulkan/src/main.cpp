@@ -110,7 +110,7 @@ int main()
     Semaphore semaphore_renderingIsOver;
 
     CommandBuffer commandBuffer;
-    CommandPool commandPool(VK::VkBase::Base().QueueFamilyIndex_Graphics(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    CommandPool commandPool(VK::VkBase::Base().PhysicalDevice().QueueFamilyIndex_Graphics(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     commandPool.AllocateBuffers(commandBuffer);
 
     VkClearValue clearColor = { .color = { 1.f, 0.f, 0.f, 1.f } };
@@ -146,11 +146,11 @@ int main()
         renderPass.CmdBegin(commandBuffer, framebuffers[i], { {}, windowSize }, clearColor);
 
         {
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_triangle);
+            /*vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_triangle);
             VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffer.Address(), &offset);
             vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-            vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
+            vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);*/
         }
         
         renderPass.CmdEnd(commandBuffer);

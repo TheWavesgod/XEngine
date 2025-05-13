@@ -15,7 +15,7 @@ namespace VK
 		// Modify the range of Non-host coherent Memory, when try to map the memory
 		VkDeviceSize AdjustNonCoherentMemoryRange(VkDeviceSize& size, VkDeviceSize& offset) const
 		{
-			const VkDeviceSize& nonCoherentAtomSize = VkBase::Base().PhysicalDeviceProperties().limits.nonCoherentAtomSize;
+			const VkDeviceSize& nonCoherentAtomSize = VkBase::Base().PhysicalDevice().Properties().limits.nonCoherentAtomSize;
 			VkDeviceSize _offset = offset;
 			offset = offset / nonCoherentAtomSize * nonCoherentAtomSize;
 			size = std::min((size + _offset + nonCoherentAtomSize - 1) / nonCoherentAtomSize * nonCoherentAtomSize, allocationSize) - offset;
@@ -132,7 +132,7 @@ namespace VK
 		//Non-const Function
 		result_t Allocate(VkMemoryAllocateInfo& allocateInfo)
 		{
-			if (allocateInfo.memoryTypeIndex >= VkBase::Base().PhysicalDeviceMemoryProperties().memoryTypeCount)
+			if (allocateInfo.memoryTypeIndex >= VkBase::Base().PhysicalDevice().MemoryProperties().memoryTypeCount)
 			{
 				outStream << std::format("[ deviceMemory ] ERROR\nInvalid memory type index!\n");
 				return VK_RESULT_MAX_ENUM; //没有合适的错误代码，别用VK_ERROR_UNKNOWN
@@ -147,7 +147,7 @@ namespace VK
 			//记录实际分配的内存大小
 			allocationSize = allocateInfo.allocationSize;
 			//取得内存属性
-			memoryProperties = VkBase::Base().PhysicalDeviceMemoryProperties().memoryTypes[allocateInfo.memoryTypeIndex].propertyFlags;
+			memoryProperties = VkBase::Base().PhysicalDevice().MemoryProperties().memoryTypes[allocateInfo.memoryTypeIndex].propertyFlags;
 			return VK_SUCCESS;
 		}
 	};
@@ -178,7 +178,7 @@ namespace VK
 
 			memoryAllocateInfo.allocationSize = memoryRequirements.size;
 			memoryAllocateInfo.memoryTypeIndex = UINT32_MAX;
-			auto& physicalDeviceMemoryProperties = VkBase::Base().PhysicalDeviceMemoryProperties();
+			auto& physicalDeviceMemoryProperties = VkBase::Base().PhysicalDevice().MemoryProperties();
 			for (size_t i = 0; i < physicalDeviceMemoryProperties.memoryTypeCount; i++)
 			{
 				if (memoryRequirements.memoryTypeBits & 1 << i &&
@@ -257,7 +257,7 @@ namespace VK
 		result_t AllocateMemory(VkMemoryPropertyFlags desiredMemoryProperties)
 		{
 			VkMemoryAllocateInfo allocateInfo = MemoryAllocateInfo(desiredMemoryProperties);
-			if (allocateInfo.memoryTypeIndex >= VkBase::Base().PhysicalDeviceMemoryProperties().memoryTypeCount)
+			if (allocateInfo.memoryTypeIndex >= VkBase::Base().PhysicalDevice().MemoryProperties().memoryTypeCount)
 			{
 				return VK_RESULT_MAX_ENUM; //没有合适的错误代码，别用VK_ERROR_UNKNOWN
 			}

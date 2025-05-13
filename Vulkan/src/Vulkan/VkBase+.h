@@ -148,22 +148,22 @@ namespace VK
             //在创建逻辑设备时执行Initialize()
             auto Initialize = []()
             {
-                if (VkBase::Base().QueueFamilyIndex_Graphics() != VK_QUEUE_FAMILY_IGNORED)
+                if (VkBase::Base().PhysicalDevice().QueueFamilyIndex_Graphics() != VK_QUEUE_FAMILY_IGNORED)
                 {
-                    singleton.commandPool_graphics.Create(VkBase::Base().QueueFamilyIndex_Graphics(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+                    singleton.commandPool_graphics.Create(VkBase::Base().PhysicalDevice().QueueFamilyIndex_Graphics(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
                     singleton.commandPool_graphics.AllocateBuffers(singleton.commandBuffer_transfer);
                 }
                     
-                if (VkBase::Base().QueueFamilyIndex_Compute() != VK_QUEUE_FAMILY_IGNORED)
+                if (VkBase::Base().PhysicalDevice().QueueFamilyIndex_Compute() != VK_QUEUE_FAMILY_IGNORED)
                 {
-                    singleton.commandPool_compute.Create(VkBase::Base().QueueFamilyIndex_Compute(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+                    singleton.commandPool_compute.Create(VkBase::Base().PhysicalDevice().QueueFamilyIndex_Compute(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
                 }
                 
-                if (VkBase::Base().QueueFamilyIndex_Presentation() != VK_QUEUE_FAMILY_IGNORED &&
-                    VkBase::Base().QueueFamilyIndex_Presentation() != VkBase::Base().QueueFamilyIndex_Graphics() &&
+                if (VkBase::Base().PhysicalDevice().QueueFamilyIndex_Presentation() != VK_QUEUE_FAMILY_IGNORED &&
+                    VkBase::Base().PhysicalDevice().QueueFamilyIndex_Presentation() != VkBase::Base().PhysicalDevice().QueueFamilyIndex_Graphics() &&
                     VkBase::Base().SwapchainCreateInfo().imageSharingMode == VK_SHARING_MODE_EXCLUSIVE)
                 {
-                    singleton.commandPool_presentation.Create(VkBase::Base().QueueFamilyIndex_Presentation(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT),
+                    singleton.commandPool_presentation.Create(VkBase::Base().PhysicalDevice().QueueFamilyIndex_Presentation(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT),
                     singleton.commandPool_presentation.AllocateBuffers(singleton.commandBuffer_presentation);
                 }
 
@@ -558,7 +558,7 @@ namespace VK
         //Static Function
         static VkDeviceSize CalculateAlignedSize(VkDeviceSize dataSize)
         {
-            const VkDeviceSize& alignment = VkBase::Base().PhysicalDeviceProperties().limits.minUniformBufferOffsetAlignment;
+            const VkDeviceSize& alignment = VkBase::Base().PhysicalDevice().Properties().limits.minUniformBufferOffsetAlignment;
             return dataSize + alignment - 1 & ~(alignment - 1);
         }
     };
@@ -582,7 +582,7 @@ namespace VK
         //Static Function
         static VkDeviceSize CalculateAlignedSize(VkDeviceSize dataSize)
         {
-            const VkDeviceSize& alignment = VkBase::Base().PhysicalDeviceProperties().limits.minStorageBufferOffsetAlignment;
+            const VkDeviceSize& alignment = VkBase::Base().PhysicalDevice().Properties().limits.minStorageBufferOffsetAlignment;
             return dataSize + alignment - 1 & ~(alignment - 1);
         }
     };
