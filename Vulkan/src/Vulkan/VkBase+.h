@@ -8,10 +8,6 @@
 
 #include "Command.h"
 
-
-
-
-
 namespace VK
 {
     struct GraphicsPipelineCreateInfoPack

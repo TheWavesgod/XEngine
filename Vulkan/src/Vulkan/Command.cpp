@@ -84,4 +84,15 @@ namespace VK
         };
         return Create(createInfo);
     }
+
+    void CommandPool::FreeBuffers(arrayRef<VkCommandBuffer> buffers) const
+    {
+        vkFreeCommandBuffers(VkBase::Base().Device(), handle, buffers.Count(), buffers.Pointer());
+        memset(buffers.Pointer(), 0, buffers.Count() * sizeof(VkCommandBuffer));
+    }
+
+    void CommandPool::FreeBuffers(arrayRef<CommandBuffer> buffers) const
+    {
+        FreeBuffers({ &buffers[0].handle, buffers.Count() });
+    }
 }

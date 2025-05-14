@@ -38,12 +38,9 @@ namespace VK
 		Surface Surface() const { return surface; }
 		VkSurfaceKHR& SurfaceRef() { return surface.Ref(); }
 
-		/**
-		 * Device
-		 **/
+	/** Device **/
 	private:
 		PhysicalDevice physicalDevice;
-	
 		LogicalDevice device;
 
 	public:
@@ -54,24 +51,15 @@ namespace VK
 		/*VkPhysicalDevice AvailablePhysicalDevice(uint32_t index) const { return availablePhysicalDevices[index]; }
 		uint32_t AvailablePhysicalDeviceCount() const { return uint32_t(availablePhysicalDevices.size()); }*/
 		
-		result_t GetPhysicalDevice(bool enableGraphicsQueue, bool enableComputeQueue);
+		result_t SetPhysicalDevice(bool enableGraphicsQueue, bool enableComputeQueue);
 		result_t CreateDevice();
 
 		//以下函数用于创建逻辑设备失败后
 		VkResult CheckDeviceExtensions(std::span<const char*> extensionsToCheck, const char* layerName = nullptr) const;
 
-		/**
-		 * Swap Chain
-		 **/
+		/** Swapchain **/
 	private:
 		Swapchain swapchain;
-
-		// Callback functions container
-		std::vector<void(*)()> callbacks_createSwapchain;
-		std::vector<void(*)()> callbacks_destroySwapchain;
-		
-		std::vector<void(*)()> callbacks_createDevice;
-		std::vector<void(*)()> callbacks_destroyDevice;
 
 	public:
 		result_t BuildSwapchain(bool limitFrameRate = true);
@@ -98,10 +86,10 @@ namespace VK
 
 		VkResult WaitIdle() const;
 
-		void AddCallback_CreateSwapchain(void(*function)()) { callbacks_createSwapchain.push_back(function); }
-		void AddCallback_DestroySwapchain(void(*function)()) { callbacks_destroySwapchain.push_back(function); }
-		void AddCallback_CreateDevice(void(*function)()) { callbacks_createDevice.push_back(function); }
-		void AddCallback_DestroyDevice(void(*function)()) { callbacks_destroyDevice.push_back(function); }
+		void AddCallback_CreateSwapchain(void(*function)()) { swapchain.AddCallback_OnCreate(function); }
+		void AddCallback_DestroySwapchain(void(*function)()) { swapchain.AddCallback_OnDestroy(function); }
+		void AddCallback_CreateDevice(void(*function)()) { device.AddCallback_OnCreate(function); }
+		void AddCallback_DestroyDevice(void(*function)()) { device.AddCallback_OnDestroy(function); }
 
 	private:
 		uint32_t apiVersion = VK_API_VERSION_1_0;
@@ -113,21 +101,21 @@ namespace VK
 		VkResult UseLatestApiVersion();
 
 
-		// 该函数用于将命令缓冲区提交到用于图形的队列
+		// Submit recorded command to graphic queue
 		result_t SubmitCommandBuffer_Graphics(VkSubmitInfo& submitInfo, VkFence fence = VK_NULL_HANDLE) const;
 
-		// 该函数用于在渲染循环中将命令缓冲区提交到图形队列的常见情形
+		// Submit recorded command to graphic queue, most common circumstance
 		result_t SubmitCommandBuffer_Graphics(VkCommandBuffer commandBuffer,
 			VkSemaphore semaphore_imageIsAvailable = VK_NULL_HANDLE, VkSemaphore semaphore_renderingIsOver = VK_NULL_HANDLE, VkFence fence = VK_NULL_HANDLE,
 			VkPipelineStageFlags waitDstStage_imageIsAvailable = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT) const;
 
-		// 该函数用于将命令缓冲区提交到用于图形的队列，且只使用栅栏的常见情形
+		// Submit recorded command to graphic queue, only use fence
 		result_t SubmitCommandBuffer_Graphics(VkCommandBuffer commandBuffer, VkFence fence = VK_NULL_HANDLE) const;
 		
-		//该函数用于将命令缓冲区提交到用于计算的队列
+		// Submit recorded command to compute queue
 		result_t SubmitCommandBuffer_Compute(VkSubmitInfo& submitInfo, VkFence fence = VK_NULL_HANDLE) const;
 
-		//该函数用于将命令缓冲区提交到用于计算的队列，且只使用栅栏的常见情形
+		// Submit recorded command to compute queue,，only use fence
 		result_t SubmitCommandBuffer_Compute(VkCommandBuffer commandBuffer, VkFence fence = VK_NULL_HANDLE) const;
 
 		// VKBase+

@@ -35,8 +35,10 @@ namespace VK
         
     public:
         CommandPool() = default;
+
         CommandPool(VkCommandPoolCreateInfo& createInfo) { Create(createInfo); }
         CommandPool(uint32_t queueFamilyIndex, VkCommandPoolCreateFlags flags = 0) { Create(queueFamilyIndex, flags); }
+
         CommandPool(CommandPool&& other) noexcept { MoveHandle; }
         ~CommandPool() { DestroyHandleBy(vkDestroyCommandPool); }
 
@@ -46,23 +48,13 @@ namespace VK
 
         // Const Function
         result_t AllocateBuffers(arrayRef<VkCommandBuffer> buffers, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY) const;
-
         result_t AllocateBuffers(arrayRef<CommandBuffer> buffers, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY) const;
 
-        void FreeBuffers(arrayRef<VkCommandBuffer> buffers) const
-        {
-            vkFreeCommandBuffers(VkBase::Base().Device(), handle, buffers.Count(), buffers.Pointer());
-            memset(buffers.Pointer(), 0, buffers.Count() * sizeof(VkCommandBuffer));
-        }
-
-        void FreeBuffers(arrayRef<CommandBuffer> buffers) const
-        {
-            FreeBuffers({ &buffers[0].handle, buffers.Count() });
-        }
+        void FreeBuffers(arrayRef<VkCommandBuffer> buffers) const;
+        void FreeBuffers(arrayRef<CommandBuffer> buffers) const;
 
         // Non-const Function
         result_t Create(VkCommandPoolCreateInfo& createInfo);
-        
         result_t Create(uint32_t queueFamilyIndex, VkCommandPoolCreateFlags flags = 0);
     };
 }

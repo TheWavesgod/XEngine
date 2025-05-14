@@ -1,23 +1,22 @@
 ﻿#include "Device.h"
-#include "Instance.h"
+#include "VkBase.h"
 
 namespace VK
 {
-    result_t PhysicalDevice::Create(Instance& instance, VK::Surface surface, bool enableGraphicsQueue, bool enableComputeQueue)
+    result_t PhysicalDevice::Create(bool enableGraphicsQueue, bool enableComputeQueue)
     {
-        this->surface = surface;
 
-        if (result_t result = AquireAvailablePhysicalDevices(instance)) return result;
+        if (result_t result = AquireAvailablePhysicalDevices()) return result;
 
         if (result_t result = DeterminePhysicalDevice(0, enableGraphicsQueue, enableComputeQueue)) return result;
 
         return VK_SUCCESS;
     }
 
-    result_t PhysicalDevice::AquireAvailablePhysicalDevices(Instance& instance)
+    result_t PhysicalDevice::AquireAvailablePhysicalDevices()
 	{
         uint32_t deviceCount = 0;
-        if (VkResult result = vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr))
+        if (VkResult result = vkEnumeratePhysicalDevices(VkBase::Base().Instance(), &deviceCount, nullptr))
         {
             std::cout << std::format("[ VkBase ] ERROR\nFailed to get the count of physical devices!\nError code: {}\n", int32_t(result));
             return result;
@@ -30,7 +29,7 @@ namespace VK
         }
 
         availablePhysicalDevices.resize(deviceCount);
-        if (VkResult result = vkEnumeratePhysicalDevices(instance, &deviceCount, availablePhysicalDevices.data()))
+        if (VkResult result = vkEnumeratePhysicalDevices(VkBase::Base().Instance(), &deviceCount, availablePhysicalDevices.data()))
         {
             std::cout << std::format("[ VkBase ] ERROR\nFailed to enumerate physical devices!\nError code: {}\n", static_cast<int32_t>(result));
             return result;
@@ -43,6 +42,8 @@ namespace VK
     {
         // define a special value used for makring a queue index has been checked but not found
         static constexpr uint32_t notFound = INT32_MAX; // == VK_QUEUE_FAMILY_IGNORED & INT32_MAX
+
+        VkSurfaceKHR surface = VkBase::Base().Surface();
 
         // struct for all the queues
         struct queueFamilyIndexCombination {
@@ -57,7 +58,7 @@ namespace VK
 
         // If any queue family index has been checked but not found, return VK_RESULT_MAX_ENUM
         if (ig == notFound && enableGraphicsQueue ||
-            ip == notFound && surface ||
+            ip == notFound && VkBase::Base().Surface() ||
             ic == notFound && enableComputeQueue)
             return VK_RESULT_MAX_ENUM;
 
@@ -122,6 +123,8 @@ namespace VK
 
     result_t PhysicalDevice::GetQueueFamilyIndices(VkPhysicalDevice physicalDevice, bool enableGraphicsQueue, bool enableComputeQueue, uint32_t(&queueFamilyIndices)[3])
     {
+        VkSurfaceKHR surface = VkBase::Base().Surface();
+
         uint32_t queueFamilyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
         if (!queueFamilyCount)
@@ -200,7 +203,7 @@ namespace VK
     result_t PhysicalDevice::GetSurfaceFormats()
     {
         uint32_t surfaceFormatCount;
-        if (VkResult result = vkGetPhysicalDeviceSurfaceFormatsKHR(handle, surface, &surfaceFormatCount, nullptr))
+        if (VkResult result = vkGetPhysicalDeviceSurfaceFormatsKHR(handle, VkBase::Base().Surface(), &surfaceFormatCount, nullptr))
         {
             std::cout << std::format("[ VkBase ] ERROR\nFailed to get the count of surface formats!\nError code: {}\n", int32_t(result));
             return result;
@@ -212,7 +215,7 @@ namespace VK
             abort();
         }
         availableSurfaceFormats.resize(surfaceFormatCount);
-        VkResult result = vkGetPhysicalDeviceSurfaceFormatsKHR(handle, surface, &surfaceFormatCount, availableSurfaceFormats.data());
+        VkResult result = vkGetPhysicalDeviceSurfaceFormatsKHR(handle, VkBase::Base().Surface(), &surfaceFormatCount, availableSurfaceFormats.data());
         if (result)
         {
             std::cout << std::format("[ VkBase ] ERROR\nFailed to get surface formats!\nError code: {}\n", int32_t(result));
@@ -223,7 +226,7 @@ namespace VK
     result_t PhysicalDevice::GetSurfacePresentModes()
     {
         uint32_t surfacePresentModeCount;
-        if (VkResult result = vkGetPhysicalDeviceSurfacePresentModesKHR(handle, surface, &surfacePresentModeCount, nullptr))
+        if (VkResult result = vkGetPhysicalDeviceSurfacePresentModesKHR(handle, VkBase::Base().Surface(), &surfacePresentModeCount, nullptr))
         {
             std::cout << std::format("[ VkBase ] ERROR\nFailed to get the count of surface present modes!\nError code: {}\n", int32_t(result));
             return result;
@@ -234,7 +237,7 @@ namespace VK
             abort();
         }
         surfacePresentModes.resize(surfacePresentModeCount);
-        if (VkResult result = vkGetPhysicalDeviceSurfacePresentModesKHR(handle, surface, &surfacePresentModeCount, surfacePresentModes.data()))
+        if (VkResult result = vkGetPhysicalDeviceSurfacePresentModesKHR(handle, VkBase::Base().Surface(), &surfacePresentModeCount, surfacePresentModes.data()))
         {
             std::cout << std::format("[ VkBase ] ERROR\nFailed to get surface present modes!\nError code: {}\n", int32_t(result));
             return result;
@@ -242,8 +245,10 @@ namespace VK
         return VK_SUCCESS;
     }
 
-    result_t LogicalDevice::Create(PhysicalDevice& physicalDevice, VkDeviceCreateFlags flags)
+    result_t LogicalDevice::Create(VkDeviceCreateFlags flags)
     {
+        PhysicalDevice& physicalDevice = VkBase::Base().PhysicalDevice();
+
         float queuePriority = 1.f;
         VkDeviceQueueCreateInfo queueCreateInfos[3] = { {}, {}, {} };
         for (VkDeviceQueueCreateInfo& queueCreateInfo : queueCreateInfos)
@@ -303,11 +308,20 @@ namespace VK
             vkGetDeviceQueue(handle, physicalDevice.QueueFamilyIndex_Compute(), 0, &queue_compute);
         }
 
-        /*for (auto& callback : callbacks_createDevice)
+        for (auto& callback : callbacks_onCreate)
         {
             callback();
-        }*/
+        }
 
         return VK_SUCCESS;
+    }
+
+    void LogicalDevice::Destroy()
+    {
+        for (auto& callback : callbacks_onDestroy) callback();
+
+        vkDestroyDevice(handle, nullptr);
+
+        handle = VK_NULL_HANDLE;
     }
 }

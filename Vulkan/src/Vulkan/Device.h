@@ -1,7 +1,6 @@
 #pragma once
 
-#include "VKEasyHearder.h"
-#include "Surface.h"
+#include "VKEasyHeader.h"
 
 namespace VK
 {
@@ -10,8 +9,6 @@ namespace VK
 	class PhysicalDevice
 	{
 		VkPhysicalDevice handle = VK_NULL_HANDLE;
-
-		Surface surface;
 
 		VkPhysicalDeviceProperties properties;
 		VkPhysicalDeviceMemoryProperties memoryProperties;
@@ -29,7 +26,7 @@ namespace VK
 	public:
 		PhysicalDevice() = default;
 
-		result_t Create(Instance& instance, Surface surface, bool enableGraphicsQueue, bool enableComputeQueue);
+		result_t Create(bool enableGraphicsQueue, bool enableComputeQueue);
 
 		// Getter
 		DefineHandleTypeOperator;
@@ -42,14 +39,12 @@ namespace VK
 		const std::vector <VkSurfaceFormatKHR>& AvailableSurfaceFormats() const { return availableSurfaceFormats; }
 		const std::vector<VkPresentModeKHR>& SurfacePresentModes() const { return surfacePresentModes; }
 
-		Surface Surface() { return surface; }
-
 		inline uint32_t QueueFamilyIndex_Graphics() const { return queueFamilyIndex_graphics; }
 		inline uint32_t QueueFamilyIndex_Presentation() const { return queueFamilyIndex_presentation; }
 		inline uint32_t QueueFamilyIndex_Compute() const { return queueFamilyIndex_compute; }
 
 	private:
-		result_t AquireAvailablePhysicalDevices(Instance& instance);
+		result_t AquireAvailablePhysicalDevices();
 
 		/*
 		 * Called to specify device and check if it has all the queue index in need and get the index  
@@ -75,13 +70,21 @@ namespace VK
 
 		std::vector<const char*> deviceExtensions;
 
+		std::vector<void(*)()> callbacks_onCreate;
+		std::vector<void(*)()> callbacks_onDestroy;
+
 	public:
 		LogicalDevice() = default;
 
-		result_t Create(PhysicalDevice& physicalDevice, VkDeviceCreateFlags flags = 0);
+		result_t Create(VkDeviceCreateFlags flags = 0);
+
+		void Destroy();
 
 		// Use before create logical device
 		void AddExtension(const char* extensionName) { AddLayerOrExtension(deviceExtensions, extensionName); }
+
+		void AddCallback_OnCreate(void(*func)()) { callbacks_onCreate.push_back(func); }
+		void AddCallback_OnDestroy(void(*func)()) { callbacks_onDestroy.push_back(func); }
 
 		// Getter
 		DefineHandleTypeOperator;

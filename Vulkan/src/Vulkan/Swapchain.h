@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VKEasyHearder.h"
+#include "VKEasyHeader.h"
 
 namespace VK
 {
@@ -17,10 +17,11 @@ namespace VK
 		// In order to rebuild the swapchain conveniently, save the createInfo of swapchain 
 		VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
 
-		PhysicalDevice* p_physicalDevice = nullptr;
-		LogicalDevice* p_device = nullptr;
-
 		uint32_t currentImageIndex = 0;
+
+		// Callback functions container
+		std::vector<void(*)()> callbacks_onCreate;
+		std::vector<void(*)()> callbacks_onDestroy;
 
 	public:
 		Swapchain() = default;
@@ -28,7 +29,7 @@ namespace VK
 		/*
 		 * Function used to build the swapchain 
 		 */
-		result_t Build(PhysicalDevice& physicalDevice, LogicalDevice& device, bool limitFrameRate = true, VkSwapchainCreateFlagsKHR flags = 0);
+		result_t Build(bool limitFrameRate = true, VkSwapchainCreateFlagsKHR flags = 0);
 
 		result_t ReBuild();
 
@@ -37,8 +38,10 @@ namespace VK
 		result_t SwapImage(VkSemaphore semaphore_imageIsAvailable);
 
 		result_t PresentImage(VkPresentInfoKHR& presentInfo);
-
 		result_t PresentImage(VkSemaphore semaphore_renderingIsOver = VK_NULL_HANDLE);
+
+		void AddCallback_OnCreate(void(*func)()) { callbacks_onCreate.push_back(func); }
+		void AddCallback_OnDestroy(void(*func)()) { callbacks_onDestroy.push_back(func); }
 
 		// Getter
 		DefineHandleTypeOperator;

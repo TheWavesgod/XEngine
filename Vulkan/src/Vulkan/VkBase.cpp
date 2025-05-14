@@ -10,8 +10,7 @@ VK::VkBase::~VkBase()
 
         swapchain.Destroy();
 
-        for (auto& callback : callbacks_destroyDevice) callback();
-        vkDestroyDevice(device, nullptr);
+        device.Destroy();
     }
 
     if (surface) vkDestroySurfaceKHR(instance, surface, nullptr);
@@ -19,19 +18,19 @@ VK::VkBase::~VkBase()
     if (instance != VK_NULL_HANDLE) instance.Destroy();
 }
 
-result_t VK::VkBase::GetPhysicalDevice(bool enableGraphicsQueue, bool enableComputeQueue)
+result_t VK::VkBase::SetPhysicalDevice(bool enableGraphicsQueue, bool enableComputeQueue)
 {
-    return physicalDevice.Create(instance, surface, enableGraphicsQueue, enableComputeQueue);
+    return physicalDevice.Create(enableGraphicsQueue, enableComputeQueue);
 }
 
 result_t VK::VkBase::CreateDevice()
 {
-    return device.Create(physicalDevice);
+    return device.Create();
 }
 
 result_t VK::VkBase::BuildSwapchain(bool limitFrameRate)
 {
-    return swapchain.Build(physicalDevice, device, limitFrameRate);
+    return swapchain.Build(limitFrameRate);
 }
 
 

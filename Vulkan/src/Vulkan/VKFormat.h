@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "VKEasyHearder.h"
+#include "VKEasyHeader.h"
 
 struct formatInfo {
     enum rawDataType :uint8_t

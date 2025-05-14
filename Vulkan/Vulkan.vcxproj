@@ -20,10 +20,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Vulkan\Device.cpp" />
+    <ClCompile Include="src\Vulkan\Framebuffer.cpp" />
+    <ClCompile Include="src\Vulkan\Image.cpp" />
     <ClCompile Include="src\Vulkan\Instance.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Renderer\Renderer.cpp" />
     <ClCompile Include="src\Vulkan\Command.cpp" />
+    <ClCompile Include="src\Vulkan\Memory.cpp" />
+    <ClCompile Include="src\Vulkan\Pipeline.cpp" />
+    <ClCompile Include="src\Vulkan\RenderPass.cpp" />
+    <ClCompile Include="src\Vulkan\Shader.cpp" />
     <ClCompile Include="src\Vulkan\VkBase.cpp">
       <RuntimeLibrary>MultiThreadedDebugDll</RuntimeLibrary>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -120,7 +126,7 @@
     <ClInclude Include="src\Vulkan\Texture.h" />
     <ClInclude Include="src\Vulkan\VkBase+.h" />
     <ClInclude Include="src\Vulkan\VkBase.h" />
-    <ClInclude Include="src\Vulkan\VKEasyHearder.h" />
+    <ClInclude Include="src\Vulkan\VKEasyHeader.h" />
     <ClInclude Include="src\Vulkan\VKFormat.h" />
     <ClInclude Include="src\Vulkan\Surface.h" />
     <ClInclude Include="src\Vulkan\Swapchain.h" />

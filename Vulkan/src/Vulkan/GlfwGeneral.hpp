@@ -86,7 +86,7 @@ inline bool InitializeWindow(VkExtent2D size, bool fullScreen = false, bool isRe
 	VK::VkBase::Base().Device().AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
 	if (
-		VK::VkBase::Base().GetPhysicalDevice(true, false) ||
+		VK::VkBase::Base().SetPhysicalDevice(true, false) ||
 		VK::VkBase::Base().CreateDevice()) 
 	{
 		return false;

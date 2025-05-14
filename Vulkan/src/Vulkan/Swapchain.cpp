@@ -1,17 +1,16 @@
 #include "Swapchain.h"
-#include "Device.h"
+#include "VkBase.h"
 
 namespace VK
 {
-	result_t Swapchain::Build(PhysicalDevice& physicalDevice, LogicalDevice& device, bool limitFrameRate, VkSwapchainCreateFlagsKHR flags)
+	result_t Swapchain::Build(bool limitFrameRate, VkSwapchainCreateFlagsKHR flags)
 	{
-        p_physicalDevice = &physicalDevice;
-        p_device = &device;
+        PhysicalDevice& physicalDevice = VkBase::Base().PhysicalDevice();
+        VkSurfaceKHR surface = VkBase::Base().Surface();
 
         const VkSurfaceCapabilitiesKHR& surfaceCapabilities = physicalDevice.SurfaceCapabilities();
         const std::vector<VkSurfaceFormatKHR>& availableSurfaceFormats = physicalDevice.AvailableSurfaceFormats();
         const std::vector<VkPresentModeKHR>& surfacePresentModes = physicalDevice.SurfacePresentModes();
-
 
         swapchainCreateInfo.minImageCount = surfaceCapabilities.minImageCount + (surfaceCapabilities.maxImageCount > surfaceCapabilities.minImageCount);
         swapchainCreateInfo.imageExtent =
@@ -81,7 +80,7 @@ namespace VK
 
         swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
         swapchainCreateInfo.flags = flags;
-        swapchainCreateInfo.surface = physicalDevice.Surface();
+        swapchainCreateInfo.surface = surface;
         swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         swapchainCreateInfo.clipped = VK_TRUE;
 
@@ -90,18 +89,20 @@ namespace VK
             return result;
         }
 
-        /*for (auto& callback : callbacks_createSwapchain)
+        for (auto& callback : callbacks_onCreate)
         {
             callback();
-        }*/
+        }
 
         return VK_SUCCESS;
 	}
 
     result_t Swapchain::ReBuild()
     {
-        // TODO: Check pointer
-        const VkSurfaceCapabilitiesKHR& surfaceCapabilities = p_physicalDevice->SurfaceCapabilities();
+        PhysicalDevice& physicalDevice = VkBase::Base().PhysicalDevice();
+        LogicalDevice& device = VkBase::Base().Device();
+
+        const VkSurfaceCapabilitiesKHR& surfaceCapabilities = physicalDevice.SurfaceCapabilities();
         if (surfaceCapabilities.currentExtent.width == 0 || surfaceCapabilities.currentExtent.height == 0)
         {
             return VK_SUBOPTIMAL_KHR;
@@ -109,11 +110,11 @@ namespace VK
         swapchainCreateInfo.imageExtent = surfaceCapabilities.currentExtent;
         swapchainCreateInfo.oldSwapchain = handle;
 
-        VkResult result = vkQueueWaitIdle(p_device->Queue_Graphics());
+        VkResult result = vkQueueWaitIdle(device.Queue_Graphics());
         
-        if (result == VK_SUCCESS && p_device->Queue_Graphics() != p_device->Queue_Presentation())
+        if (result == VK_SUCCESS && device.Queue_Graphics() != device.Queue_Presentation())
         {
-            result = vkQueueWaitIdle(p_device->Queue_Presentation());
+            result = vkQueueWaitIdle(device.Queue_Presentation());
         }
         if (result)
         {
@@ -121,16 +122,16 @@ namespace VK
             return result;
         }
 
-        /*for (auto& callback : callbacks_destroySwapchain)
+        for (auto& callback : callbacks_onDestroy)
         {
             callback();
-        }*/
+        }
 
         for (VkImageView& imageView : swapchainImageViews)
         {
             if (imageView)
             {
-                vkDestroyImageView(*p_device, imageView, nullptr);
+                vkDestroyImageView(device, imageView, nullptr);
             }
         }
         swapchainImageViews.resize(0);
@@ -140,24 +141,26 @@ namespace VK
             return result;
         }
 
-       /* for (const auto& callback : callbacks_createSwapchain)
+        for (const auto& callback : callbacks_onCreate)
         {
             callback();
-        }*/
+        }
 
         return VK_SUCCESS;
     }
 
     void Swapchain::Destroy()
     {
-        //for (auto& callback : callbacks_destroySwapchain) callback();
+        for (auto& callback : callbacks_onDestroy) callback();
 
         for (VkImageView& imageView : swapchainImageViews)
         {
-            if (imageView) vkDestroyImageView(*p_device, imageView, nullptr);
+            if (imageView) vkDestroyImageView(VkBase::Base().Device(), imageView, nullptr);
         }
 
-        vkDestroySwapchainKHR(*p_device, handle, nullptr);
+        vkDestroySwapchainKHR(VkBase::Base().Device(), handle, nullptr);
+
+        handle = VK_NULL_HANDLE;
     }
 
     result_t Swapchain::SwapImage(VkSemaphore semaphore_imageIsAvailable)
@@ -165,11 +168,11 @@ namespace VK
         if (swapchainCreateInfo.oldSwapchain &&
             swapchainCreateInfo.oldSwapchain != handle)
         {
-			vkDestroySwapchainKHR(*p_device, swapchainCreateInfo.oldSwapchain, nullptr);
+			vkDestroySwapchainKHR(VkBase::Base().Device(), swapchainCreateInfo.oldSwapchain, nullptr);
             swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
         }
 
-		while (VkResult result = vkAcquireNextImageKHR(*p_device, handle, UINT64_MAX, semaphore_imageIsAvailable, VK_NULL_HANDLE, &currentImageIndex))
+		while (VkResult result = vkAcquireNextImageKHR(VkBase::Base().Device(), handle, UINT64_MAX, semaphore_imageIsAvailable, VK_NULL_HANDLE, &currentImageIndex))
 		{
 			switch (result)
 			{
@@ -194,7 +197,7 @@ namespace VK
     result_t Swapchain::PresentImage(VkPresentInfoKHR& presentInfo)
     {
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		switch (VkResult result = vkQueuePresentKHR(p_device->Queue_Presentation(), &presentInfo))
+		switch (VkResult result = vkQueuePresentKHR(VkBase::Base().Device().Queue_Presentation(), &presentInfo))
 		{
 		case VK_SUCCESS:
 			return VK_SUCCESS;
@@ -226,21 +229,23 @@ namespace VK
 
 	result_t Swapchain::Build_Internal()
 	{
-        if (VkResult result = vkCreateSwapchainKHR(*p_device, &swapchainCreateInfo, nullptr, &handle))
+        LogicalDevice& device = VkBase::Base().Device();
+
+        if (VkResult result = vkCreateSwapchainKHR(device, &swapchainCreateInfo, nullptr, &handle))
         {
             std::cout << std::format("[ VkBase ] ERROR\nFailed to create a swapchain!\nError code: {}\n", int32_t(result));
             return result;
         }
 
         uint32_t swapchainImageCount;
-        if (VkResult result = vkGetSwapchainImagesKHR(*p_device, handle, &swapchainImageCount, nullptr))
+        if (VkResult result = vkGetSwapchainImagesKHR(device, handle, &swapchainImageCount, nullptr))
         {
             std::cout << std::format("[ VkBase ] ERROR\nFailed to get the count of swapchain images!\nError code: {}\n", int32_t(result));
             return result;
         }
 
         swapchainImages.resize(swapchainImageCount);
-        if (VkResult result = vkGetSwapchainImagesKHR(*p_device, handle, &swapchainImageCount, swapchainImages.data()))
+        if (VkResult result = vkGetSwapchainImagesKHR(device, handle, &swapchainImageCount, swapchainImages.data()))
         {
             std::cout << std::format("[ VkBase ] ERROR\nFailed to get swapchain images!\nError code: {}\n", int32_t(result));
             return result;
@@ -255,7 +260,7 @@ namespace VK
         for (size_t i = 0; i < swapchainImageCount; ++i)
         {
             imageViewCreateInfo.image = swapchainImages[i];
-            if (VkResult result = vkCreateImageView(*p_device, &imageViewCreateInfo, nullptr, &swapchainImageViews[i]))
+            if (VkResult result = vkCreateImageView(device, &imageViewCreateInfo, nullptr, &swapchainImageViews[i]))
             {
                 std::cout << std::format("[ VkBase ] ERROR\nFailed to create a swapchain image view!\nError code: {}\n", int32_t(result));
                 return result;
@@ -304,7 +309,7 @@ namespace VK
         // If swapchain already exist, rebuild
         if (handle)
         {
-            //return RecreateSwapchain();
+            return ReBuild();
         }
 
         return VK_SUCCESS;

@@ -42,8 +42,8 @@ void CreateLayout()
     /*VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
         .setLayoutCount = 1,
         .pSetLayouts = descriptorSetLayout_texture.Address()
-    };
-    pipelineLayout_texture.Create(pipelineLayoutCreateInfo);*/
+    };*/
+    //pipelineLayout_texture.Create(pipelineLayoutCreateInfo);
 
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
     pipelineLayout_triangle.Create(pipelineLayoutCreateInfo);
@@ -53,6 +53,7 @@ void CreatePipeline()
 {
     static ShaderModule vert("../shaders/VertexBuffer.vert.spv");
     static ShaderModule frag("../shaders/VertexBuffer.frag.spv");
+
     static VkPipelineShaderStageCreateInfo shaderStageCreateInfos_triangle[2] = {
         vert.StageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT),
         frag.StageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -102,6 +103,7 @@ int main()
     //std::this_thread::sleep_for(std::chrono::seconds(1));//需要#include <thread>
 
     const auto& [renderPass, framebuffers] = EasyVulkan::CreateRpwf_Screen();
+
     CreateLayout();
     CreatePipeline();
     
@@ -146,11 +148,11 @@ int main()
         renderPass.CmdBegin(commandBuffer, framebuffers[i], { {}, windowSize }, clearColor);
 
         {
-            /*vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_triangle);
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_triangle);
             VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffer.Address(), &offset);
             vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-            vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);*/
+            vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
         }
         
         renderPass.CmdEnd(commandBuffer);

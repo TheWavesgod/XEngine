@@ -45,6 +45,24 @@
     <ClCompile Include="src\Vulkan\Synchronization.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\Vulkan\RenderPass.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vulkan\Framebuffer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vulkan\Shader.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vulkan\Pipeline.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vulkan\Memory.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Vulkan\Image.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Renderer\Renderer.h">
@@ -68,7 +86,7 @@
     <ClInclude Include="src\Vulkan\VkBase.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\Vulkan\VKEasyHearder.h">
+    <ClInclude Include="src\Vulkan\VKEasyHeader.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\Vulkan\VKFormat.h">
