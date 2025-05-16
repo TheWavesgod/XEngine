@@ -1,6 +1,7 @@
 #pragma once
 
 #include "VkBase+.h"
+#include "MemoryBuffers.h"
 
 #define STB_IMAGE_IMPLEMENTATION 
 #include <stb_image.h>

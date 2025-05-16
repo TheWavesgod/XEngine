@@ -3,7 +3,7 @@
 #include "VKEasyHeader.h"
 
 namespace VK
-{
+{	
 	class DeviceMemory
 	{
 		VkDeviceMemory handle = VK_NULL_HANDLE;

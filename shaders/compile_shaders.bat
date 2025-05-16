@@ -1,5 +1,6 @@
-D:/CppProject/Library/Vulkan/Bin/glslc.exe FirstTriangle.frag.shader -c
-D:/CppProject/Library/Vulkan/Bin/glslc.exe FirstTriangle.vert.shader -c
-D:/CppProject/Library/Vulkan/Bin/glslc.exe VertexBuffer.frag.shader -c
-D:/CppProject/Library/Vulkan/Bin/glslc.exe VertexBuffer.vert.shader -c
+glslc.exe FirstTriangle.frag.shader -c 
+glslc.exe FirstTriangle.vert.shader -c
+glslc.exe VertexBuffer.frag.shader -c
+glslc.exe VertexBuffer.vert.shader -c
+glslc.exe PushConstant.vert.shader -c
 pause

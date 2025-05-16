@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\Vulkan\Descriptor.cpp" />
     <ClCompile Include="src\Vulkan\Device.cpp" />
     <ClCompile Include="src\Vulkan\Framebuffer.cpp" />
     <ClCompile Include="src\Vulkan\Image.cpp" />
@@ -27,6 +28,7 @@
     <ClCompile Include="src\Renderer\Renderer.cpp" />
     <ClCompile Include="src\Vulkan\Command.cpp" />
     <ClCompile Include="src\Vulkan\Memory.cpp" />
+    <ClCompile Include="src\Vulkan\MemoryBuffers.cpp" />
     <ClCompile Include="src\Vulkan\Pipeline.cpp" />
     <ClCompile Include="src\Vulkan\RenderPass.cpp" />
     <ClCompile Include="src\Vulkan\Shader.cpp" />
@@ -109,11 +111,13 @@
     <ClCompile Include="src\Vulkan\Synchronization.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Vulkan\Descriptor.h" />
     <ClInclude Include="src\Vulkan\Device.h" />
     <ClInclude Include="src\Vulkan\Instance.h" />
     <ClInclude Include="src\Vulkan\Framebuffer.h" />
     <ClInclude Include="src\Vulkan\Image.h" />
     <ClInclude Include="src\Vulkan\Memory.h" />
+    <ClInclude Include="src\Vulkan\MemoryBuffers.h" />
     <ClInclude Include="src\Vulkan\Pipeline.h" />
     <ClInclude Include="src\Vulkan\RenderPass.h" />
     <ClInclude Include="src\Renderer\Renderer.h" />

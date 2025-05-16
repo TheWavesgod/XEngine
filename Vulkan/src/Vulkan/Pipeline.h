@@ -5,7 +5,7 @@
 namespace VK
 {
 	/*
-	 * Layout contains the way of how pipeline uses descriptors and push constant	
+	 * Layout contains the way of how pipeline uses descriptors and push constant
 	 */
 	class PipelineLayout
 	{
@@ -16,7 +16,7 @@ namespace VK
 		PipelineLayout(VkPipelineLayoutCreateInfo& createInfo) { Create(createInfo); }
 
 		PipelineLayout(PipelineLayout&& other) noexcept { MoveHandle; }
-		~PipelineLayout(); 
+		~PipelineLayout();
 
 		// Getter
 		DefineHandleTypeOperator;
@@ -40,7 +40,7 @@ namespace VK
 		Pipeline(VkComputePipelineCreateInfo& createInfo) { Create(createInfo); }
 
 		Pipeline(Pipeline&& other) noexcept { MoveHandle; }
-		~Pipeline(); 
+		~Pipeline();
 
 		// Getter
 		DefineHandleTypeOperator;

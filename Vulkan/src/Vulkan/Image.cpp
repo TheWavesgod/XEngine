@@ -34,7 +34,7 @@ namespace VK
 		{
 			memoryAllocateInfo.memoryTypeIndex = GetMemoryTypeIndex(memoryRequirements.memoryTypeBits, desiredMemoryProperties & ~VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT);
 		}
-		//不在此检查是否成功取得内存类型索引，因为会把memoryAllocateInfo返回出去，交由外部检查
+		
 		//if (memoryAllocateInfo.memoryTypeIndex == -1)
 		//    outStream << std::format("[ image ] ERROR\nFailed to find any memory type satisfies all desired memory properties!\n");
 		return memoryAllocateInfo;

@@ -26,6 +26,12 @@ const auto& RenderPassAndFramebuffers()
 
 void CreateLayout()
 { 
+    VkPushConstantRange pushConstantRange = {
+        VK_SHADER_STAGE_VERTEX_BIT,
+        0,  // offset
+        24
+    };
+
     VkDescriptorSetLayoutBinding descriptorSetLayoutBinding_texture = {
         .binding = 0,                                                
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 
@@ -46,12 +52,15 @@ void CreateLayout()
     //pipelineLayout_texture.Create(pipelineLayoutCreateInfo);
 
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+    pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+    pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
+
     pipelineLayout_triangle.Create(pipelineLayoutCreateInfo);
 }
 
 void CreatePipeline()
 {
-    static ShaderModule vert("../shaders/VertexBuffer.vert.spv");
+    static ShaderModule vert("../shaders/PushConstant.vert.spv");
     static ShaderModule frag("../shaders/VertexBuffer.frag.spv");
 
     static VkPipelineShaderStageCreateInfo shaderStageCreateInfos_triangle[2] = {
@@ -63,11 +72,11 @@ void CreatePipeline()
     {
         GraphicsPipelineCreateInfoPack pipelineCreateInfoPack = {};
 
-        //数据来自0号顶点缓冲区，输入频率是逐顶点输入
+        // Data comes from layout 0 vertex buffer, input per vertex
         pipelineCreateInfoPack.vertexInputBindings.emplace_back(0, sizeof(vertex), VK_VERTEX_INPUT_RATE_VERTEX);
-        //location为0，数据来自0号顶点缓冲区，vec2对应VK_FORMAT_R32G32_SFLOAT，用offsetof计算position在vertex中的起始位置
+        // location is 0, data comes from layout 0，vec2 referes to VK_FORMAT_R32G32_SFLOAT, use offsetof to caculate the start position in struct vertex
         pipelineCreateInfoPack.vertexInputAttributes.emplace_back(0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(vertex, position));
-        //location为1，数据来自0号顶点缓冲区，vec4对应VK_FORMAT_R32G32B32A32_SFLOAT，用offsetof计算color在vertex中的起始位置
+        // location is 1, vec4 refers to VK_FORMAT_R32G32B32A32_SFLOAT
         pipelineCreateInfoPack.vertexInputAttributes.emplace_back(1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(vertex, color));
         
         pipelineCreateInfoPack.createInfo.layout = pipelineLayout_triangle;
@@ -133,8 +142,14 @@ int main()
     IndexBuffer indexBuffer(sizeof indices);
     indexBuffer.TransferData(indices);
 
-    VkSamplerCreateInfo samplerCreatInfo = Texture::MakeSamplerCreateInfo();
-    Sampler sampler(samplerCreatInfo);
+    glm::vec2 pushConstants[] = {
+        {  .0f, .0f },
+        { -.5f, .0f },
+        {  .5f, .0f }
+    };
+
+    //VkSamplerCreateInfo samplerCreatInfo = Texture::MakeSamplerCreateInfo();
+    //Sampler sampler(samplerCreatInfo);
 
     while (!glfwWindowShouldClose(pWindow))
     {
@@ -152,7 +167,8 @@ int main()
             VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffer.Address(), &offset);
             vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-            vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
+            vkCmdPushConstants(commandBuffer, pipelineLayout_triangle, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof pushConstants, &pushConstants);
+            vkCmdDrawIndexed(commandBuffer, 6, 3, 0, 0, 0);
         }
         
         renderPass.CmdEnd(commandBuffer);
