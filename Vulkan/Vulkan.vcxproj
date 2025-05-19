@@ -32,6 +32,7 @@
     <ClCompile Include="src\Vulkan\Pipeline.cpp" />
     <ClCompile Include="src\Vulkan\RenderPass.cpp" />
     <ClCompile Include="src\Vulkan\Shader.cpp" />
+    <ClCompile Include="src\Vulkan\Texture.cpp" />
     <ClCompile Include="src\Vulkan\VkBase.cpp">
       <RuntimeLibrary>MultiThreadedDebugDll</RuntimeLibrary>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
