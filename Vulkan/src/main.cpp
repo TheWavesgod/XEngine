@@ -3,18 +3,20 @@
 #include "Vulkan/Command.h"
 #include "Vulkan/EasyVulkan.hpp"
 #include "Vulkan/Pipeline.h"
+#include "Vulkan/Descriptor.h"
 
 using namespace VK;
 
 PipelineLayout pipelineLayout_triangle;
 Pipeline pipeline_triangle;
 
-//DescriptorSetLayout descriptorSetLayout_texture;
+DescriptorSetLayout descriptorSetLayout_texture;
 PipelineLayout pipelineLayout_texture;
 
 struct vertex
 {
     glm::vec2 position;
+    glm::vec2 texCoord;
     glm::vec4 color;
 };
 
@@ -43,25 +45,25 @@ void CreateLayout()
         .bindingCount = 1,
         .pBindings = &descriptorSetLayoutBinding_texture
     };
-    //descriptorSetLayout_texture.Create(descriptorSetLayoutCreateInfo_texture);
+    descriptorSetLayout_texture.Create(descriptorSetLayoutCreateInfo_texture);
 
-    /*VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
         .setLayoutCount = 1,
         .pSetLayouts = descriptorSetLayout_texture.Address()
-    };*/
-    //pipelineLayout_texture.Create(pipelineLayoutCreateInfo);
+    };
+    pipelineLayout_texture.Create(pipelineLayoutCreateInfo);
 
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+    /*VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
     pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
     pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
 
-    pipelineLayout_triangle.Create(pipelineLayoutCreateInfo);
+    pipelineLayout_triangle.Create(pipelineLayoutCreateInfo);*/
 }
 
 void CreatePipeline()
 {
-    static ShaderModule vert("../shaders/PushConstant.vert.spv");
-    static ShaderModule frag("../shaders/VertexBuffer.frag.spv");
+    static ShaderModule vert("../shaders/Texture.vert.spv");
+    static ShaderModule frag("../shaders/Texture.frag.spv");
 
     static VkPipelineShaderStageCreateInfo shaderStageCreateInfos_triangle[2] = {
         vert.StageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT),
@@ -76,10 +78,11 @@ void CreatePipeline()
         pipelineCreateInfoPack.vertexInputBindings.emplace_back(0, sizeof(vertex), VK_VERTEX_INPUT_RATE_VERTEX);
         // location is 0, data comes from layout 0，vec2 referes to VK_FORMAT_R32G32_SFLOAT, use offsetof to caculate the start position in struct vertex
         pipelineCreateInfoPack.vertexInputAttributes.emplace_back(0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(vertex, position));
-        // location is 1, vec4 refers to VK_FORMAT_R32G32B32A32_SFLOAT
-        pipelineCreateInfoPack.vertexInputAttributes.emplace_back(1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(vertex, color));
+        pipelineCreateInfoPack.vertexInputAttributes.emplace_back(1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(vertex, texCoord));
+        // location is 2, vec4 refers to VK_FORMAT_R32G32B32A32_SFLOAT
+        pipelineCreateInfoPack.vertexInputAttributes.emplace_back(2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(vertex, color));
         
-        pipelineCreateInfoPack.createInfo.layout = pipelineLayout_triangle;
+        pipelineCreateInfoPack.createInfo.layout = pipelineLayout_texture;
         pipelineCreateInfoPack.createInfo.renderPass = RenderPassAndFramebuffers().renderPass;
         pipelineCreateInfoPack.inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         pipelineCreateInfoPack.viewports.emplace_back(0.f, 0.f, float(windowSize.width), float(windowSize.height), 0.f, 1.f);
@@ -108,8 +111,8 @@ int main()
 {
     if (!InitializeWindow({1280, 720})) return -1;
 
-    //EasyVulkan::BootScreen("", VK_FORMAT_R8G8B8A8_UNORM);
-    //std::this_thread::sleep_for(std::chrono::seconds(1));//需要#include <thread>
+    EasyVulkan::BootScreen("../Resources/Images/StartupImage.png", VK_FORMAT_R8G8B8A8_UNORM);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     const auto& [renderPass, framebuffers] = EasyVulkan::CreateRpwf_Screen();
 
@@ -127,10 +130,10 @@ int main()
     VkClearValue clearColor = { .color = { 1.f, 0.f, 0.f, 1.f } };
 
     vertex vertices[] = {
-        { { -.5f, -.5f }, { 1, 1, 0, 1 } },
-        { {  .5f, -.5f }, { 1, 0, 0, 1 } },
-        { { -.5f,  .5f }, { 0, 1, 0, 1 } },
-        { {  .5f,  .5f }, { 0, 0, 1, 1 } }
+        { { -.5f, -.5f }, {0, 0}, { 1, 1, 0, 1 } },
+        { {  .5f, -.5f }, {1, 0}, { 1, 0, 0, 1 } },
+        { { -.5f,  .5f }, {0, 1}, { 0, 1, 0, 1 } },
+        { {  .5f,  .5f }, {1, 1}, { 0, 0, 1, 1 } }
     };
     VertexBuffer vertexBuffer(sizeof vertices);
     vertexBuffer.TransferData(vertices);
@@ -148,8 +151,22 @@ int main()
         {  .5f, .0f }
     };
 
-    //VkSamplerCreateInfo samplerCreatInfo = Texture::MakeSamplerCreateInfo();
-    //Sampler sampler(samplerCreatInfo);
+    Texture2d texture("../Resources/Images/StartupImage.png", VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, true);
+    VkSamplerCreateInfo samplerCreatInfo = Texture::MakeSamplerCreateInfo();
+    Sampler sampler(samplerCreatInfo);
+
+    VkDescriptorPoolSize descriptorPoolSizes[] = {
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }
+    };
+    DescriptorPool descriptorPool(1, descriptorPoolSizes);
+    DescriptorSet descriptorSet_texture;
+    descriptorPool.AllocateSets(descriptorSet_texture, descriptorSetLayout_texture);
+    VkDescriptorImageInfo imageInfo = {
+        .sampler = sampler,
+        .imageView = texture.ImageViewRef(),
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+    descriptorSet_texture.Write(imageInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
     while (!glfwWindowShouldClose(pWindow))
     {
@@ -167,8 +184,10 @@ int main()
             VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffer.Address(), &offset);
             vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-            vkCmdPushConstants(commandBuffer, pipelineLayout_triangle, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof pushConstants, &pushConstants);
-            vkCmdDrawIndexed(commandBuffer, 6, 3, 0, 0, 0);
+            //vkCmdPushConstants(commandBuffer, pipelineLayout_triangle, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof pushConstants, &pushConstants);
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipelineLayout_texture, 0, 1, descriptorSet_texture.Address(), 0, nullptr);
+            vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
         }
         
         renderPass.CmdEnd(commandBuffer);

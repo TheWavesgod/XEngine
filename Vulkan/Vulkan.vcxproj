@@ -31,6 +31,7 @@
     <ClCompile Include="src\Vulkan\MemoryBuffers.cpp" />
     <ClCompile Include="src\Vulkan\Pipeline.cpp" />
     <ClCompile Include="src\Vulkan\RenderPass.cpp" />
+    <ClCompile Include="src\Vulkan\Sampler.cpp" />
     <ClCompile Include="src\Vulkan\Shader.cpp" />
     <ClCompile Include="src\Vulkan\Texture.cpp" />
     <ClCompile Include="src\Vulkan\VkBase.cpp">

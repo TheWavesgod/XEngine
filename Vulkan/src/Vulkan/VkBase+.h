@@ -316,6 +316,7 @@ namespace VK
                 vkCmdPipelineBarrier(commandBuffer, imb_from.stage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
                     0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
             }
+
             vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
             if (imb_to.isNeeded) 
@@ -357,6 +358,7 @@ namespace VK
                 vkCmdPipelineBarrier(commandBuffer, imb_dst_from.stage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
                     0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
             }
+
             vkCmdBlitImage(commandBuffer,
                 image_src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 image_dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
