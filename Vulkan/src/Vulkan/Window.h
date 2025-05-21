@@ -13,9 +13,21 @@ namespace VK
 		static Window* CreateGLFWWindow(VkExtent2D size, const std::string& title = "Vulkan Renderer", bool fullScreen = false, bool isResizable = true, bool limitFrameRate = true);
 		static Window* GetPointer() { return windowPtr; }
 
-		void CloseWindow();
-
+		void TerminateWindow();
 		bool Update();
+
+		static inline float mInputX = 0.0f;
+		static inline float mInputY = 0.0f;
+		static inline float mScroll = 0.0f;
+		static inline bool enableMouseCursor = true;
+
+		static int GetInputState(int key);
+
+		void SwitchMouseInputMode();
+
+		double GetDeltaTime() const { return dt; }
+
+		void SetWindowShouldClose(bool bShouldClose = true);
 
 	private:
 		inline static Window* windowPtr = nullptr;
@@ -32,4 +44,6 @@ namespace VK
 	};
 
 	void CursorPosition_callback(GLFWwindow* window, double xpos, double ypos);
+	void MouseButton_callback(GLFWwindow* window, int button, int action, int mods);
+	void Scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 }

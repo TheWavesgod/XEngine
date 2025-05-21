@@ -12,8 +12,17 @@ int main()
 
 	while (w->Update())
 	{
+		if (w->GetInputState(GLFW_KEY_TAB) == GLFW_PRESS)
+		{
+			w->SwitchMouseInputMode();
+		}
+		if (w->GetInputState(GLFW_KEY_ESCAPE) == GLFW_PRESS)
+		{
+			w->SetWindowShouldClose();
+		}
+
 
 	}
 
-	w->CloseWindow();
+	w->TerminateWindow();
 }

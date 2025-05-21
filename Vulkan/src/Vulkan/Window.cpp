@@ -2,6 +2,10 @@
 
 namespace VK
 {
+	static bool firstMouse = true;
+	static float lastMouseX;
+	static float lastMouseY;
+
 	Window* Window::CreateGLFWWindow(VkExtent2D size, const std::string& title, bool fullScreen, bool isResizable, bool limitFrameRate)
 	{
 		if (windowPtr != nullptr) return windowPtr;
@@ -97,11 +101,13 @@ namespace VK
 
 		// Set callback function
 		glfwSetCursorPosCallback(pWindow, CursorPosition_callback);
+		glfwSetMouseButtonCallback(pWindow, MouseButton_callback);
+		glfwSetScrollCallback(pWindow, Scroll_callback);
 
 		return true;
 	}
 
-	void Window::CloseWindow()
+	void Window::TerminateWindow()
 	{
 		VK::VkBase::Base().WaitIdle();
 		glfwTerminate();
@@ -131,11 +137,69 @@ namespace VK
 
 		while (glfwGetWindowAttrib(pWindow, GLFW_ICONIFIED)) glfwWaitEvents();
 
+		mInputX = 0.0f;
+		mInputY = 0.0f;
+		mScroll = 0.0f;
+
+		glfwPollEvents();
+
 		return true;
 	}
 
+	int Window::GetInputState(int key)
+	{
+		return glfwGetKey(windowPtr->pWindow, key);
+	}
+
+	void Window::SwitchMouseInputMode()
+	{
+		if (enableMouseCursor)
+		{
+			firstMouse = true;
+			glfwSetInputMode(pWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		}
+		else
+		{
+			glfwSetInputMode(pWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		}
+		enableMouseCursor = !enableMouseCursor;
+	}
+
+	void Window::SetWindowShouldClose(bool bShouldClose)
+	{
+		glfwSetWindowShouldClose(pWindow, bShouldClose);
+	}
+
+	
+
 	void CursorPosition_callback(GLFWwindow* window, double xpos, double ypos)
 	{
+		if (Window::enableMouseCursor) return;
 
+		if (firstMouse)
+		{
+			lastMouseX = xpos;
+			lastMouseY = ypos;
+			firstMouse = false;
+		}
+
+		Window::mInputX = xpos - lastMouseX;
+		Window::mInputY = lastMouseY - ypos; // reversed since y-coordinates range from bottom to top
+
+		lastMouseX = xpos;
+		lastMouseY = ypos;
+	}
+
+	void MouseButton_callback(GLFWwindow* window, int button, int action, int mods)
+	{
+		if (button == GLFW_MOUSE_BUTTON_RIGHT)
+		{
+
+		}
+	}
+
+	void Scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+	{
+		Window::mScroll = yoffset;
 	}
 }
