@@ -19,12 +19,17 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\Renderer\Camera.cpp" />
+    <ClCompile Include="src\Renderer\Light.cpp" />
+    <ClCompile Include="src\Renderer\Mesh.cpp" />
+    <ClCompile Include="src\Vulkan\Attachment.cpp" />
     <ClCompile Include="src\Vulkan\Descriptor.cpp" />
     <ClCompile Include="src\Vulkan\Device.cpp" />
     <ClCompile Include="src\Vulkan\Framebuffer.cpp" />
     <ClCompile Include="src\Vulkan\Image.cpp" />
     <ClCompile Include="src\Vulkan\Instance.cpp" />
-    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\main1.cpp" />
     <ClCompile Include="src\Renderer\Renderer.cpp" />
     <ClCompile Include="src\Vulkan\Command.cpp" />
     <ClCompile Include="src\Vulkan\Memory.cpp" />
@@ -111,8 +116,14 @@
     <ClCompile Include="src\Vulkan\Surface.cpp" />
     <ClCompile Include="src\Vulkan\Swapchain.cpp" />
     <ClCompile Include="src\Vulkan\Synchronization.cpp" />
+    <ClCompile Include="src\Renderer\Transform.cpp" />
+    <ClCompile Include="src\Vulkan\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Renderer\Camera.h" />
+    <ClInclude Include="src\Renderer\Light.h" />
+    <ClInclude Include="src\Renderer\Mesh.h" />
+    <ClInclude Include="src\Vulkan\Attachment.h" />
     <ClInclude Include="src\Vulkan\Descriptor.h" />
     <ClInclude Include="src\Vulkan\Device.h" />
     <ClInclude Include="src\Vulkan\Instance.h" />
@@ -136,6 +147,8 @@
     <ClInclude Include="src\Vulkan\VKFormat.h" />
     <ClInclude Include="src\Vulkan\Surface.h" />
     <ClInclude Include="src\Vulkan\Swapchain.h" />
+    <ClInclude Include="src\Renderer\Transform.h" />
+    <ClInclude Include="src\Vulkan\Window.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
