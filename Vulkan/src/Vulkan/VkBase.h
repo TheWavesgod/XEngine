@@ -54,7 +54,7 @@ namespace VK
 		result_t SetPhysicalDevice(bool enableGraphicsQueue, bool enableComputeQueue);
 		result_t CreateDevice();
 
-		//以下函数用于创建逻辑设备失败后
+		// Used when fail to create logical device
 		VkResult CheckDeviceExtensions(std::span<const char*> extensionsToCheck, const char* layerName = nullptr) const;
 
 		/** Swapchain **/

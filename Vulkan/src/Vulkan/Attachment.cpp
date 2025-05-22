@@ -41,11 +41,16 @@ namespace VK
 		   .mipLevels = 1,
 		   .arrayLayers = layerCount,
 		   .samples = sampleCount,
-		   .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | otherUsages
+		   .tiling = VK_IMAGE_TILING_OPTIMAL,
+		   .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | otherUsages,
+		   .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 		};
-		imageMemory.Create(
+		if (result_t result = imageMemory.Create(
 			imageCreateInfo,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | bool(otherUsages & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT) * VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT);
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | bool(otherUsages & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT) * VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT))
+		{
+			outStream << std::format("[ DepthStencilAttachment ] ERROR\nFailed to create image memory for depthStencilAttachment!\nError code: {}\n", int32_t(result));
+		}
 		
 		// Decide aspcet mask-------------------------
 		VkImageAspectFlags aspectMask = (!stencilOnly) * VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -55,11 +60,14 @@ namespace VK
 			aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
 		//----------------------------------------
 		
-		imageView.Create(
+		if (result_t result = imageView.Create(
 			imageMemory.ImageRef(),
 			layerCount > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D,
 			format,
-			{ aspectMask, 0, 1, 0, layerCount });
+			{ aspectMask, 0, 1, 0, layerCount }))
+		{
+			outStream << std::format("[ DepthStencilAttachment ] ERROR\nFailed to create image view for depthStencilAttachment!\nError code: {}\n", int32_t(result));
+		}
 	}
 
 	bool DepthStencilAttachment::FormatAvailability(VkFormat format)

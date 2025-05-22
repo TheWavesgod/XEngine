@@ -28,6 +28,11 @@ result_t VK::VkBase::CreateDevice()
     return device.Create();
 }
 
+VkResult VK::VkBase::CheckDeviceExtensions(std::span<const char*> extensionsToCheck, const char* layerName) const
+{
+    return VK_SUCCESS;
+}
+
 result_t VK::VkBase::BuildSwapchain(bool limitFrameRate)
 {
     return swapchain.Build(limitFrameRate);
