@@ -8,7 +8,13 @@ vec2 positions[3] = {
     {  .5f,  .5f }
 };
 
+int add(int i)
+{
+    return i;
+}
+
 void main()
 {
+    int b = add(1);
     gl_Position = vec4(positions[gl_VertexIndex], 0, 1);   
 }

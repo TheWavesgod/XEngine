@@ -26,6 +26,7 @@ int main()
 		}
 
 		level.RenderFrame();
+		level.UpdateObject(w->GetDeltaTime());
 	}
 
 	w->TerminateWindow();

@@ -89,6 +89,8 @@ namespace LittleEngine
 		commandPool.AllocateBuffers(commandBuffer);
 
 		semaphores_renderingIsOver = std::vector<Semaphore>(VkBase::Base().SwapchainImageCount());
+
+
 	}
 
 	void Level::RenderFrame()
@@ -115,5 +117,15 @@ namespace LittleEngine
 		VkBase::Base().Swapchain().PresentImage(semaphores_renderingIsOver[i]);
 
 		fence.WaitAndReset();
+	}
+
+	void Level::UpdateObject(float dt)
+	{
+		cam.Update(dt);
+	}
+
+	void Level::InitialScene()
+	{
+
 	}
 }

@@ -2,7 +2,8 @@
 
 #include <vector>
 
-#include "Mesh.h"
+#include "RenderObject.h"
+#include "Camera.h"
 
 #include "../Vulkan/VkBase+.h"
 #include "../Vulkan/RenderPass.h"
@@ -18,9 +19,11 @@ namespace LittleEngine
 
 		void Initialize();
 		void RenderFrame();
+		void UpdateObject(float dt);
 
 	private:
-		std::vector<Mesh> renderObjects;
+		std::vector<RenderObject> renderObjects;
+		Camera cam;
 
 		CommandBuffer commandBuffer;
 		CommandPool commandPool;
@@ -36,6 +39,9 @@ namespace LittleEngine
 			RenderPass renderPass;
 			std::vector<Framebuffer> framebuffers;
 		} rpwf_swapChain;
+
+	private:
+		void InitialScene();
 	};
 }
 

@@ -45,4 +45,29 @@ namespace VK
 		}
 		return result;
 	}
+
+	GraphicsPipelineCreateInfoPack::GraphicsPipelineCreateInfoPack(const GraphicsPipelineCreateInfoPack& other) noexcept
+	{
+		createInfo = other.createInfo;
+		SetCreateInfos();
+
+		vertexInputStateCreateInfo = other.vertexInputStateCreateInfo;
+		inputAssemblyStateCreateInfo = other.inputAssemblyStateCreateInfo;
+		tessellationStateCreateInfo = other.tessellationStateCreateInfo;
+		viewportStateCreateInfo = other.viewportStateCreateInfo;
+		rasterizationStateCreateInfo = other.rasterizationStateCreateInfo;
+		multisampleStateCreateInfo = other.multisampleStateCreateInfo;
+		depthStencilStateCreateInfo = other.depthStencilStateCreateInfo;
+		colorBlendStateCreateInfo = other.colorBlendStateCreateInfo;
+		dynamicStateCreateInfo = other.dynamicStateCreateInfo;
+
+		shaderStages = other.shaderStages;
+		vertexInputBindings = other.vertexInputBindings;
+		vertexInputAttributes = other.vertexInputAttributes;
+		viewports = other.viewports;
+		scissors = other.scissors;
+		colorBlendAttachmentStates = other.colorBlendAttachmentStates;
+		dynamicStates = other.dynamicStates;
+		UpdateAllArrayAddresses();
+	}
 }

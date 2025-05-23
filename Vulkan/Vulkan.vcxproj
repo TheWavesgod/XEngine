@@ -24,6 +24,7 @@
     <ClCompile Include="src\Renderer\Camera.cpp" />
     <ClCompile Include="src\Renderer\Light.cpp" />
     <ClCompile Include="src\Renderer\Mesh.cpp" />
+    <ClCompile Include="src\Renderer\RenderObject.cpp" />
     <ClCompile Include="src\Vulkan\Attachment.cpp" />
     <ClCompile Include="src\Vulkan\Descriptor.cpp" />
     <ClCompile Include="src\Vulkan\Device.cpp" />
@@ -125,6 +126,7 @@
     <ClInclude Include="src\Renderer\Camera.h" />
     <ClInclude Include="src\Renderer\Light.h" />
     <ClInclude Include="src\Renderer\Mesh.h" />
+    <ClInclude Include="src\Renderer\RenderObject.h" />
     <ClInclude Include="src\Vulkan\Attachment.h" />
     <ClInclude Include="src\Vulkan\Descriptor.h" />
     <ClInclude Include="src\Vulkan\Device.h" />
@@ -220,13 +222,13 @@
     <LibraryPath>$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)$(ProjectName)_$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)bin\$(ProjectName)_$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)Dependency\Vulkan\Include;$(SolutionDir)Dependency\GLFW\include;$(SolutionDir)Dependency\glm;$(SolutionDir)Dependency;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)Dependency\Vulkan\Include;$(SolutionDir)Dependency\GLFW\include;$(SolutionDir)Dependency\glm;$(SolutionDir)Vulkan\src;$(SolutionDir)Dependency;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LibraryPath>$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)$(ProjectName)_$(Platform)\$(Configuration)</OutDir>
     <IntDir>$(SolutionDir)bin\$(ProjectName)_$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)Dependency\Vulkan\Include;$(SolutionDir)Dependency\GLFW\include;$(SolutionDir)Dependency\glm;$(SolutionDir)Dependency;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)Dependency\Vulkan\Include;$(SolutionDir)Dependency\GLFW\include;$(SolutionDir)Dependency\glm;$(SolutionDir)Vulkan\src;$(SolutionDir)Dependency;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

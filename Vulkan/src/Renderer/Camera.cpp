@@ -7,7 +7,7 @@ namespace LittleEngine
 	using namespace VK;
 	using namespace glm;
 
-	void Camera::UpdateCamera(float dt)
+	void Camera::Update(float dt)
 	{
 		if (Window::enableMouseCursor) return;
 

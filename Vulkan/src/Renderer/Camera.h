@@ -25,7 +25,7 @@ namespace LittleEngine
 
 		~Camera(void) {}
 
-		void UpdateCamera(float dt = 1.0f);
+		void Update(float dt = 1.0f);
 
 		glm::mat4 BuildViewMatrix();
 		glm::mat4 BuildProjectionMatrix();
