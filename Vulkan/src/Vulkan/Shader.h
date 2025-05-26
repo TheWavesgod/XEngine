@@ -11,7 +11,7 @@ namespace VK
 	public:
 		ShaderModule() = default;
 		ShaderModule(VkShaderModuleCreateInfo& createInfo) { Create(createInfo); }
-		ShaderModule(const char* filepath /*VkShaderModuleCreateFlags flags*/) { Create(filepath); }
+		ShaderModule(const char* filename /*VkShaderModuleCreateFlags flags*/) { Create(filename); }
 		ShaderModule(size_t codeSize, const uint32_t* pCode /*VkShaderModuleCreateFlags flags*/) { Create(codeSize, pCode); }
 
 		ShaderModule(ShaderModule&& other) noexcept { MoveHandle; }
@@ -38,7 +38,7 @@ namespace VK
 		// Const Function
 		result_t Create(VkShaderModuleCreateInfo& createInfo);
 
-		result_t Create(const char* filepath /*VkShaderModuleCreateFlags flags*/);
+		result_t Create(const char* filename /*VkShaderModuleCreateFlags flags*/);
 
 		result_t Create(size_t codeSize, const uint32_t* pCode);
 	};

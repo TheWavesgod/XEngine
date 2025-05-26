@@ -12,9 +12,13 @@ layout(location = 5) in vec4 inColor;
 
 // Output to fragment shader
 layout(location = 0) out vec3 fragPos;
-layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
-layout(location = 2) out vec3 fragNormal;
+layout(location = 2) out vec3 fragViewPos;
+layout(location = 3) out vec3 fragNormal;
+layout(location = 4) out vec3 fragTangent;
+layout(location = 5) out vec3 fragBitangent;
+layout(location = 6) out vec4 vertexColor;
+
 
 // MVP uniform buffer
 layout(set = 0, binding = 0) uniform GlobalUBO {
@@ -32,5 +36,11 @@ void main()
     mat4 mvp = global.projection * global.view * push.model;
     gl_Position = mvp * vec4(inPosition, 1.0);
 
-    GragPos
+    fragPos = vec3(push.model * vec4(inPosition, 1.0f));
+    fragTexCoord = inTexCoord;
+    fragViewPos = global.camPos;
+    fragNormal = inNormal;
+    fragTangent = inTangent;
+    fragBitangent = inBitangent;
+    vertexColor = inColor;
 }

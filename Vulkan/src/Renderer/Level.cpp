@@ -89,8 +89,6 @@ namespace LittleEngine
 		commandPool.AllocateBuffers(commandBuffer);
 
 		semaphores_renderingIsOver = std::vector<Semaphore>(VkBase::Base().SwapchainImageCount());
-
-
 	}
 
 	void Level::RenderFrame()

@@ -23,6 +23,7 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Renderer\Camera.cpp" />
     <ClCompile Include="src\Renderer\Light.cpp" />
+    <ClCompile Include="src\Renderer\Material.cpp" />
     <ClCompile Include="src\Renderer\Mesh.cpp" />
     <ClCompile Include="src\Renderer\RenderObject.cpp" />
     <ClCompile Include="src\Vulkan\Attachment.cpp" />
@@ -125,6 +126,7 @@
     <ClInclude Include="src\Renderer\Level.h" />
     <ClInclude Include="src\Renderer\Camera.h" />
     <ClInclude Include="src\Renderer\Light.h" />
+    <ClInclude Include="src\Renderer\Material.h" />
     <ClInclude Include="src\Renderer\Mesh.h" />
     <ClInclude Include="src\Renderer\RenderObject.h" />
     <ClInclude Include="src\Vulkan\Attachment.h" />

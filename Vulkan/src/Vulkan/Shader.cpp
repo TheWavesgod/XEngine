@@ -19,8 +19,12 @@ namespace VK
 		return result;
 	}
 
-	result_t ShaderModule::Create(const char* filepath /*VkShaderModuleCreateFlags flags*/)
+	result_t ShaderModule::Create(const char* filename /*VkShaderModuleCreateFlags flags*/)
 	{
+		std::string filepath = "../shaders/spv/";
+		filepath += filename;
+		filepath += ".spv";
+
 		std::ifstream file(filepath, std::ios::ate | std::ios::binary);
 		if (!file)
 		{

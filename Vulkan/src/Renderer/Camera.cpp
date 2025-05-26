@@ -7,6 +7,23 @@ namespace LittleEngine
 	using namespace VK;
 	using namespace glm;
 
+	void Camera::Init()
+	{
+		VkDescriptorSetLayoutBinding uboLayoutBinding = {
+			.binding = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT
+		};
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo = {
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+			.bindingCount = 1,
+			.pBindings = &uboLayoutBinding
+		};
+		cameraDescriptorSetLayout.Create(layoutInfo);
+	}
+
 	void Camera::Update(float dt)
 	{
 		if (Window::enableMouseCursor) return;
@@ -39,6 +56,14 @@ namespace LittleEngine
 			vec3 moveDistance = glm::normalize(moveDir) * displacement;
 			transform.SetPosition(transform.GetPosition() + moveDistance);
 		}
+
+		// Update data in global camera buffer
+		GlobalCameraData data = {
+			.view = BuildViewMatrix(),
+			.projection = BuildProjectionMatrix(),
+			.camPos = transform.GetPosition()
+		};
+		globalCameraBuffer.TransferData(data); // TODO CHECK
 	}
 
 	glm::mat4 Camera::BuildViewMatrix()

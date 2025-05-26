@@ -2,8 +2,13 @@
 
 #include "Transform.h"
 
+#include "Vulkan/MemoryBuffers.h"
+#include "Vulkan/Descriptor.h"
+
 namespace LittleEngine
 {
+	using namespace VK;
+
 	class Camera
 	{
 	public:
@@ -25,6 +30,7 @@ namespace LittleEngine
 
 		~Camera(void) {}
 
+		void Init();
 		void Update(float dt = 1.0f);
 
 		glm::mat4 BuildViewMatrix();
@@ -38,11 +44,25 @@ namespace LittleEngine
 
 		inline Transform& GetCameraTransform() { return transform; }
 
+		// For Renderer Data
+		
+
 	protected:
 		float yaw;
 		float pitch;
 		float cameraMoveSpeed;
 
 		Transform transform;
+
+		struct GlobalCameraData
+		{
+			mat4 view;
+			mat4 projection;
+			vec3 camPos;
+			float pad0;
+		};
+
+		UniformBuffer globalCameraBuffer = UniformBuffer(sizeof GlobalCameraData);
+		DescriptorSetLayout cameraDescriptorSetLayout;
 	};
 }
