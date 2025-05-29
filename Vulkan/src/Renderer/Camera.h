@@ -8,6 +8,7 @@
 namespace LittleEngine
 {
 	using namespace VK;
+	using namespace glm;
 
 	class Camera
 	{
@@ -44,16 +45,10 @@ namespace LittleEngine
 
 		inline Transform& GetCameraTransform() { return transform; }
 
+		const UniformBuffer& GetGlobalCameraBuffer() const { return globalCameraBuffer; }
+		VkDescriptorSetLayoutBinding GetCameraGlobalDescriptorSetLayoutBinding() const;
+
 		// For Renderer Data
-		
-
-	protected:
-		float yaw;
-		float pitch;
-		float cameraMoveSpeed;
-
-		Transform transform;
-
 		struct GlobalCameraData
 		{
 			mat4 view;
@@ -62,7 +57,15 @@ namespace LittleEngine
 			float pad0;
 		};
 
+	protected:
+		float yaw;
+		float pitch;
+		float cameraMoveSpeed;
+
+		Transform transform;
+
+		
+
 		UniformBuffer globalCameraBuffer = UniformBuffer(sizeof GlobalCameraData);
-		DescriptorSetLayout cameraDescriptorSetLayout;
 	};
 }

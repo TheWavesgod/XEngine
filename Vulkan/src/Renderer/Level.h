@@ -8,6 +8,7 @@
 #include "../Vulkan/VkBase+.h"
 #include "../Vulkan/RenderPass.h"
 #include "../Vulkan/Framebuffer.h"
+#include "Vulkan/Descriptor.h"
 
 namespace LittleEngine
 {
@@ -27,6 +28,10 @@ namespace LittleEngine
 
 		CommandBuffer commandBuffer;
 		CommandPool commandPool;
+
+		DescriptorPool descriptorPool;
+		DescriptorSetLayout globalUniformDescriptorSetLayout; 
+		DescriptorSet globalUniformDescriptorSet;
 
 		Semaphore semaphore_imageIsAvailable;
 		std::vector<Semaphore> semaphores_renderingIsOver;

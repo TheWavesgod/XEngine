@@ -31,9 +31,18 @@ namespace LittleEngine
 			.size = sizeof glm::mat4
 		};
 
+		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
+			.setLayoutCount = 1,
+			//.pSetLayouts
+			.pushConstantRangeCount = 1,
+			.pPushConstantRanges = &pushRange
+		};
+
+		pipelineLayout.Create(pipelineLayoutCreateInfo);
+
 		GraphicsPipelineCreateInfoPack pipelineCreateInfoPack = {};
 		
-		//pipelineCreateInfoPack.createInfo.layout = 
+		pipelineCreateInfoPack.createInfo.layout = pipelineLayout;
 		pipelineCreateInfoPack.inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 		//pipelineCreateInfoPack.viewports.emplace_back(0.f, 0.f, float(windowSize.width), float(windowSize.height), 0.f, 1.f);
 		//pipelineCreateInfoPack.scissors.emplace_back(VkOffset2D{}, windowSize);

@@ -89,6 +89,31 @@ namespace LittleEngine
 		commandPool.AllocateBuffers(commandBuffer);
 
 		semaphores_renderingIsOver = std::vector<Semaphore>(VkBase::Base().SwapchainImageCount());
+
+		// Create Global Descriptor Set
+		VkDescriptorPoolSize descriptorPoolSizes[] = {
+			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}
+		};
+		descriptorPool.Create(1, descriptorPoolSizes);
+
+		VkDescriptorSetLayoutBinding globalCamUBDB = cam.GetCameraGlobalDescriptorSetLayoutBinding();
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo = {
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+			.bindingCount = 1,
+			.pBindings = &globalCamUBDB
+		};
+		globalUniformDescriptorSetLayout.Create(layoutInfo);
+
+		descriptorPool.AllocateSets(globalUniformDescriptorSet, globalUniformDescriptorSetLayout);
+
+		VkDescriptorBufferInfo bufferInfo = {
+			.buffer = cam.GetGlobalCameraBuffer(),
+			.offset = 0,
+			.range = sizeof Camera::GlobalCameraData
+		};
+
+		globalUniformDescriptorSet.Write(bufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 	}
 
 	void Level::RenderFrame()

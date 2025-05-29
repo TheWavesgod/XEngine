@@ -9,19 +9,6 @@ namespace LittleEngine
 
 	void Camera::Init()
 	{
-		VkDescriptorSetLayoutBinding uboLayoutBinding = {
-			.binding = 0,
-			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			.descriptorCount = 1,
-			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT
-		};
-
-		VkDescriptorSetLayoutCreateInfo layoutInfo = {
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-			.bindingCount = 1,
-			.pBindings = &uboLayoutBinding
-		};
-		cameraDescriptorSetLayout.Create(layoutInfo);
 	}
 
 	void Camera::Update(float dt)
@@ -74,6 +61,16 @@ namespace LittleEngine
 	glm::mat4 Camera::BuildProjectionMatrix()
 	{
 		return glm::perspective(glm::radians(45.0f), float(1280 / 720), 0.1f, 1000.0f);
+	}
+
+	VkDescriptorSetLayoutBinding Camera::GetCameraGlobalDescriptorSetLayoutBinding() const
+	{
+		return {
+			.binding = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT
+		};
 	}
 }
 

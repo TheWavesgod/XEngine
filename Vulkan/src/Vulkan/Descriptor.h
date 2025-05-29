@@ -54,7 +54,6 @@ namespace VK
     public:
         DescriptorPool() = default;
         DescriptorPool(VkDescriptorPoolCreateInfo& createInfo) { Create(createInfo); }
-
         DescriptorPool(uint32_t maxSetCount, arrayRef<const VkDescriptorPoolSize> poolSizes, VkDescriptorPoolCreateFlags flags = 0) { Create(maxSetCount, poolSizes, flags); }
        
         DescriptorPool(DescriptorPool&& other) noexcept { MoveHandle; }

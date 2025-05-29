@@ -31,6 +31,7 @@ namespace LittleEngine
 
 		std::shared_ptr<Mesh> mesh;
 
+		PipelineLayout pipelineLayout;
 		Pipeline pipeline;
 	};
 }
