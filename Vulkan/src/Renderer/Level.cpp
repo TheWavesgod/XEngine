@@ -1,6 +1,5 @@
 #include "Level.h"
 
-
 #include "../Vulkan/Attachment.h"
 
 namespace LittleEngine
@@ -131,7 +130,10 @@ namespace LittleEngine
 		commandBuffer.Begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 		renderPass.CmdBegin(commandBuffer, framebuffers[i], { {}, windowSize }, clearColors[0]);
 		{
-		
+			for (const RenderObject& ro : renderObjects)
+			{
+				ro.Draw(commandBuffer);
+			}
 		}
 		renderPass.CmdEnd(commandBuffer);
 		commandBuffer.End();
@@ -149,6 +151,15 @@ namespace LittleEngine
 
 	void Level::InitialScene()
 	{
+		cam.GetCameraTransform().SetPosition({ 0.0f, 0.0f, -3.0f });
 
+		renderObjects.emplace_back(Mesh::GenerateCube());
+		renderObjects.emplace_back(Mesh::GenerateCube());
+		renderObjects.emplace_back(Mesh::GenerateCube());
+
+		for (size_t i = 0; i < renderObjects.size(); ++i)
+		{
+			renderObjects[i].SetPosition({ -3.0f + (float)(i * 2), 0.0f, 5.0f });
+		}
 	}
 }

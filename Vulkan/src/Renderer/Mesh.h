@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <array>
 #include <memory>
 #include "glm.hpp"
 
@@ -21,7 +22,7 @@ namespace LittleEngine
 
 		Mesh();
 
-		enum MeshBufferType
+		enum MeshBufferType : uint32_t
 		{
 			VERTEX = 0,
 			TEXCOORD,
@@ -33,6 +34,9 @@ namespace LittleEngine
 			MAXBUFFER
 		};
 
+		// Getter
+		std::array<VkBuffer, MAXBUFFER> GetVertexBuffers() const;
+
 	protected:
 		// Mesh attributes
 		std::vector<glm::vec3> vertices;
@@ -43,7 +47,7 @@ namespace LittleEngine
 		std::vector<glm::vec4> colors;
 		std::vector<unsigned int> indices;
 
-		VertexBuffer vertexBuffers[MAXBUFFER];
+		std::array<VertexBuffer, MAXBUFFER> vertexBuffers;
 		IndexBuffer indexBuffer;
 
 		std::vector<VkVertexInputBindingDescription> bindingDescriptions;

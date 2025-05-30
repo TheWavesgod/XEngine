@@ -200,6 +200,8 @@ namespace LittleEngine
 
 		m->GenerateTangentCoords();
 
+		m->BufferData();
+
 		return m;
 	}
 
@@ -304,6 +306,16 @@ namespace LittleEngine
 	
 	Mesh::Mesh()
 	{
+	}
+
+	std::array<VkBuffer, MAXBUFFER> Mesh::GetVertexBuffers() const
+	{
+		std::array<VkBuffer, MAXBUFFER> buffers;
+		for (size_t i = 0; i < MAXBUFFER; ++i)
+		{
+			buffers[i] = vertexBuffers[i];
+		}
+		return buffers;
 	}
 
 	void Mesh::BufferData()

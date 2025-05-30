@@ -6,12 +6,25 @@
 
 namespace LittleEngine
 {
-	void RenderObject::Draw(VkCommandBuffer commandBuffer)
+	void RenderObject::Draw(VkCommandBuffer commandBuffer) const
 	{
-		PipelineLayout layout;
-		vkCmdPushConstants(commandBuffer, layout,
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+		
+		std::array<VkDeviceSize, 6> offsets = { 0, 0, 0, 0, 0, 0 };
+		vkCmdBindVertexBuffers(commandBuffer, 0, 
+			static_cast<uint32_t>(mesh->GetVertexBuffers().size()), 
+			mesh->GetVertexBuffers().data(),
+			offsets.data());
+		vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
+		vkCmdPushConstants(commandBuffer, pipelineLayout,
 			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 			0, sizeof glm::mat4, glm::value_ptr(transform.GetTransMatrix()));
+
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			pipelineLayout, 0, 1, );
+
+		vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
 	}
 
 	void RenderObject::Create()

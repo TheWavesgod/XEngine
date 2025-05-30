@@ -22,7 +22,7 @@ namespace LittleEngine
 
 		void SetPosition(const vec3& newPos) { transform.SetPosition(newPos); }
 
-		void Draw(VkCommandBuffer commandBuffer);
+		void Draw(VkCommandBuffer commandBuffer) const;
 
 	protected:
 		void Create();

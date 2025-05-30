@@ -64,8 +64,6 @@ namespace LittleEngine
 
 		Transform transform;
 
-		
-
-		UniformBuffer globalCameraBuffer = UniformBuffer(sizeof GlobalCameraData);
+		UniformBuffer globalCameraBuffer = UniformBuffer(sizeof(GlobalCameraData));
 	};
 }
