@@ -32,7 +32,6 @@
     <ClCompile Include="src\Vulkan\Framebuffer.cpp" />
     <ClCompile Include="src\Vulkan\Image.cpp" />
     <ClCompile Include="src\Vulkan\Instance.cpp" />
-    <ClCompile Include="src\main1.cpp" />
     <ClCompile Include="src\Renderer\Renderer.cpp" />
     <ClCompile Include="src\Vulkan\Command.cpp" />
     <ClCompile Include="src\Vulkan\Memory.cpp" />
@@ -123,6 +122,7 @@
     <ClCompile Include="src\Vulkan\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Renderer\example.h" />
     <ClInclude Include="src\Renderer\Level.h" />
     <ClInclude Include="src\Renderer\Camera.h" />
     <ClInclude Include="src\Renderer\Light.h" />
@@ -222,13 +222,13 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LibraryPath>$(LibraryPath)</LibraryPath>
-    <OutDir>$(SolutionDir)$(ProjectName)_$(Platform)\$(Configuration)\</OutDir>
+    <OutDir>$(SolutionDir)$(ProjectName)_$(Platform)_$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)bin\$(ProjectName)_$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(SolutionDir)Dependency\Vulkan\Include;$(SolutionDir)Dependency\GLFW\include;$(SolutionDir)Dependency\glm;$(SolutionDir)Vulkan\src;$(SolutionDir)Dependency;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LibraryPath>$(LibraryPath)</LibraryPath>
-    <OutDir>$(SolutionDir)$(ProjectName)_$(Platform)\$(Configuration)</OutDir>
+    <OutDir>$(SolutionDir)$(ProjectName)_$(Platform)_$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)bin\$(ProjectName)_$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(SolutionDir)Dependency\Vulkan\Include;$(SolutionDir)Dependency\GLFW\include;$(SolutionDir)Dependency\glm;$(SolutionDir)Vulkan\src;$(SolutionDir)Dependency;$(IncludePath)</IncludePath>
   </PropertyGroup>

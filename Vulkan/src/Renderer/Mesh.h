@@ -22,7 +22,7 @@ namespace LittleEngine
 
 		Mesh();
 
-		enum MeshBufferType : uint32_t
+		enum MeshBufferType
 		{
 			VERTEX = 0,
 			TEXCOORD,
@@ -34,8 +34,16 @@ namespace LittleEngine
 			MAXBUFFER
 		};
 
+		bool UseIndices() const { return !indices.empty(); }
+
 		// Getter
-		std::array<VkBuffer, MAXBUFFER> GetVertexBuffers() const;
+		std::array<VkBuffer, MeshBufferType::MAXBUFFER> GetVertexBuffers() const;
+		const IndexBuffer& GetIndexBuffer() const { return indexBuffer; }
+		uint32_t GetVertexCount() const { return static_cast<uint32_t>(vertices.size()); }
+		uint32_t GetIndexCount() const { return static_cast<uint32_t>(indices.size()); }
+
+		const std::vector<VkVertexInputBindingDescription>& GetVertexInputBindings() const { return bindingDescriptions; }
+		const std::vector<VkVertexInputAttributeDescription>& GetVertexInputAttributes() const { return attributeDescriptions; }
 
 	protected:
 		// Mesh attributes

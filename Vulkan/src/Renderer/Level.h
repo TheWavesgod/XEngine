@@ -5,10 +5,11 @@
 #include "RenderObject.h"
 #include "Camera.h"
 
-#include "../Vulkan/VkBase+.h"
-#include "../Vulkan/RenderPass.h"
-#include "../Vulkan/Framebuffer.h"
+#include "Vulkan/VkBase+.h"
+#include "Vulkan/RenderPass.h"
+#include "Vulkan/Framebuffer.h"
 #include "Vulkan/Descriptor.h"
+#include "Vulkan/Attachment.h"
 
 namespace LittleEngine
 {
@@ -44,6 +45,8 @@ namespace LittleEngine
 			RenderPass renderPass;
 			std::vector<Framebuffer> framebuffers;
 		} rpwf_swapChain;
+
+		std::vector<DepthStencilAttachment> dsas_screenWithDS;
 
 	private:
 		void InitialScene();

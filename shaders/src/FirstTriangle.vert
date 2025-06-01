@@ -2,19 +2,11 @@
 
 #pragma shader_stage(vertex)
 
-vec2 positions[3] = {
-    {    0, -.5f },
-    { -.5f,  .5f },
-    {  .5f,  .5f }
-};
+layout(location = 0) in vec2 i_Position;
+layout(location = 1) in vec4 i_Color;
+layout(location = 0) out vec4 o_Color;
 
-int add(int i)
-{
-    return i;
-}
-
-void main()
-{
-    int b = add(1);
-    gl_Position = vec4(positions[gl_VertexIndex], 0, 1);   
+void main() {
+    gl_Position = vec4(i_Position, 0, 1);
+    o_Color = i_Color;
 }

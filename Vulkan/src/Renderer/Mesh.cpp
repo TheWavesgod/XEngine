@@ -308,7 +308,7 @@ namespace LittleEngine
 	{
 	}
 
-	std::array<VkBuffer, MAXBUFFER> Mesh::GetVertexBuffers() const
+	std::array<VkBuffer, Mesh::MAXBUFFER> Mesh::GetVertexBuffers() const
 	{
 		std::array<VkBuffer, MAXBUFFER> buffers;
 		for (size_t i = 0; i < MAXBUFFER; ++i)

@@ -90,7 +90,6 @@ namespace VK
         const CommandBuffer& CommandBuffer_Transfer() const { return commandBuffer_transfer; }
         
         //Const Function
-        //简化命令提交
         result_t ExecuteCommandBuffer_Graphics(VkCommandBuffer commandBuffer) const
         {
             Fence fence;

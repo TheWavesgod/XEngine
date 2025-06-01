@@ -48,7 +48,7 @@ void CreateLayout()
     descriptorSetLayout_texture.Create(descriptorSetLayoutCreateInfo_texture);
 
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
-        .setLayoutCount = 1,
+        .setLayoutCount = 0,
         .pSetLayouts = descriptorSetLayout_texture.Address()
     };
     pipelineLayout_texture.Create(pipelineLayoutCreateInfo);
@@ -62,8 +62,8 @@ void CreateLayout()
 
 void CreatePipeline()
 {
-    static ShaderModule vert("../shaders/Texture.vert.spv");
-    static ShaderModule frag("../shaders/Texture.frag.spv");
+    static ShaderModule vert("FirstTriangle.vert");
+    static ShaderModule frag("FirstTriangle.frag");
 
     static VkPipelineShaderStageCreateInfo shaderStageCreateInfos_triangle[2] = {
         vert.StageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT),

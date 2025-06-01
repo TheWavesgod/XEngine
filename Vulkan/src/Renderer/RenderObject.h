@@ -9,6 +9,12 @@
 
 #include "vulkan/Pipeline.h"
 
+namespace VK
+{
+	class DescriptorSet;
+	class RenderPass;
+	class DescriptorSetLayout;
+}
 
 namespace LittleEngine
 {
@@ -18,15 +24,15 @@ namespace LittleEngine
 	class RenderObject
 	{
 	public:
-		RenderObject(std::shared_ptr<Mesh> mesh) : mesh(mesh) {}
+		RenderObject(std::shared_ptr<Mesh> mesh) : mesh(mesh) { }
 
 		void SetPosition(const vec3& newPos) { transform.SetPosition(newPos); }
 
-		void Draw(VkCommandBuffer commandBuffer) const;
+		void Draw(VkCommandBuffer commandBuffer, const DescriptorSet& globalSet) const;
 
+		void Create(const RenderPass& rp, const DescriptorSetLayout& gds);
+	
 	protected:
-		void Create();
-
 		Transform transform;
 
 		std::shared_ptr<Mesh> mesh;

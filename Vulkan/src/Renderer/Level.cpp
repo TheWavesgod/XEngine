@@ -1,6 +1,6 @@
 #include "Level.h"
 
-#include "../Vulkan/Attachment.h"
+#include "example.h"
 
 namespace LittleEngine
 {
@@ -37,7 +37,7 @@ namespace LittleEngine
 			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 			.colorAttachmentCount = 1,
 			.pColorAttachments = attachmentReferences,
-			//.pDepthStencilAttachment = attachmentReferences + 1
+			.pDepthStencilAttachment = attachmentReferences + 1
 		};
 
 		VkSubpassDependency subpassDependency = {
@@ -51,17 +51,16 @@ namespace LittleEngine
 		};
 
 		VkRenderPassCreateInfo renderPassCreateInfo = {
-			.attachmentCount = 1,
+			.attachmentCount = 2,
 			.pAttachments = attachmentDescriptions,
 			.subpassCount = 1,
 			.pSubpasses = &subpassDescription,
-			//.dependencyCount = 1,
-			//.pDependencies = &subpassDependency
+			.dependencyCount = 1,
+			.pDependencies = &subpassDependency
 		};
 		rpwf_swapChain.renderPass.Create(renderPassCreateInfo);
 
-		std::vector<DepthStencilAttachment> dsas_screenWithDS;
-
+		// Create Render Attachment
 		dsas_screenWithDS.resize(VkBase::Base().SwapchainImageCount());
 		rpwf_swapChain.framebuffers.resize(VkBase::Base().SwapchainImageCount());
 		for (auto& i : dsas_screenWithDS)
@@ -69,7 +68,7 @@ namespace LittleEngine
 
 		VkFramebufferCreateInfo framebufferCreateInfo = {
 			.renderPass = rpwf_swapChain.renderPass,
-			.attachmentCount = 1,
+			.attachmentCount = 2,
 			.width = windowSize.width,
 			.height = windowSize.height,
 			.layers = 1
@@ -113,6 +112,12 @@ namespace LittleEngine
 		};
 
 		globalUniformDescriptorSet.Write(bufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+
+		InitialScene();
+
+		CreateLayout();
+		CreatePipeline(rpwf_swapChain.renderPass, windowSize);
+		CreateRenderObject();
 	}
 
 	void Level::RenderFrame()
@@ -124,16 +129,22 @@ namespace LittleEngine
 
 		VkClearValue clearColors[2] = {
 			{ 0.0f, 0.1f, 0.1f, 1.f },
-			{ 1.0f, 0}
+			{ 1.0f, 0.0f}
 		};
 
 		commandBuffer.Begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-		renderPass.CmdBegin(commandBuffer, framebuffers[i], { {}, windowSize }, clearColors[0]);
+		renderPass.CmdBegin(commandBuffer, framebuffers[i], { {}, windowSize }, clearColors);
 		{
 			for (const RenderObject& ro : renderObjects)
 			{
-				ro.Draw(commandBuffer);
+				ro.Draw(commandBuffer, globalUniformDescriptorSet);
 			}
+
+			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_triangle);
+			VkDeviceSize offset = 0;
+			vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffer.Address(), &offset);
+			vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+			vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
 		}
 		renderPass.CmdEnd(commandBuffer);
 		commandBuffer.End();
@@ -160,6 +171,7 @@ namespace LittleEngine
 		for (size_t i = 0; i < renderObjects.size(); ++i)
 		{
 			renderObjects[i].SetPosition({ -3.0f + (float)(i * 2), 0.0f, 5.0f });
+			renderObjects[i].Create(rpwf_swapChain.renderPass, globalUniformDescriptorSetLayout);
 		}
 	}
 }
