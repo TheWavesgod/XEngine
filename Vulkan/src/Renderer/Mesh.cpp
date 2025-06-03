@@ -308,15 +308,15 @@ namespace LittleEngine
 	{
 	}
 
-	std::array<VkBuffer, Mesh::MAXBUFFER> Mesh::GetVertexBuffers() const
-	{
-		std::array<VkBuffer, MAXBUFFER> buffers;
-		for (size_t i = 0; i < MAXBUFFER; ++i)
-		{
-			buffers[i] = vertexBuffers[i];
-		}
-		return buffers;
-	}
+	//std::array<VkBuffer, Mesh::MAXBUFFER> Mesh::GetVertexBuffers() const
+	//{
+	//	std::array<VkBuffer, MAXBUFFER> buffers;
+	//	for (size_t i = 0; i < MAXBUFFER; ++i)
+	//	{
+	//		buffers[i] = vertexBuffers[i];
+	//	}
+	//	return buffers;
+	//}
 
 	void Mesh::BufferData()
 	{
@@ -369,14 +369,6 @@ namespace LittleEngine
 			{ 3, 3, VK_FORMAT_R32G32B32_SFLOAT, 0 }, // tangent
 			{ 4, 4, VK_FORMAT_R32G32B32_SFLOAT, 0 }, // bitangent
 			{ 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT, 0 }, // color
-		};
-
-		VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-			.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size()),
-			.pVertexBindingDescriptions = bindingDescriptions.data(),
-			.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
-			.pVertexAttributeDescriptions = attributeDescriptions.data()
 		};
 	}
 

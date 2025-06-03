@@ -5,7 +5,7 @@
 #include <memory>
 #include "glm.hpp"
 
-#include "../Vulkan/MemoryBuffers.h"
+#include "Vulkan/MemoryBuffers.h"
 
 namespace LittleEngine
 {
@@ -37,7 +37,7 @@ namespace LittleEngine
 		bool UseIndices() const { return !indices.empty(); }
 
 		// Getter
-		std::array<VkBuffer, MeshBufferType::MAXBUFFER> GetVertexBuffers() const;
+		const std::array<VertexBuffer, MAXBUFFER>& GetVertexBuffers() const { return vertexBuffers; }
 		const IndexBuffer& GetIndexBuffer() const { return indexBuffer; }
 		uint32_t GetVertexCount() const { return static_cast<uint32_t>(vertices.size()); }
 		uint32_t GetIndexCount() const { return static_cast<uint32_t>(indices.size()); }
@@ -53,7 +53,7 @@ namespace LittleEngine
 		std::vector<glm::vec3> tangents;
 		std::vector<glm::vec3> biTangents;
 		std::vector<glm::vec4> colors;
-		std::vector<unsigned int> indices;
+		std::vector<uint32_t> indices;
 
 		std::array<VertexBuffer, MAXBUFFER> vertexBuffers;
 		IndexBuffer indexBuffer;

@@ -9,20 +9,21 @@
 
 namespace LittleEngine
 {
-	void RenderObject::Draw(VkCommandBuffer commandBuffer, const DescriptorSet& globalSet) const
+	void RenderObject::Draw(VkCommandBuffer commandBuffer, const DescriptorSet& globalSet) const  
 	{
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 		
-		const std::array<VkDeviceSize, Mesh::MAXBUFFER> offsets = { 0, 0, 0, 0, 0, 0 };
-		std::array<VkBuffer, Mesh::MAXBUFFER> tmp = mesh->GetVertexBuffers();
-		vkCmdBindVertexBuffers(commandBuffer, 0, 
-			static_cast<uint32_t>(mesh->GetVertexBuffers().size()), 
-			mesh->GetVertexBuffers().data(),
-			offsets.data());
+		VkDeviceSize offset = 0;
+		vkCmdBindVertexBuffers(commandBuffer, Mesh::VERTEX, 1, mesh->GetVertexBuffers()[Mesh::VERTEX].Address(), &offset);
+		vkCmdBindVertexBuffers(commandBuffer, Mesh::TEXCOORD, 1, mesh->GetVertexBuffers()[Mesh::TEXCOORD].Address(), &offset);
+		vkCmdBindVertexBuffers(commandBuffer, Mesh::NORMAL, 1, mesh->GetVertexBuffers()[Mesh::NORMAL].Address(), &offset);
+		vkCmdBindVertexBuffers(commandBuffer, Mesh::TANGENT, 1, mesh->GetVertexBuffers()[Mesh::TANGENT].Address(), &offset);
+		vkCmdBindVertexBuffers(commandBuffer, Mesh::BiTANGENT, 1, mesh->GetVertexBuffers()[Mesh::BiTANGENT].Address(), &offset);
+		vkCmdBindVertexBuffers(commandBuffer, Mesh::COLOUR, 1, mesh->GetVertexBuffers()[Mesh::COLOUR].Address(), &offset);
 
 		if (mesh->UseIndices())
 		{
-			vkCmdBindIndexBuffer(commandBuffer, mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT16);
+			vkCmdBindIndexBuffer(commandBuffer, mesh->GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 		}
 
 		vkCmdPushConstants(commandBuffer, pipelineLayout,
@@ -44,6 +45,8 @@ namespace LittleEngine
 
 	void RenderObject::Create(const RenderPass& rp, const DescriptorSetLayout& gdsl)
 	{
+		const VkExtent2D& windowSize = VkBase::Base().SwapchainCreateInfo().imageExtent;
+
 		ShaderModule vert("GeneralPBR.vert");
 		ShaderModule frag("GeneralPBR.frag");
 
@@ -70,8 +73,6 @@ namespace LittleEngine
 
 		GraphicsPipelineCreateInfoPack pipelineCiPack = {};
 		
-		const VkExtent2D& windowSize = VkBase::Base().SwapchainCreateInfo().imageExtent;
-
 		pipelineCiPack.createInfo.layout = pipelineLayout;
 		pipelineCiPack.createInfo.renderPass = rp;
 		pipelineCiPack.vertexInputBindings = mesh->GetVertexInputBindings();

@@ -200,8 +200,5 @@
     <ClInclude Include="src\Renderer\Material.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\Renderer\example.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

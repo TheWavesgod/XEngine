@@ -122,7 +122,6 @@
     <ClCompile Include="src\Vulkan\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Renderer\example.h" />
     <ClInclude Include="src\Renderer\Level.h" />
     <ClInclude Include="src\Renderer\Camera.h" />
     <ClInclude Include="src\Renderer\Light.h" />

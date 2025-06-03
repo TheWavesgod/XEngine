@@ -67,8 +67,10 @@ namespace VK
         void UpdateAllArrays()
         {
             createInfo.stageCount = shaderStages.size();
+
             vertexInputStateCreateInfo.vertexBindingDescriptionCount = vertexInputBindings.size();
             vertexInputStateCreateInfo.vertexAttributeDescriptionCount = vertexInputAttributes.size();
+
             viewportStateCreateInfo.viewportCount = viewports.size() ? uint32_t(viewports.size()) : dynamicViewportCount;
             viewportStateCreateInfo.scissorCount = scissors.size() ? uint32_t(scissors.size()) : dynamicScissorCount;
             colorBlendStateCreateInfo.attachmentCount = colorBlendAttachmentStates.size();

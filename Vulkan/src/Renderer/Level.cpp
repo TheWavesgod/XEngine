@@ -1,7 +1,5 @@
 #include "Level.h"
 
-#include "example.h"
-
 namespace LittleEngine
 {
 	using namespace VK;
@@ -114,10 +112,6 @@ namespace LittleEngine
 		globalUniformDescriptorSet.Write(bufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
 		InitialScene();
-
-		CreateLayout();
-		CreatePipeline(rpwf_swapChain.renderPass, windowSize);
-		CreateRenderObject();
 	}
 
 	void Level::RenderFrame()
@@ -139,12 +133,6 @@ namespace LittleEngine
 			{
 				ro.Draw(commandBuffer, globalUniformDescriptorSet);
 			}
-
-			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_triangle);
-			VkDeviceSize offset = 0;
-			vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffer.Address(), &offset);
-			vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-			vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
 		}
 		renderPass.CmdEnd(commandBuffer);
 		commandBuffer.End();
@@ -170,8 +158,8 @@ namespace LittleEngine
 
 		for (size_t i = 0; i < renderObjects.size(); ++i)
 		{
-			renderObjects[i].SetPosition({ -3.0f + (float)(i * 2), 0.0f, 5.0f });
 			renderObjects[i].Create(rpwf_swapChain.renderPass, globalUniformDescriptorSetLayout);
+			renderObjects[i].SetPosition({ -3.0f + (float)(i * 2), 0.0f, 5.0f });
 		}
 	}
 }
