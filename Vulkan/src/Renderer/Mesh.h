@@ -27,7 +27,7 @@ namespace LittleEngine
 			VERTEX = 0,
 			TEXCOORD,
 			NORMAL,
-			TANGENT,
+			TANGENT,	
 			BiTANGENT,
 			COLOUR,
 

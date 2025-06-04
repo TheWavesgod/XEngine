@@ -29,7 +29,7 @@ namespace LittleEngine
 			glm::vec2(0.5f, 0.0f)
 		};
 
-		m->GenerateTangentCoords();
+		m->BufferData();
 
 		return m;
 	}
@@ -308,68 +308,64 @@ namespace LittleEngine
 	{
 	}
 
-	//std::array<VkBuffer, Mesh::MAXBUFFER> Mesh::GetVertexBuffers() const
-	//{
-	//	std::array<VkBuffer, MAXBUFFER> buffers;
-	//	for (size_t i = 0; i < MAXBUFFER; ++i)
-	//	{
-	//		buffers[i] = vertexBuffers[i];
-	//	}
-	//	return buffers;
-	//}
-
 	void Mesh::BufferData()
 	{
+		// position
 		vertexBuffers[VERTEX].Create(vertices.size() * sizeof(glm::vec3));
 		vertexBuffers[VERTEX].TransferData(vertices.data());
+		bindingDescriptions.push_back({ .binding = VERTEX, .stride = sizeof(glm::vec3),
+				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX });
+		attributeDescriptions.push_back({ VERTEX, VERTEX, VK_FORMAT_R32G32B32_SFLOAT, 0 });
+
 		if (!texCoords.empty())
 		{
 			vertexBuffers[TEXCOORD].Create(texCoords.size() * sizeof(glm::vec2));
 			vertexBuffers[TEXCOORD].TransferData(texCoords.data());
+			bindingDescriptions.push_back({ .binding = TEXCOORD, .stride = sizeof(glm::vec2),
+				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX });
+			attributeDescriptions.push_back({ TEXCOORD, TEXCOORD, VK_FORMAT_R32G32_SFLOAT, 0 });
 		}
+
 		if (!normals.empty())
 		{
 			vertexBuffers[NORMAL].Create(normals.size() * sizeof(glm::vec3));
 			vertexBuffers[NORMAL].TransferData(normals.data());
+			bindingDescriptions.push_back({ .binding = NORMAL, .stride = sizeof(glm::vec3),
+				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX });
+			attributeDescriptions.push_back({ NORMAL, NORMAL, VK_FORMAT_R32G32B32_SFLOAT, 0 });
 		}
+
 		if (!tangents.empty())
 		{
 			vertexBuffers[TANGENT].Create(tangents.size() * sizeof(glm::vec3));
 			vertexBuffers[TANGENT].TransferData(tangents.data());
+			bindingDescriptions.push_back({ .binding = TANGENT, .stride = sizeof(glm::vec3),
+				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX });
+			attributeDescriptions.push_back({ TANGENT, TANGENT, VK_FORMAT_R32G32B32_SFLOAT, 0 });
 		}
+
 		if (!biTangents.empty())
 		{
 			vertexBuffers[BiTANGENT].Create(biTangents.size() * sizeof(glm::vec3));
 			vertexBuffers[BiTANGENT].TransferData(biTangents.data());
+			bindingDescriptions.push_back({ .binding = BiTANGENT, .stride = sizeof(glm::vec3),
+				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX });
+			attributeDescriptions.push_back({ BiTANGENT, BiTANGENT, VK_FORMAT_R32G32B32_SFLOAT, 0 });
 		}
+
 		if (!colors.empty())
 		{
 			vertexBuffers[COLOUR].Create(colors.size() * sizeof(glm::vec4));
 			vertexBuffers[COLOUR].TransferData(colors.data());
+			bindingDescriptions.push_back({ .binding = COLOUR, .stride = sizeof(glm::vec4),
+				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX });
+			attributeDescriptions.push_back({ COLOUR, COLOUR, VK_FORMAT_R32G32B32A32_SFLOAT, 0 });
 		}
 		if (!indices.empty())
 		{
 			indexBuffer.Create(indices.size() * sizeof(unsigned int));
 			indexBuffer.TransferData(indices.data());
 		}
-
-		bindingDescriptions = {
-			{.binding = 0, .stride = sizeof(glm::vec3), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX }, // position
-		    {.binding = 1, .stride = sizeof(glm::vec2), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX }, // Taxcoord	
-		    {.binding = 2, .stride = sizeof(glm::vec3), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX }, // normal
-		    {.binding = 3, .stride = sizeof(glm::vec3), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX }, // tangent
-		    {.binding = 4, .stride = sizeof(glm::vec3), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX }, // bitangent
-			{.binding = 5, .stride = sizeof(glm::vec4), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX }, // color
-		};
-
-		attributeDescriptions = {
-			{ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 }, // position
-			{ 1, 1, VK_FORMAT_R32G32_SFLOAT, 0 }, // texCoord
-			{ 2, 2, VK_FORMAT_R32G32B32_SFLOAT, 0 }, // normal
-			{ 3, 3, VK_FORMAT_R32G32B32_SFLOAT, 0 }, // tangent
-			{ 4, 4, VK_FORMAT_R32G32B32_SFLOAT, 0 }, // bitangent
-			{ 5, 5, VK_FORMAT_R32G32B32A32_SFLOAT, 0 }, // color
-		};
 	}
 
 	void Mesh::GenerateTangentCoords(int numPrimitive)

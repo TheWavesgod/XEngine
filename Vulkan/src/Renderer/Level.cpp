@@ -1,8 +1,71 @@
 #include "Level.h"
 
+#include "vulkan/Shader.h"
+
 namespace LittleEngine
 {
 	using namespace VK;
+
+	glm::vec3 positions[] = {
+		{0.0f, -.5f, .0f},
+		{-.5f,  .5f, .0f},
+		{ .5f,  .5f, .0f}
+	};
+	glm::vec4 colors[] = {
+		{1, 0, 0, 1},
+		{0, 1, 0, 1},
+		{0, 0, 1, 1}
+	};
+	glm::vec2 uvs[] = {
+		{0.0f, 0.0f},
+		{0.0f, 0.0f},
+		{0.0f, 0.0f}
+	};
+	VertexBuffer vb_position;
+	VertexBuffer vb_color;
+	VertexBuffer vb_uv;
+
+	Pipeline pipeline_triangle;
+	PipelineLayout pipelineLayout_triangle;
+
+	void CreatePipelineTriangle(VkRenderPass rp, std::shared_ptr<Mesh> mesh)
+	{
+		auto windowSize = VkBase::Base().SwapchainCreateInfo().imageExtent;
+
+		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+		pipelineLayout_triangle.Create(pipelineLayoutCreateInfo);
+
+		static ShaderModule vert("FirstTriangle.vert");
+		static ShaderModule frag("FirstTriangle.frag");
+
+		static VkPipelineShaderStageCreateInfo shaderStageCreateInfos_triangle[2] = {
+			vert.StageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT),
+			frag.StageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT)
+		};
+
+		GraphicsPipelineCreateInfoPack pipelineCreateInfoPack = {};
+		pipelineCreateInfoPack.vertexInputBindings = mesh->GetVertexInputBindings();
+		pipelineCreateInfoPack.vertexInputAttributes = mesh->GetVertexInputAttributes();
+		pipelineCreateInfoPack.createInfo.layout = pipelineLayout_triangle;
+		pipelineCreateInfoPack.createInfo.renderPass = rp;
+		pipelineCreateInfoPack.inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		pipelineCreateInfoPack.viewports.emplace_back(0.f, 0.f, float(windowSize.width), float(windowSize.height), 0.f, 1.f);
+		pipelineCreateInfoPack.scissors.emplace_back(VkOffset2D{}, windowSize);
+		pipelineCreateInfoPack.multisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+		pipelineCreateInfoPack.colorBlendAttachmentStates.push_back({ .colorWriteMask = 0b1111 });
+		pipelineCreateInfoPack.UpdateAllArrays();
+		pipelineCreateInfoPack.createInfo.stageCount = 2;
+		pipelineCreateInfoPack.createInfo.pStages = shaderStageCreateInfos_triangle;
+
+		pipeline_triangle.Create(pipelineCreateInfoPack);
+
+		vb_position.Create(sizeof positions);
+		vb_color.Create(sizeof colors);
+		vb_uv.Create(sizeof uvs);
+		vb_position.TransferData(positions);
+		vb_color.TransferData(colors);
+		vb_uv.TransferData(uvs);
+	}
 
 	void Level::Initialize()
 	{
@@ -112,6 +175,9 @@ namespace LittleEngine
 		globalUniformDescriptorSet.Write(bufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
 		InitialScene();
+
+		triangle = Mesh::GenerateTriangle();
+		CreatePipelineTriangle(rpwf_swapChain.renderPass, triangle);
 	}
 
 	void Level::RenderFrame()
@@ -133,6 +199,20 @@ namespace LittleEngine
 			{
 				ro.Draw(commandBuffer, globalUniformDescriptorSet);
 			}
+
+			const VertexBuffer& vb_tmp_pos = triangle->GetVertexBuffers()[Mesh::VERTEX];
+			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_triangle);
+			VkDeviceSize offset = 0;
+			vkCmdBindVertexBuffers(commandBuffer, Mesh::VERTEX, 1, vb_tmp_pos.Address(), &offset);
+			vkCmdBindVertexBuffers(commandBuffer, Mesh::TEXCOORD, 1, triangle->GetVertexBuffers()[Mesh::TEXCOORD].Address(), &offset);
+			vkCmdBindVertexBuffers(commandBuffer, Mesh::COLOUR, 1, triangle->GetVertexBuffers()[Mesh::COLOUR].Address(), &offset);
+			vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_triangle);
+			vkCmdBindVertexBuffers(commandBuffer, Mesh::VERTEX, 1, vb_position.Address(), &offset);
+			vkCmdBindVertexBuffers(commandBuffer, Mesh::TEXCOORD, 1, vb_uv.Address(), &offset);
+			vkCmdBindVertexBuffers(commandBuffer, Mesh::COLOUR, 1, vb_color.Address(), &offset);
+			vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 		}
 		renderPass.CmdEnd(commandBuffer);
 		commandBuffer.End();
