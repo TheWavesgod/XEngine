@@ -8,6 +8,10 @@ namespace VK
 {
 	class Texture 
 	{
+	protected:
+		ImageView imageView;
+		ImageMemory imageMemory;
+
 	public:
 		//Getter
 		VkImageView ImageViewRef() const { return imageView; }
@@ -29,9 +33,9 @@ namespace VK
 		[[nodiscard]]
 		static std::unique_ptr<uint8_t[]> LoadFile(const uint8_t* fileBinaries, size_t fileSize, VkExtent2D& extent, formatInfo requiredFormatInfo);
 		
-
+#ifdef WIN32
 		std::pair<const uint8_t*, size_t> LoadResourceFromModule(int32_t resourceId, HMODULE hModule = NULL);
-
+#endif
 
 		static uint32_t CalculateMipLevelCount(VkExtent2D extent);
 
@@ -48,9 +52,6 @@ namespace VK
 		
 
 	protected:
-		ImageView imageView;
-		ImageMemory imageMemory;
-
 		//--------------------------
 		Texture() = default;
 

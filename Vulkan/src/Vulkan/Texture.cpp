@@ -15,6 +15,7 @@ namespace VK
 		return LoadFile_Internal(fileBinaries, fileSize, extent, requiredFormatInfo);
 	}
 
+#ifdef WIN32
 	std::pair<const uint8_t*, size_t> Texture::LoadResourceFromModule(int32_t resourceId, HMODULE hModule)
 	{
 		if (HRSRC hResource = FindResource(hModule, MAKEINTRESOURCE(resourceId), RT_RCDATA))
@@ -23,6 +24,7 @@ namespace VK
 					return { pData, SizeofResource(hModule, hResource) };
 		return {};
 	}
+#endif
 	
 	uint32_t Texture::CalculateMipLevelCount(VkExtent2D extent)
 	{
