@@ -28,7 +28,7 @@ namespace LittleEngine
 
 		vkCmdPushConstants(commandBuffer, pipelineLayout,
 			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-			0, sizeof glm::mat4, glm::value_ptr(transform.GetTransMatrix()));
+			0, sizeof(glm::mat4), glm::value_ptr(transform.GetTransMatrix()));
 
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			pipelineLayout, 0, 1, globalSet.Address(), 0, nullptr);
@@ -59,14 +59,14 @@ namespace LittleEngine
 		VkPushConstantRange pushRange = {
 			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 			.offset = 0,
-			.size = sizeof glm::mat4
+			.size = sizeof(glm::mat4)
 		};
 
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
 			.setLayoutCount = 1,
 			.pSetLayouts = gdsl.Address(),
 			.pushConstantRangeCount = 1,
-			.pPushConstantRanges = &pushRange
+			.pPushConstantRanges = &pushRange  
 		};
 
 		pipelineLayout.Create(pipelineLayoutCreateInfo);

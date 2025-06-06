@@ -17,7 +17,7 @@ namespace LittleEngine
 		{
 			yaw = 90.0f;
 			pitch = 0.0f;
-			cameraMoveSpeed = 30.0f;
+			cameraMoveSpeed = 10.0f;
 			transform.SetPosition(glm::vec3(0.0f, 0.0f, 3.0f));
 		}
 
@@ -25,7 +25,7 @@ namespace LittleEngine
 		{
 			this->pitch = pitch;
 			this->yaw = yaw;
-			this->cameraMoveSpeed = 30.0f;
+			this->cameraMoveSpeed = 10.0f;
 			transform.SetPosition(position);
 		}
 
@@ -38,10 +38,10 @@ namespace LittleEngine
 		glm::mat4 BuildProjectionMatrix();
 
 		float GetCameraYaw() const { return yaw; }
-		void SetCameraYaw(const float& y) { yaw = y; }
+		void SetCameraYaw(const float& y) { yaw = y; transform.SetRotation(vec3(pitch, yaw, 0.0f)); }
 
 		float GetCameraPitch() const { return pitch; }
-		void SetCameraPitch(const float& p) { pitch = p; }
+		void SetCameraPitch(const float& p) { pitch = p; transform.SetRotation(vec3(pitch, yaw, 0.0f)); }
 
 		inline Transform& GetCameraTransform() { return transform; }
 
@@ -55,7 +55,7 @@ namespace LittleEngine
 			mat4 projection;
 			vec3 camPos;
 			float pad0;
-		};
+		} data;
 
 	protected:
 		float yaw;

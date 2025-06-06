@@ -30,8 +30,6 @@ namespace LittleEngine
 		CommandBuffer commandBuffer;
 		CommandPool commandPool;
 
-		std::shared_ptr<Mesh> triangle;
-
 		DescriptorPool descriptorPool;
 		DescriptorSetLayout globalUniformDescriptorSetLayout; 
 		DescriptorSet globalUniformDescriptorSet;

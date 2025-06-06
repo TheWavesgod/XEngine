@@ -12,9 +12,9 @@ namespace LittleEngine
 		std::shared_ptr<Mesh> m(defaultMeshes[TRIANGLE]);
 
 		m->vertices = {
-			glm::vec3(-0.5f, -0.5f, 0.0f),
-			glm::vec3(0.5f, -0.5f, 0.0f),
-			glm::vec3(0.0f,  0.5f, 0.0f)
+			glm::vec3(-0.5f, 0.5f, 0.0f),
+			glm::vec3( 0.5f, 0.5f, 0.0f),
+			glm::vec3( 0.0f,-0.5f, 0.0f)
 		};
 
 		m->colors = {
@@ -309,18 +309,22 @@ namespace LittleEngine
 	}
 
 	void Mesh::BufferData()
-	{
+	{ 
 		// position
-		vertexBuffers[VERTEX].Create(vertices.size() * sizeof(glm::vec3));
-		vertexBuffers[VERTEX].TransferData(vertices.data());
+		VkDeviceSize bufferSize = vertices.size() * sizeof(glm::vec3);
+		vertexBuffers[VERTEX].Create(bufferSize);
+		vertexBuffers[VERTEX].TransferData(vertices.data(), bufferSize);
+
 		bindingDescriptions.push_back({ .binding = VERTEX, .stride = sizeof(glm::vec3),
 				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX });
 		attributeDescriptions.push_back({ VERTEX, VERTEX, VK_FORMAT_R32G32B32_SFLOAT, 0 });
 
 		if (!texCoords.empty())
 		{
-			vertexBuffers[TEXCOORD].Create(texCoords.size() * sizeof(glm::vec2));
-			vertexBuffers[TEXCOORD].TransferData(texCoords.data());
+			bufferSize = texCoords.size() * sizeof(glm::vec2);
+			vertexBuffers[TEXCOORD].Create(bufferSize);
+			vertexBuffers[TEXCOORD].TransferData(texCoords.data(), bufferSize);
+
 			bindingDescriptions.push_back({ .binding = TEXCOORD, .stride = sizeof(glm::vec2),
 				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX });
 			attributeDescriptions.push_back({ TEXCOORD, TEXCOORD, VK_FORMAT_R32G32_SFLOAT, 0 });
@@ -328,8 +332,10 @@ namespace LittleEngine
 
 		if (!normals.empty())
 		{
-			vertexBuffers[NORMAL].Create(normals.size() * sizeof(glm::vec3));
-			vertexBuffers[NORMAL].TransferData(normals.data());
+			bufferSize = normals.size() * sizeof(glm::vec3);
+			vertexBuffers[NORMAL].Create(bufferSize);
+			vertexBuffers[NORMAL].TransferData(normals.data(), bufferSize);
+
 			bindingDescriptions.push_back({ .binding = NORMAL, .stride = sizeof(glm::vec3),
 				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX });
 			attributeDescriptions.push_back({ NORMAL, NORMAL, VK_FORMAT_R32G32B32_SFLOAT, 0 });
@@ -337,8 +343,10 @@ namespace LittleEngine
 
 		if (!tangents.empty())
 		{
-			vertexBuffers[TANGENT].Create(tangents.size() * sizeof(glm::vec3));
-			vertexBuffers[TANGENT].TransferData(tangents.data());
+			bufferSize = tangents.size() * sizeof(glm::vec3);
+			vertexBuffers[TANGENT].Create(bufferSize);
+			vertexBuffers[TANGENT].TransferData(tangents.data(), bufferSize);
+
 			bindingDescriptions.push_back({ .binding = TANGENT, .stride = sizeof(glm::vec3),
 				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX });
 			attributeDescriptions.push_back({ TANGENT, TANGENT, VK_FORMAT_R32G32B32_SFLOAT, 0 });
@@ -346,8 +354,10 @@ namespace LittleEngine
 
 		if (!biTangents.empty())
 		{
-			vertexBuffers[BiTANGENT].Create(biTangents.size() * sizeof(glm::vec3));
-			vertexBuffers[BiTANGENT].TransferData(biTangents.data());
+			bufferSize = biTangents.size() * sizeof(glm::vec3);
+			vertexBuffers[BiTANGENT].Create(bufferSize);
+			vertexBuffers[BiTANGENT].TransferData(biTangents.data(), bufferSize);
+
 			bindingDescriptions.push_back({ .binding = BiTANGENT, .stride = sizeof(glm::vec3),
 				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX });
 			attributeDescriptions.push_back({ BiTANGENT, BiTANGENT, VK_FORMAT_R32G32B32_SFLOAT, 0 });
@@ -355,16 +365,20 @@ namespace LittleEngine
 
 		if (!colors.empty())
 		{
-			vertexBuffers[COLOUR].Create(colors.size() * sizeof(glm::vec4));
-			vertexBuffers[COLOUR].TransferData(colors.data());
+			bufferSize = colors.size() * sizeof(glm::vec4);
+			vertexBuffers[COLOUR].Create(bufferSize);
+			vertexBuffers[COLOUR].TransferData(colors.data(), bufferSize);
+
 			bindingDescriptions.push_back({ .binding = COLOUR, .stride = sizeof(glm::vec4),
 				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX });
 			attributeDescriptions.push_back({ COLOUR, COLOUR, VK_FORMAT_R32G32B32A32_SFLOAT, 0 });
 		}
+
 		if (!indices.empty())
 		{
-			indexBuffer.Create(indices.size() * sizeof(unsigned int));
-			indexBuffer.TransferData(indices.data());
+			bufferSize = indices.size() * sizeof(unsigned int);
+			indexBuffer.Create(bufferSize);
+			indexBuffer.TransferData(indices.data(), bufferSize);
 		}
 	}
 
