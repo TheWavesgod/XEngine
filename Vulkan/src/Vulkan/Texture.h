@@ -69,14 +69,14 @@ namespace VK
 		{
 #ifndef NDEBUG
 			if ( // if data need to be float, stb_image only support 32bit float
-				(requiredFormatInfo.rawDataType == formatInfo::floatingPoint && requiredFormatInfo.sizePerComponent == 4) ||
+				!(requiredFormatInfo.rawDataType == formatInfo::floatingPoint && requiredFormatInfo.sizePerComponent == 4) &&
 				//  if data need to be int, stb_image only support 8bit or 16bit per channel
-				(requiredFormatInfo.rawDataType == formatInfo::integer && requiredFormatInfo.sizePerComponent >= 1
+				!(requiredFormatInfo.rawDataType == formatInfo::integer && requiredFormatInfo.sizePerComponent >= 1
 					&& requiredFormatInfo.sizePerComponent <= 2))
-				/* empty expression */;
-			else
-				outStream << std::format("[ Texture ] ERROR\nRequired format is not available for source image data!\n"),
+			{
+				outStream << std::format("[ Texture ] ERROR\nRequired format is not available for source image data!\n");
 				abort();
+			}
 #endif
 
 			int& width = reinterpret_cast<int&>(extent.width);

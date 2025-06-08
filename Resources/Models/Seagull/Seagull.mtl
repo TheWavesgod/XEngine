@@ -1,0 +1,110 @@
+# Blender 4.0.1 MTL File: 'SeagullForOpenGL.blend'
+# www.blender.org
+
+newmtl EmissiveLight
+Ns 200.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.000000 0.000000 0.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+
+newmtl Glass
+Ns 200.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.135269 0.135269 0.135269
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 0.222798
+illum 1
+
+newmtl Hanger
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd Seagull fighter jet_Seagull_Hanger_BaseColor.jpg
+map_Ns Seagull fighter jet_Seagull_Hanger_Roughness.jpg
+map_Bump -bm 1.000000 Seagull fighter jet_Seagull_Hanger_Normal.jpg
+
+newmtl MainBody
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd Seagull fighter jet_Seagull_mainbody_BaseColor.jpg
+map_Ns Seagull fighter jet_Seagull_mainbody_Roughness.jpg
+map_Bump -bm 1.000000 Seagull fighter jet_Seagull_mainbody_Normal.jpg
+
+newmtl Missile
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd Seagull fighter jet_Seagull_Missile_BaseColor.jpg
+map_Ns Seagull fighter jet_Seagull_Missile_Roughness.jpg
+map_Bump -bm 1.000000 Seagull fighter jet_Seagull_Missile_Normal.jpg
+
+newmtl Seat
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd Seagull fighter jet_Seagull_Pilot_seat_BaseColor.jpg
+map_Ns Seagull fighter jet_Seagull_Pilot_seat_Roughness.jpg
+map_Bump -bm 1.000000 Seagull fighter jet_Seagull_Pilot_seat_Normal.jpg
+
+newmtl cockpit
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd Seagull fighter jet_Seagull_cockpit_BaseColor.jpg
+map_Ns Seagull fighter jet_Seagull_cockpit_Roughness.jpg
+map_Bump -bm 1.000000 Seagull fighter jet_Seagull_cockpit_Normal.jpg
+
+newmtl controlPanel
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd Seagull fighter jet_Seagull_control_panel_BaseColor.jpg
+map_Ns Seagull fighter jet_Seagull_control_panel_Roughness.jpg
+map_Ke Seagull fighter jet_Seagull_control_panel_Emissive.jpg
+map_Bump -bm 1.000000 Seagull fighter jet_Seagull_control_panel_Normal.jpg
+
+newmtl ladder
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd Seagull fighter jet_Seagull_Ladder_BaseColor.jpg
+map_Ns Seagull fighter jet_Seagull_Ladder_Roughness.jpg
+map_Bump -bm 1.000000 Seagull fighter jet_Seagull_Ladder_Normal.jpg
+
+newmtl wing
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Kd Seagull fighter jet_Seagull_Wings_BaseColor.jpg
+map_Ns Seagull fighter jet_Seagull_Wings_Roughness.jpg
+map_Bump -bm 1.000000 Seagull fighter jet_Seagull_Wings_Normal.jpg

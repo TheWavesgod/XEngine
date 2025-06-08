@@ -104,7 +104,7 @@ namespace VK
 		VkDeviceMemory MemoryRef() const { return static_cast<const DeviceMemory&>(*this); }
 		const VkDeviceMemory* AddressOfMemory() const { return DeviceMemory::Address(); }
 
-		// if areBond is true, so device momeory allocating success, buffers createdm and bind togethre
+		// if areBond is true, so device memory allocating success, buffers created and bind together
 		bool AreBound() const { return areBound; }
 		using DeviceMemory::AllocationSize;
 		using DeviceMemory::MemoryProperties;

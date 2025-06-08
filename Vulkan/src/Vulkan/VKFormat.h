@@ -2,7 +2,7 @@
 #include "VKEasyHeader.h"
 
 struct formatInfo {
-    enum rawDataType :uint8_t
+    enum rawDataType : uint8_t
     {
         other,        //0，没数据或各个通道不同
         integer,      //1，数据类型为整型
