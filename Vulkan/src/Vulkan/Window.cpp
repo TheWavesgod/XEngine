@@ -30,7 +30,6 @@ namespace VK
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // with no API for vulkan
 		glfwWindowHint(GLFW_RESIZABLE, isResizable);
 
-
 		// Get Necessary Extensions 
 		uint32_t extensionCount = 0;
 		const char** extensionNames = glfwGetRequiredInstanceExtensions(&extensionCount);

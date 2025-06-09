@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <array>
 #include <stack>
 #include <map>
 #include <unordered_map>
