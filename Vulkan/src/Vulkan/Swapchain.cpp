@@ -63,7 +63,6 @@ namespace VK
                 std::cout << std::format("[ VkBase ] WARNING\nFailed to select a four-component UNORM surface format!\n");
             }
         }
-
    
         swapchainCreateInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
         if (!limitFrameRate)

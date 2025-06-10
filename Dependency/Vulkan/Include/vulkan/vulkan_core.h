@@ -3393,7 +3393,7 @@ typedef struct VkBufferViewCreateInfo {
     VkBuffer                   buffer;
     VkFormat                   format;
     VkDeviceSize               offset;
-    VkDeviceSize               range;
+    VkDeviceSize               range;   
 } VkBufferViewCreateInfo;
 
 typedef struct VkImageCreateInfo {
@@ -3491,7 +3491,7 @@ typedef struct VkComputePipelineCreateInfo {
 
 typedef struct VkVertexInputBindingDescription {
     uint32_t             binding;
-    uint32_t             stride;
+    uint32_t             stride;    
     VkVertexInputRate    inputRate;
 } VkVertexInputBindingDescription;
 

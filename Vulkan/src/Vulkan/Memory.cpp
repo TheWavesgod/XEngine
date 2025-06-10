@@ -152,9 +152,8 @@ namespace VK
 			}
 		}
 
-		// 
-		//if (memoryAllocateInfo.memoryTypeIndex == UINT32_MAX)
-		//    outStream << std::format("[ buffer ] ERROR\nFailed to find any memory type satisfies all desired memory properties!\n");
+		/*if (memoryAllocateInfo.memoryTypeIndex == UINT32_MAX)
+		    outStream << std::format("[ buffer ] ERROR\nFailed to find any memory type satisfies all desired memory properties!\n");*/
 		return memoryAllocateInfo;
 	}
 
