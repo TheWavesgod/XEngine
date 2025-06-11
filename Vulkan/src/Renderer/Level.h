@@ -24,9 +24,11 @@ namespace LittleEngine
 		void UpdateObject(float dt);
 
 	private:
-		std::vector<RenderObject> renderObjects;
 		Camera cam;
-
+		std::vector<RenderObject> renderObjects;
+		
+		std::vector<std::shared_ptr<Material>> materials;
+		
 		CommandBuffer commandBuffer;
 		CommandPool commandPool;
 

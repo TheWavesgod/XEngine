@@ -7,6 +7,9 @@ int main()
 	using namespace VK;
 	using namespace LittleEngine;
 
+	std::string test = "";
+	bool em = test.empty();
+
 	Window* w = Window::CreateGLFWWindow({ 1280, 720 });
 	if (w == nullptr)
 		return -1;

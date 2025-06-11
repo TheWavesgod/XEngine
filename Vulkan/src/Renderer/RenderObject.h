@@ -2,6 +2,7 @@
 
 #include "Transform.h"
 #include "Mesh.h"
+#include "Material.h"
 
 #include <memory>
 
@@ -24,7 +25,7 @@ namespace LittleEngine
 	class RenderObject
 	{
 	public:
-		RenderObject(std::shared_ptr<Mesh> mesh) : mesh(mesh) { }
+		RenderObject(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material = nullptr) : mesh(mesh), material(material) { }
 
 		void SetPosition(const vec3& newPos) { transform.SetPosition(newPos); }
 
@@ -36,6 +37,7 @@ namespace LittleEngine
 		Transform transform;
 
 		std::shared_ptr<Mesh> mesh;
+		std::shared_ptr<Material> material;
 
 		PipelineLayout pipelineLayout;
 		Pipeline pipeline;

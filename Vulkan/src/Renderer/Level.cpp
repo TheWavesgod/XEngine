@@ -155,9 +155,18 @@ namespace LittleEngine
 		cam.GetCameraTransform().SetPosition({ 0.0f, 0.0f, 3.0f });
 		cam.SetCameraYaw(0.0f);
 
-		renderObjects.emplace_back(Mesh::GenerateCube());
-		renderObjects.emplace_back(Mesh::GenerateCube());
-		renderObjects.emplace_back(Mesh::GenerateCube());
+		materials.emplace_back(std::make_shared<Material>(
+			"StainlessSteel/used-stainless-steel2_albedo.png",
+			"StainlessSteel/used-stainless-steel2_normal-dx.png",
+			"StainlessSteel/used-stainless-steel2_metallic.png",
+			"StainlessSteel/used-stainless-steel2_roughness.png",
+			"StainlessSteel/used-stainless-steel2_ao.png",
+			"StainlessSteel/used-stainless-steel2_height.png")
+		);
+
+		renderObjects.emplace_back(Mesh::GenerateCube(), materials[0]);
+		renderObjects.emplace_back(Mesh::GenerateCube(), materials[0]);
+		renderObjects.emplace_back(Mesh::GenerateCube(), materials[0]);
 
 		for (size_t i = 0; i < renderObjects.size(); ++i)
 		{

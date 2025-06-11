@@ -62,9 +62,11 @@ namespace LittleEngine
 			.size = sizeof(glm::mat4)
 		};
 
+		VkDescriptorSetLayout setLayouts[] = { gdsl, material->GetDescriptorSetLayout() }; // TODO: CHECK if material is valid
+
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
-			.setLayoutCount = 1,
-			.pSetLayouts = gdsl.Address(),
+			.setLayoutCount = 2,
+			.pSetLayouts = setLayouts,
 			.pushConstantRangeCount = 1,
 			.pPushConstantRanges = &pushRange  
 		};
