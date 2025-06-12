@@ -1,6 +1,6 @@
 #include "Vulkan/Window.h"
-
-#include "Renderer/Level.h"
+#include "Renderer/Renderer.h"
+#include "Renderer/Scene.h"
 
 int main()
 {
@@ -14,8 +14,10 @@ int main()
 	if (w == nullptr)
 		return -1;
 
-	Level level;
-	level.Initialize();
+	if (!Renderer::Get().Initialize()) return -1;
+
+	Scene Scene;
+	Scene.Initialize();
 
 	while (w->Update())
 	{
@@ -28,8 +30,8 @@ int main()
 			w->SetWindowShouldClose();
 		}
 
-		level.RenderFrame();
-		level.UpdateObject(w->GetDeltaTime());
+		Scene.UpdateObject(w->GetDeltaTime());
+		Renderer::Get().RenderFrame(Scene);
 	}
 
 	w->TerminateWindow();

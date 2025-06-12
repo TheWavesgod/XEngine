@@ -21,14 +21,6 @@ namespace LittleEngine
 
 	void Camera::Update(float dt)
 	{
-		// Update data in global camera buffer
-		data = {
-			.view = BuildViewMatrix(),
-			.projection = BuildProjectionMatrix(),
-			.camPos = transform.GetPosition()
-		};
-		globalCameraBuffer.TransferData(data); // TODO CHECK
-
 		if (Window::enableMouseCursor) return;
 
 		const float sensitive = 0.01f;
@@ -54,8 +46,8 @@ namespace LittleEngine
 		if (Window::GetInputState(GLFW_KEY_S) == GLFW_PRESS) { moveDir -= transform.GetForwardVector(); }
 		if (Window::GetInputState(GLFW_KEY_A) == GLFW_PRESS) { moveDir -= transform.GetRightVector(); }
 		if (Window::GetInputState(GLFW_KEY_D) == GLFW_PRESS) { moveDir += transform.GetRightVector(); }
-		if (Window::GetInputState(GLFW_KEY_E) == GLFW_PRESS) { moveDir += transform.GetUpVector(); }
-		if (Window::GetInputState(GLFW_KEY_Q) == GLFW_PRESS) { moveDir -= transform.GetUpVector(); }
+		if (Window::GetInputState(GLFW_KEY_E) == GLFW_PRESS) { moveDir += glm::vec3(0.0f, 1.0f, 0.0f); }
+		if (Window::GetInputState(GLFW_KEY_Q) == GLFW_PRESS) { moveDir -= glm::vec3(0.0f, 1.0f, 0.0f); }
 		if (length(moveDir) != 0.0f)
 		{
 			vec3 moveDistance = glm::normalize(moveDir) * displacement;
@@ -73,13 +65,12 @@ namespace LittleEngine
 		return FlipVertical(glm::perspectiveFovRH_ZO(glm::radians(45.0f), 1280.0f, 720.0f, 0.1f, 1000.0f));
 	}
 
-	VkDescriptorSetLayoutBinding Camera::GetCameraGlobalDescriptorSetLayoutBinding() const
+	Camera::RenderingData Camera::GetCameraRenderingData()
 	{
-		return {
-			.binding = 0,
-			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			.descriptorCount = 1,
-			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT
+		return RenderingData {
+			.view = BuildViewMatrix(),
+			.projection = BuildProjectionMatrix(),
+			.camPos = transform.GetPosition()
 		};
 	}
 }

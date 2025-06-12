@@ -29,9 +29,9 @@ namespace LittleEngine
 
 		void SetPosition(const vec3& newPos) { transform.SetPosition(newPos); }
 
-		void Draw(VkCommandBuffer commandBuffer, const DescriptorSet& globalSet) const;
+		void Draw(VkCommandBuffer commandBuffer) const;
 
-		void Create(const RenderPass& rp, const DescriptorSetLayout& gds);
+		void Create();
 	
 	protected:
 		Transform transform;

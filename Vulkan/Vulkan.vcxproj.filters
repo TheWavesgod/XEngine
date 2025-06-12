@@ -93,7 +93,7 @@
     <ClCompile Include="src\main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="src\Renderer\Level.cpp">
+    <ClCompile Include="src\Renderer\Scene.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="src\Renderer\RenderObject.cpp">
@@ -194,7 +194,7 @@
     <ClInclude Include="src\Vulkan\Window.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\Renderer\Level.h">
+    <ClInclude Include="src\Renderer\Scene.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\Renderer\RenderObject.h">

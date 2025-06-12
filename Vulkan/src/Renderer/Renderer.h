@@ -6,10 +6,13 @@
 #include "Vulkan/Descriptor.h"
 #include "Vulkan/Command.h"
 #include "Vulkan/Synchronization.h"
+#include "Vulkan/MemoryBuffers.h"
 
 namespace LittleEngine
 {
 	using namespace VK;
+
+	class Scene;
 
 	class Renderer
 	{
@@ -25,15 +28,19 @@ namespace LittleEngine
 
 		bool Initialize();
 
-		void RenderFrame();
+		void RenderFrame(Scene& scene);
 
 		bool CreateRenderPass();
 		bool AllocateCommandBuffer();
 		bool PrepareSynchronization();
-		bool CreateDescriptor();
+		bool PrepareGlobalInfo();
 		
 		// Getter
 		DescriptorPool& GetGlobalDescriptorPool() { return globalDescriptorPool; }
+		const DescriptorSet& GetViewDescriptorSet() const { return globalViewDescriptorSet; }
+		const DescriptorSetLayout& GetViewDescriptorSetLayout() const { return globalViewDescriptorSetLayout; }
+
+		RenderPass& GetCurrentRenderPass() { return rpwf_swapChain.renderPass; }
 
 	private:
 		struct renderPassWithFramebuffers
@@ -45,14 +52,17 @@ namespace LittleEngine
 
 		CommandBuffer commandBuffer_Rendering;
 
-		Semaphore semaphore_imageIsAvailable;
+		/*Semaphore semaphore_imageIsAvailable;
 		std::vector<Semaphore> semaphores_renderingIsOver;
-		Fence fence;
+		Fence fence;*/
 
 		DescriptorPool globalDescriptorPool;
 
-		DescriptorSet globalUniformDescriptorSet;
-		DescriptorSetLayout globalUniformDescriptorSetLayout;
+		// Global Info
+		DescriptorSet globalViewDescriptorSet;
+		DescriptorSetLayout globalViewDescriptorSetLayout;
+
+		UniformBuffer viewDataBuffer;
 	};
 
 	inline Renderer Renderer::renderer;

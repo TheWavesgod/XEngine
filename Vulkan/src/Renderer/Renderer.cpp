@@ -1,5 +1,9 @@
 ﻿#include "Renderer.h"
 
+#include "Scene.h"
+#include "Camera.h"
+#include "RenderObject.h"
+
 #include "Vulkan/Window.h"
 #include "vulkan/VkBase.h"
 #include "vulkan/VkBase+.h"
@@ -7,6 +11,10 @@
 namespace LittleEngine
 {
 	const VkExtent2D& windowSize = VkBase::Base().SwapchainCreateInfo().imageExtent;
+	const VkClearValue clearColors[2] = {
+			{ 0.0f, 0.1f, 0.1f, 1.f },
+			{ 1.0f, 0.0f}
+	};
 
 	bool Renderer::Initialize()
 	{
@@ -37,24 +45,36 @@ namespace LittleEngine
 		}
 
 		if (VK::VkBase::Base().BuildSwapchain(VK::Window::GetPointer()->IsFrameRateLimited())) return false;
+
+		CreateRenderPass();
+		AllocateCommandBuffer();
+		PrepareSynchronization();
+		PrepareGlobalInfo();
 	}
 
-	void Renderer::RenderFrame()
+	void Renderer::RenderFrame(Scene& scene)
 	{
+		Semaphore semaphore_imageIsAvailable;
+		std::vector<Semaphore> semaphores_renderingIsOver(VkBase::Base().SwapchainImageCount());
+		Fence fence;
+
 		VkBase::Base().Swapchain().SwapImage(semaphore_imageIsAvailable);
 		uint32_t i = VkBase::Base().Swapchain().CurrentImageIndex();
 
 		const auto& [renderPass, framebuffers] = rpwf_swapChain;
 
-		VkClearValue clearColors[2] = {
-			{ 0.0f, 0.1f, 0.1f, 1.f },
-			{ 1.0f, 0.0f}
-		};
+		// Update Global Data
+		viewDataBuffer.TransferData(scene.GetCam().GetCameraRenderingData());
+		std::vector<RenderObject>& renderObjs = scene.GetRenderObjects();
+
 
 		commandBuffer_Rendering.Begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 		renderPass.CmdBegin(commandBuffer_Rendering, framebuffers[i], { {}, windowSize }, clearColors);
 		{
-
+			for (auto& obj : renderObjs)
+			{
+				obj.Draw(commandBuffer_Rendering);
+			}
 		}
 		renderPass.CmdEnd(commandBuffer_Rendering);
 		commandBuffer_Rendering.End();
@@ -142,39 +162,52 @@ namespace LittleEngine
 			framebufferCreateInfo.pAttachments = attachments;
 			rpwf_swapChain.framebuffers[i].Create(framebufferCreateInfo);
 		}
+
+		return true;
 	}
 
 	bool Renderer::AllocateCommandBuffer()
 	{
 		if (VkBase::Base().Plus().CommandPool_Graphics().AllocateBuffers(commandBuffer_Rendering)) return false;
+
+		return true;
 	}
 
 	bool Renderer::PrepareSynchronization()
 	{
-		semaphores_renderingIsOver = std::vector<Semaphore>(VkBase::Base().SwapchainImageCount());
+		/*semaphores_renderingIsOver = std::vector<Semaphore>(VkBase::Base().SwapchainImageCount());*/
+
+		return true;
 	}
 
-	bool Renderer::CreateDescriptor()
+ 	bool Renderer::PrepareGlobalInfo()
 	{
 		// Create Global Descriptor Set
 		VkDescriptorPoolSize descriptorPoolSizes[] = {
 			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2}
 		};
-		globalDescriptorPool.Create(1, descriptorPoolSizes);
+		globalDescriptorPool.Create(2, descriptorPoolSizes);
+		
 
+		viewDataBuffer.Create(sizeof(Camera::RenderingData));
 
-		VkDescriptorSetLayoutBinding globalUniformSetLayoutBindings[2] = {
-			{ 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT },
-			{ 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT }
+		// Initial view descriptor
+		VkDescriptorSetLayoutBinding globalViewSetLayoutBinding = { 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT };
+
+		VkDescriptorSetLayoutCreateInfo globalViewSetLayoutCreateInfo = {
+			.bindingCount = 1,
+			.pBindings = &globalViewSetLayoutBinding
 		};
-		VkDescriptorSetLayoutCreateInfo globalUniformSetLayoutCreateInfo = {
-			.bindingCount = 2,
-			.pBindings = globalUniformSetLayoutBindings
+		globalViewDescriptorSetLayout.Create(globalViewSetLayoutCreateInfo);
+
+		globalDescriptorPool.AllocateSets(globalViewDescriptorSet, globalViewDescriptorSetLayout);
+
+		VkDescriptorBufferInfo globalViewBufferInfo = {
+			.buffer = viewDataBuffer,
+			.offset = 0,
+			.range = viewDataBuffer.AllocationSize()
 		};
-		globalUniformDescriptorSetLayout.Create(globalUniformSetLayoutCreateInfo);
-
-		globalDescriptorPool.AllocateSets(globalUniformDescriptorSet, globalUniformDescriptorSetLayout);
-
+		globalViewDescriptorSet.Write(globalViewBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0);
 
 		return true;
 	}

@@ -1,5 +1,7 @@
 #include "RenderObject.h"
 
+#include "Renderer.h"
+
 #include "Vulkan/VkBase.h"
 #include "Vulkan/Shader.h"
 #include "Vulkan/Descriptor.h"
@@ -9,7 +11,7 @@
 
 namespace LittleEngine
 {
-	void RenderObject::Draw(VkCommandBuffer commandBuffer, const DescriptorSet& globalSet) const  
+	void RenderObject::Draw(VkCommandBuffer commandBuffer) const  
 	{
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 		
@@ -31,7 +33,7 @@ namespace LittleEngine
 			0, sizeof(glm::mat4), glm::value_ptr(transform.GetTransMatrix()));
 
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			pipelineLayout, 0, 1, globalSet.Address(), 0, nullptr);
+			pipelineLayout, 0, 1, Renderer::Get().GetViewDescriptorSet().Address(), 0, nullptr);
 
 		if (mesh->UseIndices())
 		{
@@ -43,7 +45,7 @@ namespace LittleEngine
 		}
 	}
 
-	void RenderObject::Create(const RenderPass& rp, const DescriptorSetLayout& gdsl)
+	void RenderObject::Create()
 	{
 		const VkExtent2D& windowSize = VkBase::Base().SwapchainCreateInfo().imageExtent;
 
@@ -62,10 +64,13 @@ namespace LittleEngine
 			.size = sizeof(glm::mat4)
 		};
 
-		VkDescriptorSetLayout setLayouts[] = { gdsl, material->GetDescriptorSetLayout() }; // TODO: CHECK if material is valid
+		VkDescriptorSetLayout setLayouts[] = { 
+			Renderer::Get().GetViewDescriptorSetLayout(),
+			//material->GetDescriptorSetLayout() 
+		}; // TODO: CHECK if material is valid
 
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
-			.setLayoutCount = 2,
+			.setLayoutCount = 1,
 			.pSetLayouts = setLayouts,
 			.pushConstantRangeCount = 1,
 			.pPushConstantRanges = &pushRange  
@@ -76,7 +81,7 @@ namespace LittleEngine
 		GraphicsPipelineCreateInfoPack pipelineCiPack = {};
 		
 		pipelineCiPack.createInfo.layout = pipelineLayout;
-		pipelineCiPack.createInfo.renderPass = rp;
+		pipelineCiPack.createInfo.renderPass = Renderer::Get().GetCurrentRenderPass();
 		pipelineCiPack.vertexInputBindings = mesh->GetVertexInputBindings();
 		pipelineCiPack.vertexInputAttributes = mesh->GetVertexInputAttributes();
 		pipelineCiPack.inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;

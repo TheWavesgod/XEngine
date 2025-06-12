@@ -13,6 +13,14 @@ namespace LittleEngine
 	class Camera
 	{
 	public:
+		struct RenderingData
+		{
+			mat4 view;
+			mat4 projection;
+			vec3 camPos;
+			float pad0;
+		};
+
 		Camera(void)
 		{
 			yaw = 90.0f;
@@ -45,17 +53,7 @@ namespace LittleEngine
 
 		inline Transform& GetCameraTransform() { return transform; }
 
-		const UniformBuffer& GetGlobalCameraBuffer() const { return globalCameraBuffer; }
-		VkDescriptorSetLayoutBinding GetCameraGlobalDescriptorSetLayoutBinding() const;
-
-		// For Renderer Data
-		struct GlobalCameraData
-		{
-			mat4 view;
-			mat4 projection;
-			vec3 camPos;
-			float pad0;
-		} data;
+		RenderingData GetCameraRenderingData();
 
 	protected:
 		float yaw;
@@ -63,7 +61,5 @@ namespace LittleEngine
 		float cameraMoveSpeed;
 
 		Transform transform;
-
-		UniformBuffer globalCameraBuffer = UniformBuffer(sizeof(GlobalCameraData));
 	};
 }

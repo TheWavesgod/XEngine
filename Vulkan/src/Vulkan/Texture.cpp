@@ -87,7 +87,7 @@ namespace VK
 			{ VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL }
 		};
 
-		// the precondition of generating mipmap is the level of mip should larger then 1
+		// the precondition of generating mipmap is the Scene of mip should larger then 1
 		bool generateMipmap = mipLevelCount > 1;
 
 		// The condition for the occurrence of blit is that the source image and the target image are different
