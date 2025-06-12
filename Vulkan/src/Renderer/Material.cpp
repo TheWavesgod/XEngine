@@ -53,7 +53,7 @@ namespace LittleEngine
 			.bindingCount = 6,
 			.pBindings = materialBindings
 		};
-		descriptorSetLayout.Create(materialLayoutCreateInfo);
+		pbrMaterialDefaultDescriptorSetLayout.Create(materialLayoutCreateInfo);
 
 		// Update DescriptorSet
 		VkDescriptorImageInfo imageInfo = {

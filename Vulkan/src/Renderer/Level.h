@@ -20,7 +20,7 @@ namespace LittleEngine
 	public:
 
 		void Initialize();
-		void RenderFrame();
+
 		void UpdateObject(float dt);
 
 	private:
@@ -28,27 +28,9 @@ namespace LittleEngine
 		std::vector<RenderObject> renderObjects;
 		
 		std::vector<std::shared_ptr<Material>> materials;
-		
-		CommandBuffer commandBuffer;
-		CommandPool commandPool;
 
-		DescriptorPool descriptorPool;
 		DescriptorSetLayout globalUniformDescriptorSetLayout; 
 		DescriptorSet globalUniformDescriptorSet;
-
-		Semaphore semaphore_imageIsAvailable;
-		std::vector<Semaphore> semaphores_renderingIsOver;
-		Fence fence;
-
-		const VkExtent2D& windowSize = VkBase::Base().SwapchainCreateInfo().imageExtent;
-
-		struct renderPassWithFramebuffers
-		{
-			RenderPass renderPass;
-			std::vector<Framebuffer> framebuffers;
-		} rpwf_swapChain;
-
-		std::vector<DepthStencilAttachment> dsas_screenWithDS;
 
 	private:
 		void InitialScene();

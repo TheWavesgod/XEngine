@@ -33,4 +33,6 @@ int main()
 	}
 
 	w->TerminateWindow();
+
+	return 0;
 }

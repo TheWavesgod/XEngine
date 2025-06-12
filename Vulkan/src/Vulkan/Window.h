@@ -16,6 +16,8 @@ namespace VK
 		void TerminateWindow();
 		bool Update();
 
+		result_t CreateSuface();
+
 		static inline float mInputX = 0.0f;
 		static inline float mInputY = 0.0f;
 		static inline float mScroll = 0.0f;
@@ -28,6 +30,9 @@ namespace VK
 		double GetDeltaTime() const { return dt; }
 
 		void SetWindowShouldClose(bool bShouldClose = true);
+		uint32_t GetExtensionCount() const { return extensionCount; }
+		const char** GetExtensionNames() const { return extensionNames; }
+		bool IsFrameRateLimited() const { return limitFrameRate; }
 
 	private:
 		inline static Window* windowPtr = nullptr;
@@ -38,6 +43,10 @@ namespace VK
 
 		GLFWwindow* pWindow = nullptr;
 		GLFWmonitor* pMonitor = nullptr;
+
+		uint32_t extensionCount = 0;
+		const char** extensionNames = nullptr;
+		bool limitFrameRate = true;
 
 		Window() = default;
 		bool Initialize(VkExtent2D size, const std::string& title, bool fullScreen, bool isResizable, bool limitFrameRate);

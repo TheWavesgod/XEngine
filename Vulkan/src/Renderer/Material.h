@@ -44,7 +44,7 @@ namespace LittleEngine
 			const std::string& aoPath = "",
 			const std::string& heightPath = "");
 
-		const DescriptorSetLayout& GetDescriptorSetLayout() const { return descriptorSetLayout; }
+		static const DescriptorSetLayout& GetPbrMaterialDefaultDescriptorSetLayout() { return pbrMaterialDefaultDescriptorSetLayout; }
 
 	private:
 		std::array<std::string, static_cast<size_t>(TextureType::COUNT)> loadPaths;
@@ -53,6 +53,8 @@ namespace LittleEngine
 		std::array<Sampler, static_cast<size_t>(TextureType::COUNT)> samplers;
 
 		static const std::string defaultTexturePath;
+		
+		static inline DescriptorSetLayout pbrMaterialDefaultDescriptorSetLayout;
 
 		/*enum MaterialFlagBits {
 			USE_ALBEDO		= 1 << 0,
@@ -66,6 +68,5 @@ namespace LittleEngine
 		uint32_t materialFlagBits = 0;
 
 		DescriptorSet desciptorSet;
-		DescriptorSetLayout descriptorSetLayout;
 	};
 }

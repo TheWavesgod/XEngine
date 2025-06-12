@@ -31,17 +31,12 @@ namespace VK
 		glfwWindowHint(GLFW_RESIZABLE, isResizable);
 
 		// Get Necessary Extensions 
-		uint32_t extensionCount = 0;
-		const char** extensionNames = glfwGetRequiredInstanceExtensions(&extensionCount);
+		extensionNames = glfwGetRequiredInstanceExtensions(&extensionCount);
 		if (!extensionNames)
 		{
 			std::cout << std::format("[ InitializeWindow ]\nVulkan is not available on this machine!\n");
 			glfwTerminate();
 			return false;
-		}
-		for (size_t i = 0; i < extensionCount; i++)
-		{
-			VK::VkBase::Base().Instance().AddExtension(extensionNames[i]);
 		}
 
 		pMonitor = glfwGetPrimaryMonitor();
@@ -52,6 +47,7 @@ namespace VK
 			glfwCreateWindow((int)size.width, size.height, title.data(), nullptr, nullptr);
 
 		this->title = title;
+		this->limitFrameRate = limitFrameRate;
 
 		if (!pWindow)
 		{
@@ -60,44 +56,6 @@ namespace VK
 			return false;
 		}
 
-#ifdef _WIN32
-		VK::VkBase::Base().Instance().AddExtension(VK_KHR_SURFACE_EXTENSION_NAME);
-		VK::VkBase::Base().Instance().AddExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-#else
-		uint32_t extensionCount = 0;
-		const char** extensionNames;
-		extensionNames = glfwGetRequiredInstanceExtensions(&extensionCount);
-		if (!extensionNames) {
-			std::cout << std::format("[ InitializeWindow ]\nVulkan is not available on this machine!\n");
-			glfwTerminate();
-			return false;
-		}
-		for (size_t i = 0; i < extensionCount; i++)
-		{
-			VK::VkBase::Base().Instance().AddExtension(extensionNames[i]);
-		}
-#endif
-		VK::VkBase::Base().UseLatestApiVersion();
-		if (VK::VkBase::Base().CreateInstance()) return false;
-
-		if (VkResult result = glfwCreateWindowSurface(VK::VkBase::Base().Instance(), pWindow, nullptr, &VK::VkBase::Base().SurfaceRef()))
-		{
-			std::cout << std::format("[ InitializeWindow ] ERROR\nFailed to create a window surface!\nError code: {}\n", int32_t(result));
-			glfwTerminate();
-			return false;
-		}
-
-		VK::VkBase::Base().Device().AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-
-		if (
-			VK::VkBase::Base().SetPhysicalDevice(true, false) ||
-			VK::VkBase::Base().CreateDevice())
-		{
-			return false;
-		}
-
-		if (VK::VkBase::Base().BuildSwapchain(limitFrameRate)) return false;
-
 		// Set callback function
 		glfwSetCursorPosCallback(pWindow, CursorPosition_callback);
 		glfwSetMouseButtonCallback(pWindow, MouseButton_callback);
@@ -105,6 +63,17 @@ namespace VK
 
 		return true;
 	}
+
+	result_t Window::CreateSuface()
+	{
+		VkResult result = glfwCreateWindowSurface(VK::VkBase::Base().Instance(), pWindow, nullptr, &VK::VkBase::Base().SurfaceRef());
+		if (result)
+		{
+			std::cout << std::format("[ InitializeWindow ] ERROR\nFailed to create a window surface!\nError code: {}\n", int32_t(result));
+		}
+		return result;
+	}
+
 
 	void Window::TerminateWindow()
 	{
