@@ -1,6 +1,7 @@
 #include "Vulkan/Window.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/Scene.h"
+#include "Renderer/AssetManager.h"
 
 int main()
 {
@@ -15,6 +16,8 @@ int main()
 		return -1;
 
 	if (!Renderer::Get().Initialize()) return -1;
+
+	AssetManager::Get().Initialize();
 
 	Scene Scene;
 	Scene.Initialize();

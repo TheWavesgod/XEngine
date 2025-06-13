@@ -70,6 +70,12 @@ namespace VK
 		DestroyHandleBy(vkDestroySemaphore);
 	}
 
+	result_t Semaphore::Create()
+	{
+		VkSemaphoreCreateInfo createInfo = {};
+		return Create(createInfo);
+	}
+
 	result_t Semaphore::Create(VkSemaphoreCreateInfo& createInfo)
 	{
 		createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -81,9 +87,11 @@ namespace VK
 		return result;
 	}
 
-	result_t Semaphore::Create(/*VkSemaphoreCreateFlags flags*/)
+	result_t Semaphore::Create(VkSemaphoreCreateFlags flags)
 	{
-		VkSemaphoreCreateInfo createInfo = {};
+		VkSemaphoreCreateInfo createInfo = {
+			.flags = flags
+		};
 		return Create(createInfo);
 	}
 

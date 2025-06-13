@@ -52,9 +52,9 @@ namespace LittleEngine
 
 		CommandBuffer commandBuffer_Rendering;
 
-		/*Semaphore semaphore_imageIsAvailable;
+		Semaphore semaphore_imageIsAvailable;
 		std::vector<Semaphore> semaphores_renderingIsOver;
-		Fence fence;*/
+		Fence fence;
 
 		DescriptorPool globalDescriptorPool;
 

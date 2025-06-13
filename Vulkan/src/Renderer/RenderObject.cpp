@@ -35,6 +35,12 @@ namespace LittleEngine
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			pipelineLayout, 0, 1, Renderer::Get().GetViewDescriptorSet().Address(), 0, nullptr);
 
+		if (material) 
+		{
+			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				pipelineLayout, 1, 1, material->GetDescriptorSet().Address(), 0, nullptr);
+		}
+
 		if (mesh->UseIndices())
 		{
 			vkCmdDrawIndexed(commandBuffer, mesh->GetIndexCount(), 1, 0, 0, 0);
@@ -64,13 +70,13 @@ namespace LittleEngine
 			.size = sizeof(glm::mat4)
 		};
 
-		VkDescriptorSetLayout setLayouts[] = { 
+		VkDescriptorSetLayout setLayouts[] = {
 			Renderer::Get().GetViewDescriptorSetLayout(),
-			//material->GetDescriptorSetLayout() 
-		}; // TODO: CHECK if material is valid
+			Material::GetPbrMaterialDefaultDescriptorSetLayout()
+		}; 
 
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
-			.setLayoutCount = 1,
+			.setLayoutCount = 2,
 			.pSetLayouts = setLayouts,
 			.pushConstantRangeCount = 1,
 			.pPushConstantRanges = &pushRange  

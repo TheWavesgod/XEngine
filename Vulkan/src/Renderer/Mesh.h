@@ -2,7 +2,6 @@
 
 #include <vector>
 #include <array>
-#include <memory>
 #include "glm.hpp"
 
 #include "Vulkan/MemoryBuffers.h"
@@ -14,11 +13,11 @@ namespace LittleEngine
 	class Mesh
 	{
 	public:
-		static std::shared_ptr<Mesh> GenerateTriangle();
-		static std::shared_ptr<Mesh> GenerateQuad();
-		static std::shared_ptr<Mesh> GenerateCube();
-		static std::shared_ptr<Mesh> GenerateFloor();
-		static std::shared_ptr<Mesh> GenerateSphere();
+		static Mesh* GenerateTriangle();
+		static Mesh* GenerateQuad();
+		static Mesh* GenerateCube();
+		static Mesh* GenerateFloor();
+		static Mesh* GenerateSphere();
 
 		Mesh();
 
@@ -60,18 +59,6 @@ namespace LittleEngine
 
 		std::vector<VkVertexInputBindingDescription> bindingDescriptions;
 		std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
-
-		enum DefaultMeshType
-		{
-			TRIANGLE = 0,
-			QUAD,
-			CUBE,
-			FLOOR,
-			SPHERE,
-
-			TYPENUM
-		};
-		static std::vector<std::shared_ptr<Mesh>> defaultMeshes;
 
 	private:
 		void BufferData();

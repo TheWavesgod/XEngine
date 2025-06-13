@@ -1,5 +1,6 @@
 #include "Scene.h"
 
+#include "AssetManager.h"
 #include "vulkan/Shader.h"
 
 namespace LittleEngine
@@ -22,18 +23,11 @@ namespace LittleEngine
 		cam.GetCameraTransform().SetPosition({ 0.0f, 0.0f, 3.0f });
 		cam.SetCameraYaw(0.0f);
 
-		/*materials.emplace_back(std::make_shared<Material>(
-			"StainlessSteel/used-stainless-steel2_albedo.png",
-			"StainlessSteel/used-stainless-steel2_normal-dx.png",
-			"StainlessSteel/used-stainless-steel2_metallic.png",
-			"StainlessSteel/used-stainless-steel2_roughness.png",
-			"StainlessSteel/used-stainless-steel2_ao.png",
-			"StainlessSteel/used-stainless-steel2_height.png")
-		);*/
-
-		renderObjects.emplace_back(Mesh::GenerateCube(), nullptr);
-		renderObjects.emplace_back(Mesh::GenerateCube(), nullptr);
-		renderObjects.emplace_back(Mesh::GenerateCube(), nullptr);
+		Mesh* cube = AssetManager::GetMeshByIndex(static_cast<int>(DefaultMeshType::CUBE));
+		Material* stainlessSteel = AssetManager::GetMaterialByIndex(0);
+		renderObjects.emplace_back(cube, stainlessSteel);
+		renderObjects.emplace_back(cube, stainlessSteel);
+		renderObjects.emplace_back(cube, nullptr);
 
 		for (size_t i = 0; i < renderObjects.size(); ++i)
 		{

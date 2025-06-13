@@ -126,7 +126,7 @@ namespace VK
 		VkExtent2D extent = {};
 		//--------------------
 		void Create_Internal(VkFormat format_initial, VkFormat format_final, bool generateMipmap);
-
+		 
 	public:
 		Texture2d() = default;
 

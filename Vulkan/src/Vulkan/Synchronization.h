@@ -12,10 +12,10 @@ namespace VK
     {
         VkFence handle = VK_NULL_HANDLE;
         
-    public: 
+    public:
+        Fence() = default;
         Fence(VkFenceCreateInfo& createInfo) { Create(createInfo); }
-
-        Fence(VkFenceCreateFlags flags = 0) { Create(flags); }
+        Fence(VkFenceCreateFlags flags) { Create(flags); }
 
         Fence(Fence&& other) noexcept { MoveHandle; }
         ~Fence();
@@ -36,7 +36,6 @@ namespace VK
 
         // Non-const Function
         result_t Create(VkFenceCreateInfo& createInfo);
-        
         result_t Create(VkFenceCreateFlags flags = 0);
     };
 
@@ -50,10 +49,9 @@ namespace VK
         VkSemaphore handle = VK_NULL_HANDLE;
 
     public:
+        Semaphore() = default;
         Semaphore(VkSemaphoreCreateInfo& createInfo) { Create(createInfo); }
-        
-        //默认构造器创建未置位的信号量
-        Semaphore(/*VkSemaphoreCreateFlags flags*/) { Create(); }
+        Semaphore(VkSemaphoreCreateFlags flags) { Create(flags); }
         
         Semaphore(Semaphore&& other) noexcept { MoveHandle; }
         ~Semaphore();
@@ -63,8 +61,9 @@ namespace VK
         DefineAddressFunction;
 
         // Non-const functions
+        result_t Create();
         result_t Create(VkSemaphoreCreateInfo& createInfo);
-        result_t Create(/*VkSemaphoreCreateFlags flags*/);
+        result_t Create(VkSemaphoreCreateFlags flags);
     };
 
 

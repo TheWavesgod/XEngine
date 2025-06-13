@@ -4,8 +4,6 @@
 #include "Mesh.h"
 #include "Material.h"
 
-#include <memory>
-
 #include "glm.hpp"
 
 #include "vulkan/Pipeline.h"
@@ -25,7 +23,7 @@ namespace LittleEngine
 	class RenderObject
 	{
 	public:
-		RenderObject(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material = nullptr) : mesh(mesh), material(material) { }
+		RenderObject(Mesh* mesh, Material* material = nullptr) : mesh(mesh), material(material) { }
 
 		void SetPosition(const vec3& newPos) { transform.SetPosition(newPos); }
 
@@ -36,8 +34,8 @@ namespace LittleEngine
 	protected:
 		Transform transform;
 
-		std::shared_ptr<Mesh> mesh;
-		std::shared_ptr<Material> material;
+		Mesh* mesh;
+		Material* material;
 
 		PipelineLayout pipelineLayout;
 		Pipeline pipeline;

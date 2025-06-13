@@ -139,7 +139,7 @@ namespace VK
 		VkMemoryRequirements memoryRequirements;
 		vkGetBufferMemoryRequirements(VkBase::Base().Device(), handle, &memoryRequirements);
 
-		memoryAllocateInfo.allocationSize = memoryRequirements.size;
+		memoryAllocateInfo.allocationSize = memoryRequirements.size; // TODO: Check why the actual memory here is larger than we specified 
 		memoryAllocateInfo.memoryTypeIndex = UINT32_MAX;
 		auto& physicalDeviceMemoryProperties = VkBase::Base().PhysicalDevice().MemoryProperties();
 		for (size_t i = 0; i < physicalDeviceMemoryProperties.memoryTypeCount; i++)

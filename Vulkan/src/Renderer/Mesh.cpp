@@ -1,15 +1,11 @@
 #include "Mesh.h"
+#include "AssetManager.h"
 
 namespace LittleEngine
 {
-	std::vector<std::shared_ptr<Mesh>> Mesh::defaultMeshes(DefaultMeshType::TYPENUM, nullptr);
-
-	std::shared_ptr<Mesh> Mesh::GenerateTriangle()
+	Mesh* Mesh::GenerateTriangle()
 	{
-		if (defaultMeshes[TRIANGLE] != nullptr) return defaultMeshes[TRIANGLE];
-		
-		defaultMeshes[TRIANGLE] = std::make_shared<Mesh>();
-		std::shared_ptr<Mesh> m(defaultMeshes[TRIANGLE]);
+		Mesh* m = new Mesh();
 
 		m->vertices = {
 			glm::vec3(-0.5f, 0.5f, 0.0f),
@@ -34,12 +30,9 @@ namespace LittleEngine
 		return m;
 	}
 
-	std::shared_ptr<Mesh> Mesh::GenerateQuad()
+	Mesh* Mesh::GenerateQuad()
 	{
-		if (defaultMeshes[QUAD] != nullptr) return defaultMeshes[QUAD];
-
-		defaultMeshes[QUAD] = std::make_shared<Mesh>();
-		std::shared_ptr<Mesh> m(defaultMeshes[QUAD]);
+		Mesh* m = new Mesh();
 
 		m->vertices = {
 			glm::vec3(-0.5f,  0.5f, 0.0f),  // top-left
@@ -72,12 +65,9 @@ namespace LittleEngine
 		return m;
 	}
 
-	std::shared_ptr<Mesh> Mesh::GenerateCube()
+	Mesh* Mesh::GenerateCube()
 	{
-		if (defaultMeshes[CUBE] != nullptr) return defaultMeshes[CUBE];
-
-		defaultMeshes[CUBE] = std::make_shared<Mesh>();
-		std::shared_ptr<Mesh> m(defaultMeshes[CUBE]);
+		Mesh* m = new Mesh();
 
 		using glm::vec4;
 		using glm::vec3;
@@ -205,12 +195,9 @@ namespace LittleEngine
 		return m;
 	}
 
-	std::shared_ptr<Mesh> Mesh::GenerateFloor()
+	Mesh* Mesh::GenerateFloor()
 	{
-		if (defaultMeshes[FLOOR] != nullptr) return defaultMeshes[FLOOR];
-
-		defaultMeshes[FLOOR] = std::make_shared<Mesh>();
-		std::shared_ptr<Mesh> m(defaultMeshes[FLOOR]);
+		Mesh* m = new Mesh();
 
 		m->vertices = {
 			glm::vec3(-100.0f, 0.0f, -100.0f),
@@ -243,12 +230,9 @@ namespace LittleEngine
 		return m;
 	}
 
-	std::shared_ptr<Mesh> Mesh::GenerateSphere()
+	Mesh* Mesh::GenerateSphere()
 	{
-		if (defaultMeshes[SPHERE] != nullptr) return defaultMeshes[SPHERE];
-
-		defaultMeshes[SPHERE] = std::make_shared<Mesh>();
-		std::shared_ptr<Mesh> m(defaultMeshes[SPHERE]);
+		Mesh* m = new Mesh();
 
 		const unsigned int X_SEGMENTS = 64;
 		const unsigned int Y_SEGMENTS = 64;

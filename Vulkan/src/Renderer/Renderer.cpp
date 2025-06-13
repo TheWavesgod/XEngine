@@ -54,10 +54,6 @@ namespace LittleEngine
 
 	void Renderer::RenderFrame(Scene& scene)
 	{
-		Semaphore semaphore_imageIsAvailable;
-		std::vector<Semaphore> semaphores_renderingIsOver(VkBase::Base().SwapchainImageCount());
-		Fence fence;
-
 		VkBase::Base().Swapchain().SwapImage(semaphore_imageIsAvailable);
 		uint32_t i = VkBase::Base().Swapchain().CurrentImageIndex();
 
@@ -175,7 +171,13 @@ namespace LittleEngine
 
 	bool Renderer::PrepareSynchronization()
 	{
-		/*semaphores_renderingIsOver = std::vector<Semaphore>(VkBase::Base().SwapchainImageCount());*/
+		semaphore_imageIsAvailable.Create();
+		semaphores_renderingIsOver = std::vector<Semaphore>(VkBase::Base().SwapchainImageCount());
+		for (auto& semaphore : semaphores_renderingIsOver)
+		{
+			semaphore.Create();
+		}
+		fence.Create();
 
 		return true;
 	}
@@ -205,7 +207,7 @@ namespace LittleEngine
 		VkDescriptorBufferInfo globalViewBufferInfo = {
 			.buffer = viewDataBuffer,
 			.offset = 0,
-			.range = viewDataBuffer.AllocationSize()
+			.range = sizeof(Camera::RenderingData)
 		};
 		globalViewDescriptorSet.Write(globalViewBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0);
 

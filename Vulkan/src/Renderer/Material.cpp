@@ -1,5 +1,7 @@
 #include "Material.h"
 
+#include "Renderer.h"
+
 namespace LittleEngine
 {
 	const std::string Material::defaultTexturePath = "../Resources/Materials/";
@@ -54,6 +56,8 @@ namespace LittleEngine
 			.pBindings = materialBindings
 		};
 		pbrMaterialDefaultDescriptorSetLayout.Create(materialLayoutCreateInfo);
+
+		Renderer::Get().GetGlobalDescriptorPool().AllocateSets(desciptorSet, pbrMaterialDefaultDescriptorSetLayout);
 
 		// Update DescriptorSet
 		VkDescriptorImageInfo imageInfo = {

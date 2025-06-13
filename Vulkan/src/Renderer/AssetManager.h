@@ -5,19 +5,46 @@
 
 #include "Mesh.h"
 #include "Material.h"
+#include "Vulkan/Shader.h"
 
 namespace LittleEngine
 {
+	enum class DefaultMeshType
+	{
+		TRIANGLE = 0,
+		QUAD,
+		CUBE,
+		FLOOR,
+		SPHERE,
+
+		TYPENUM
+	};
+
 	class AssetManager
 	{
-		class MaterialManager 
-		{
-			std::vector<std::shared_ptr<Material>> materials;
-		};
+		friend class Mesh;
+	public:
+		static AssetManager& Get() { return am; }
 
-		class MeshManager
-		{
-			std::vector<std::shared_ptr<Mesh>> meshes;
-		};
+		static Mesh* GetMeshByIndex(int index);
+		static Material* GetMaterialByIndex(int index);
+
+		static Material* LoadMaterialFromPath(
+			const std::string& albedoPath,
+			const std::string& normalPath = "",
+			const std::string& metallicPath = "",
+			const std::string& roughnessPath = "",
+			const std::string& aoPath = "",
+			const std::string& heightPath = "");
+
+		void Initialize();
+
+	private:
+		static AssetManager am;
+		
+		std::vector<std::unique_ptr<ShaderModule>> shaderCache;
+		std::vector<std::unique_ptr<Mesh>> meshCache;
+		std::vector<std::unique_ptr<Material>> materialCache;
 	};
+	inline AssetManager AssetManager::am;
 }

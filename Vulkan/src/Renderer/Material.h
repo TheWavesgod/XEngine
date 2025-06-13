@@ -45,7 +45,7 @@ namespace LittleEngine
 			const std::string& heightPath = "");
 
 		static const DescriptorSetLayout& GetPbrMaterialDefaultDescriptorSetLayout() { return pbrMaterialDefaultDescriptorSetLayout; }
-
+		const DescriptorSet& GetDescriptorSet() { return desciptorSet; }
 	private:
 		std::array<std::string, static_cast<size_t>(TextureType::COUNT)> loadPaths;
 
