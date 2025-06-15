@@ -34,6 +34,6 @@ namespace LittleEngine
 			"StainlessSteel/used-stainless-steel2_roughness.png",
 			"StainlessSteel/used-stainless-steel2_ao.png",
 			"StainlessSteel/used-stainless-steel2_height.png"
-		));
+		)); // TODO: Something wrong with generating mipmap and check the desired format about material textures
 	}
 }
