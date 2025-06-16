@@ -30,6 +30,8 @@ namespace LittleEngine
 
 		void RenderFrame(Scene& scene);
 
+		void BootScreen(const std::string& imagePath, VkFormat imageFormat);
+
 		bool CreateRenderPass();
 		bool AllocateCommandBuffer();
 		bool PrepareSynchronization();
