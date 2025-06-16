@@ -313,7 +313,8 @@ namespace LittleEngine
 	{
 		// Create Global Descriptor Set
 		VkDescriptorPoolSize descriptorPoolSizes[] = {
-			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2}
+			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 20},
+			{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 20}
 		};
 		globalDescriptorPool.Create(2, descriptorPoolSizes);
 		

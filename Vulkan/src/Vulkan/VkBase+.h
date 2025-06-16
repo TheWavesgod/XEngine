@@ -92,7 +92,7 @@ namespace VK
         //Const Function
         result_t ExecuteCommandBuffer_Graphics(VkCommandBuffer commandBuffer) const
         {
-            Fence fence;
+            Fence fence(0);
             VkSubmitInfo submitInfo = {
                 .commandBufferCount = 1,
                 .pCommandBuffers = &commandBuffer
@@ -260,6 +260,8 @@ namespace VK
         static void CmdGenerateMipmap2d(VkCommandBuffer commandBuffer, VkImage image, VkExtent2D imageExtent, uint32_t mipLevelCount, uint32_t layerCount,
             ImageMemoryBarrierParameterPack imb_to, VkFilter minFilter = VK_FILTER_LINEAR) 
         {
+            return;
+
             auto MipmapExtent = 
                 [](VkExtent2D imageExtent, uint32_t mipLevel) 
                 {
