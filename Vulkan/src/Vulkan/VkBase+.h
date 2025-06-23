@@ -225,11 +225,11 @@ namespace VK
                 VK_QUEUE_FAMILY_IGNORED,
                 image_dst,
                 {
-                    region.srcSubresource.aspectMask,
-                    region.srcSubresource.mipLevel,
+                    region.dstSubresource.aspectMask,
+                    region.dstSubresource.mipLevel,
                     1,
-                    region.srcSubresource.baseArrayLayer,
-                    region.srcSubresource.layerCount
+                    region.dstSubresource.baseArrayLayer,
+                    region.dstSubresource.layerCount
                 }
             };
 
@@ -260,15 +260,13 @@ namespace VK
         static void CmdGenerateMipmap2d(VkCommandBuffer commandBuffer, VkImage image, VkExtent2D imageExtent, uint32_t mipLevelCount, uint32_t layerCount,
             ImageMemoryBarrierParameterPack imb_to, VkFilter minFilter = VK_FILTER_LINEAR) 
         {
-            return;
-
             auto MipmapExtent = 
                 [](VkExtent2D imageExtent, uint32_t mipLevel) 
                 {
-                    VkOffset3D extent = { int32_t(imageExtent.width >> mipLevel), int32_t(imageExtent.height >> mipLevel), 1 };
-                    extent.x += ~extent.x;
-                    extent.y += ~extent.y;
-                    return extent;
+					VkOffset3D extent = { int32_t(imageExtent.width >> mipLevel), int32_t(imageExtent.height >> mipLevel), 1 };
+					extent.x = std::max(1, extent.x);
+					extent.y = std::max(1, extent.x);
+					return extent;
                 };
 
             if (layerCount > 1) 
@@ -321,7 +319,7 @@ namespace VK
             }
             else
             {
-                for (uint32_t i = 1; i < mipLevelCount; i++) 
+                for (uint32_t i = 1; i < mipLevelCount; ++i) 
                 {
                     VkImageBlit region = {
                         { VK_IMAGE_ASPECT_COLOR_BIT, i - 1, 0, 1 },

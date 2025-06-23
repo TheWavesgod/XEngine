@@ -45,7 +45,6 @@ namespace VK
 
 		auto& commandBuffer = VkBase::Plus().CommandBuffer_Transfer();
 		commandBuffer.Begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
 		{
 			VkBufferImageCopy region = {
 				.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, layerCount },
@@ -74,7 +73,6 @@ namespace VK
 					{ VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL }, minFilter);
 			}
 		}
-
 		commandBuffer.End();
 
 		VkBase::Plus().ExecuteCommandBuffer_Graphics(commandBuffer);
