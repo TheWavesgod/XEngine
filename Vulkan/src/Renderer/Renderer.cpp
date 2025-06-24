@@ -48,7 +48,7 @@ namespace LittleEngine
 		if (VK::VkBase::Base().BuildSwapchain(VK::Window::GetPointer()->IsFrameRateLimited())) return false;
 		
 		PrepareSynchronization();
-		BootScreen("../Resources/Images/texture_test.jpg", VK_FORMAT_R8G8B8A8_UNORM);
+		BootScreen("../Resources/Images/StartupImage.png", VK_FORMAT_R8G8B8A8_UNORM);
 
 		CreateRenderPass();
 		AllocateCommandBuffer();
@@ -212,34 +212,37 @@ namespace LittleEngine
 	{
 		using namespace VK;
 
-		VkAttachmentDescription attachmentDescriptions[2] = {
-			{
-				.format = VkBase::Base().SwapchainCreateInfo().imageFormat,
-				.samples = VK_SAMPLE_COUNT_1_BIT,
-				.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-				.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-				.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR},
-			{
-				.format = _depthStencilFormat,
+		VkAttachmentDescription colorAttachDescription_postProcess = {
+
+		};
+
+		/*{
+			.format = _depthStencilFormat,
 				.samples = VK_SAMPLE_COUNT_1_BIT,
 				.loadOp = _depthStencilFormat != VK_FORMAT_S8_UINT ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.stencilLoadOp = _depthStencilFormat >= VK_FORMAT_S8_UINT ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL}
+				.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+		}*/
+
+		VkAttachmentDescription attachmentDescription = {
+			.format = VkBase::Base().SwapchainCreateInfo().imageFormat,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
 		};
 
-		VkAttachmentReference attachmentReferences[2] = {
-			{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL },
-			{ 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL }
+		VkAttachmentReference attachmentReferences = {
+			0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 		};
 
 		VkSubpassDescription subpassDescription = {
 			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 			.colorAttachmentCount = 1,
-			.pColorAttachments = attachmentReferences,
-			.pDepthStencilAttachment = attachmentReferences + 1
+			.pColorAttachments = &attachmentReferences,
 		};
 
 		VkSubpassDependency subpassDependency = {
@@ -253,8 +256,8 @@ namespace LittleEngine
 		};
 
 		VkRenderPassCreateInfo renderPassCreateInfo = {
-			.attachmentCount = 2,
-			.pAttachments = attachmentDescriptions,
+			.attachmentCount = 1,
+			.pAttachments = &attachmentDescription,
 			.subpassCount = 1,
 			.pSubpasses = &subpassDescription,
 			.dependencyCount = 1,
@@ -264,25 +267,22 @@ namespace LittleEngine
 
 		// Create Render Attachment
 		rpwf_swapChain.framebuffers.resize(VkBase::Base().SwapchainImageCount());
-		dsas_screenWithDS.resize(VkBase::Base().SwapchainImageCount());
+		//dsas_screenWithDS.resize(VkBase::Base().SwapchainImageCount());
 
-		for (auto& i : dsas_screenWithDS)
-			i.Create(_depthStencilFormat, windowSize, 1, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT);
+		/*for (auto& i : dsas_screenWithDS)
+			i.Create(_depthStencilFormat, windowSize, 1, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT);*/
 
 		VkFramebufferCreateInfo framebufferCreateInfo = {
 			.renderPass = rpwf_swapChain.renderPass,
-			.attachmentCount = 2,
+			.attachmentCount = 1,
 			.width = windowSize.width,
 			.height = windowSize.height,
 			.layers = 1
 		};
 
 		for (size_t i = 0; i < VkBase::Base().SwapchainImageCount(); ++i) {
-			VkImageView attachments[2] = {
-				VkBase::Base().SwapchainImageView(i),
-				dsas_screenWithDS[i].ImageView()
-			};
-			framebufferCreateInfo.pAttachments = attachments;
+			VkImageView attachment = VkBase::Base().SwapchainImageView(i);
+			framebufferCreateInfo.pAttachments = &attachment;
 			rpwf_swapChain.framebuffers[i].Create(framebufferCreateInfo);
 		}
 

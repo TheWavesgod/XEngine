@@ -42,15 +42,23 @@ namespace LittleEngine
 		const DescriptorSet& GetViewDescriptorSet() const { return globalViewDescriptorSet; }
 		const DescriptorSetLayout& GetViewDescriptorSetLayout() const { return globalViewDescriptorSetLayout; }
 
-		RenderPass& GetCurrentRenderPass() { return rpwf_swapChain.renderPass; }
+		RenderPass& GetCurrentRenderPass() { return rpwf_draw.renderPass; }
 
 	private:
-		struct renderPassWithFramebuffers
+		struct RenderPassWithFramebuffers
 		{
 			RenderPass renderPass;
 			std::vector<Framebuffer> framebuffers;
-		} rpwf_swapChain;
-		std::vector<DepthStencilAttachment> dsas_screenWithDS;
+		} rpwf_postProcess;
+		std::vector<DepthStencilAttachment> dsas_postProcess;
+
+		struct RenderPassWithFramebuffer
+		{
+			RenderPass renderPass;
+			Framebuffer frameBuffer;
+		} rpwf_draw;
+		ColorAttachment ca_draw;
+		DepthStencilAttachment dsa_draw;
 
 		CommandBuffer commandBuffer_Rendering;
 

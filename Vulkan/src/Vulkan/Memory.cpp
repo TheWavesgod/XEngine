@@ -24,7 +24,7 @@ namespace VK
 	DeviceMemory::~DeviceMemory()
 	{
 		DestroyHandleBy(vkFreeMemory); 
-		allocationSize = 0;
+		allocationSize = 0; 
 		memoryProperties = 0;
 	}
 
