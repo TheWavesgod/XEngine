@@ -58,24 +58,37 @@ namespace LittleEngine
 	void Renderer::RenderFrame(Scene& scene)
 	{
 		VkBase::Base().Swapchain().SwapImage(semaphore_imageIsAvailable);
-		uint32_t i = VkBase::Base().Swapchain().CurrentImageIndex();
+		const uint32_t i = VkBase::Base().Swapchain().CurrentImageIndex();
 
-		const auto& [renderPass, framebuffers] = rpwf_swapChain;
+		const auto& [rp_draw, fb_draw] = rpwf_draw;
+		const auto& [rp_postProcess, fbs_postProcess] = rpwf_postProcess;
 
 		// Update Global Data
 		viewDataBuffer.TransferData(scene.GetCam().GetCameraRenderingData());
 		std::vector<RenderObject>& renderObjs = scene.GetRenderObjects();
 
-
 		commandBuffer_Rendering.Begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-		renderPass.CmdBegin(commandBuffer_Rendering, framebuffers[i], { {}, windowSize }, clearColors);
+		// Draw scene
+		rp_draw.CmdBegin(commandBuffer_Rendering, fb_draw, { {}, windowSize }, clearColors);
 		{
 			for (auto& obj : renderObjs)
 			{
 				obj.Draw(commandBuffer_Rendering);
 			}
 		}
-		renderPass.CmdEnd(commandBuffer_Rendering);
+		rp_draw.CmdEnd(commandBuffer_Rendering);
+
+		// Post process
+		rp_postProcess.CmdBegin(commandBuffer_Rendering, fbs_postProcess[i], { {}, windowSize }, clearColors[0]);
+		{
+			vkCmdBindPipeline(commandBuffer_Rendering, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_postProcess);
+			vkCmdBindDescriptorSets(commandBuffer_Rendering, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_postProcess,
+				0, 1, postProcessDescriptorSet.Address(), 0, nullptr);
+			vkCmdPushConstants(commandBuffer_Rendering, pipelineLayout_postProcess, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float), &settings.exposure);
+			vkCmdDraw(commandBuffer_Rendering, 3, 1, 0, 0);
+		}
+		rp_postProcess.CmdEnd(commandBuffer_Rendering);
+		
 		commandBuffer_Rendering.End();
 
 		VkBase::Base().SubmitCommandBuffer_Graphics(commandBuffer_Rendering, semaphore_imageIsAvailable, semaphores_renderingIsOver[i], fence);
@@ -212,21 +225,77 @@ namespace LittleEngine
 	{
 		using namespace VK;
 
-		VkAttachmentDescription colorAttachDescription_postProcess = {
-
-		};
-
-		/*{
-			.format = _depthStencilFormat,
+		VkAttachmentDescription attachmentDescriptions_draw[2] = {
+			{
+				.format = VK_FORMAT_R16G16B16A16_SFLOAT, // HDR format
 				.samples = VK_SAMPLE_COUNT_1_BIT,
+				.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+				.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+			{
+				.format = _depthStencilFormat,
 				.loadOp = _depthStencilFormat != VK_FORMAT_S8_UINT ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 				.stencilLoadOp = _depthStencilFormat >= VK_FORMAT_S8_UINT ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-				.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-		}*/
+				.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL}
+		};
 
-		VkAttachmentDescription attachmentDescription = {
+		VkAttachmentReference colorAttachRef = {
+			.attachment = 0,
+			.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		};
+
+		VkAttachmentReference depthAttachRef = {
+			.attachment = 1,
+			.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		};
+
+		VkSubpassDescription subpass_draw = {
+			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.colorAttachmentCount = 1,
+			.pColorAttachments = &colorAttachRef,
+			.pDepthStencilAttachment = &depthAttachRef
+		};
+
+		VkSubpassDependency subpassDependency_draw = {
+			.srcSubpass = VK_SUBPASS_EXTERNAL,
+			.dstSubpass = 0,
+			.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+			.srcAccessMask = 0,
+			.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+			.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT
+		};
+
+		VkRenderPassCreateInfo rpCreateInfo_draw = {
+			.attachmentCount = 2,
+			.pAttachments = attachmentDescriptions_draw,
+			.subpassCount = 1,
+			.pSubpasses = &subpass_draw,
+			.dependencyCount = 1,
+			.pDependencies = &subpassDependency_draw
+		};
+		rpwf_draw.renderPass.Create(rpCreateInfo_draw);
+
+		ca_draw.Create(VK_FORMAT_R16G16B16A16_SFLOAT, windowSize, 1, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT);
+		dsa_draw.Create(_depthStencilFormat, windowSize, 1, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT);
+		VkImageView attachments_draw[] = {ca_draw.ImageView(), dsa_draw.ImageView()};
+
+		VkFramebufferCreateInfo fbCreateInfo_draw = {
+			.renderPass = rpwf_draw.renderPass,
+			.attachmentCount = 2,
+			.pAttachments = attachments_draw,
+			.width = windowSize.width,
+			.height = windowSize.height,
+			.layers = 1
+		};
+		rpwf_draw.frameBuffer.Create(fbCreateInfo_draw);
+
+		// Post process Render pass
+		VkAttachmentDescription attachmentDescription_postProcess = {
 			.format = VkBase::Base().SwapchainCreateInfo().imageFormat,
 			.samples = VK_SAMPLE_COUNT_1_BIT,
 			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
@@ -235,17 +304,17 @@ namespace LittleEngine
 			.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
 		};
 
-		VkAttachmentReference attachmentReferences = {
+		VkAttachmentReference attachRef_postProcess = {
 			0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 		};
 
-		VkSubpassDescription subpassDescription = {
+		VkSubpassDescription subpass_postProcess = {
 			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 			.colorAttachmentCount = 1,
-			.pColorAttachments = &attachmentReferences,
+			.pColorAttachments = &attachRef_postProcess,
 		};
 
-		VkSubpassDependency subpassDependency = {
+		VkSubpassDependency subpassDependency_postProcess = {
 			.srcSubpass = VK_SUBPASS_EXTERNAL,
 			.dstSubpass = 0,
 			.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -257,23 +326,19 @@ namespace LittleEngine
 
 		VkRenderPassCreateInfo renderPassCreateInfo = {
 			.attachmentCount = 1,
-			.pAttachments = &attachmentDescription,
+			.pAttachments = &attachmentDescription_postProcess,
 			.subpassCount = 1,
-			.pSubpasses = &subpassDescription,
+			.pSubpasses = &subpass_postProcess,
 			.dependencyCount = 1,
-			.pDependencies = &subpassDependency
+			.pDependencies = &subpassDependency_postProcess
 		};
-		rpwf_swapChain.renderPass.Create(renderPassCreateInfo);
+		rpwf_postProcess.renderPass.Create(renderPassCreateInfo);
 
 		// Create Render Attachment
-		rpwf_swapChain.framebuffers.resize(VkBase::Base().SwapchainImageCount());
-		//dsas_screenWithDS.resize(VkBase::Base().SwapchainImageCount());
-
-		/*for (auto& i : dsas_screenWithDS)
-			i.Create(_depthStencilFormat, windowSize, 1, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT);*/
+		rpwf_postProcess.framebuffers.resize(VkBase::Base().SwapchainImageCount());
 
 		VkFramebufferCreateInfo framebufferCreateInfo = {
-			.renderPass = rpwf_swapChain.renderPass,
+			.renderPass = rpwf_postProcess.renderPass,
 			.attachmentCount = 1,
 			.width = windowSize.width,
 			.height = windowSize.height,
@@ -283,7 +348,7 @@ namespace LittleEngine
 		for (size_t i = 0; i < VkBase::Base().SwapchainImageCount(); ++i) {
 			VkImageView attachment = VkBase::Base().SwapchainImageView(i);
 			framebufferCreateInfo.pAttachments = &attachment;
-			rpwf_swapChain.framebuffers[i].Create(framebufferCreateInfo);
+			rpwf_postProcess.framebuffers[i].Create(framebufferCreateInfo);
 		}
 
 		return true;

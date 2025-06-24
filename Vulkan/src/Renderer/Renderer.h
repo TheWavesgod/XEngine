@@ -14,6 +14,11 @@ namespace LittleEngine
 
 	class Scene;
 
+	struct RendererSettings
+	{
+		float exposure = 1.0f;
+	};
+
 	class Renderer
 	{
 		static Renderer renderer;
@@ -44,6 +49,8 @@ namespace LittleEngine
 
 		RenderPass& GetCurrentRenderPass() { return rpwf_draw.renderPass; }
 
+		RendererSettings settings;
+
 	private:
 		struct RenderPassWithFramebuffers
 		{
@@ -60,6 +67,9 @@ namespace LittleEngine
 		ColorAttachment ca_draw;
 		DepthStencilAttachment dsa_draw;
 
+		Pipeline pipeline_postProcess;
+		PipelineLayout pipelineLayout_postProcess;
+
 		CommandBuffer commandBuffer_Rendering;
 
 		Semaphore semaphore_imageIsAvailable;
@@ -71,6 +81,9 @@ namespace LittleEngine
 		// Global Info
 		DescriptorSet globalViewDescriptorSet;
 		DescriptorSetLayout globalViewDescriptorSetLayout;
+
+		DescriptorSet postProcessDescriptorSet;
+		DescriptorSetLayout postProcessDescriptorSetLayout;
 
 		UniformBuffer viewDataBuffer;
 	};
