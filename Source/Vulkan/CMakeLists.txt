@@ -18,6 +18,7 @@ file(GLOB VULKAN_IMPL_PUBLIC
 
 set(ALL_FILES 
     ${VULKAN_IMPL_PRIVATE}
+    ${VULKAN_IMPL_PUBLIC}
 )
 
 set_source_files_properties(${ALL_FILES} PROPERTIES LANGUAGE CXX)
@@ -27,10 +28,9 @@ set_source_files_properties(${ALL_FILES} PROPERTIES LANGUAGE CXX)
 ###########################################################################
 add_library(${PROJECT_NAME} STATIC ${ALL_FILES})
 
-target_precompile_headers(${PROJECT_NAME}
-    PUBLIC
-    ${VULKAN_IMPL_PUBLIC}
-)
+#target_precompile_headers(${PROJECT_NAME}
+ #   PUBLIC
+#)
 
 ###########################################################################
 # Dependencies
