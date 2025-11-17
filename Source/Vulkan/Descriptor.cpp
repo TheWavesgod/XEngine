@@ -165,7 +165,83 @@ namespace VK
 		return *this;
 	}
 
-	DescriptorSet& DescriptorSet::Update()
+	DescriptorSet& DescriptorSet::WriteBuffer(uint32_t binding, VkDescriptorType type, const VkDescriptorBufferInfo& info, uint32_t arrayElement)
+	{
+		BufferWrite w{};
+		w.binding = binding;
+		w.arrayElement = arrayElement;
+		w.type = type;
+		w.info = info;
+		bufferWrites.push_back(w);
+		return *this;
+	}
+
+	DescriptorSet& DescriptorSet::WriteImage(uint32_t binding, VkDescriptorType type, VkImageView imageView, VkSampler sampler, VkImageLayout layout, uint32_t arrayElement)
+	{
+		VkDescriptorImageInfo info{};
+		info.imageView = imageView;
+		info.sampler = sampler;
+		info.imageLayout = layout;
+		return WriteImage(binding, type, info, arrayElement);
+	}
+
+	DescriptorSet& DescriptorSet::WriteImage(uint32_t binding, VkDescriptorType type, const VkDescriptorImageInfo& info, uint32_t arrayElement)
+	{
+		ImageWrite w{};
+		w.binding = binding;
+		w.arrayElement = arrayElement;
+		w.type = type;
+		w.info = info;
+		imageWrites.push_back(w);
+		return *this;
+	}
+
+	DescriptorSet& DescriptorSet::WriteImageArray(uint32_t binding, VkDescriptorType type, const std::vector<VkDescriptorImageInfo>& infos, uint32_t firstArrayElement)
+	{
+		if (infos.empty()) return *this;
+		for (uint32_t i = 0; i < infos.size(); ++i) 
+		{
+			ImageWrite w{};
+			w.binding = binding;
+			w.arrayElement = firstArrayElement + i;
+			w.type = type;
+			w.info = infos[i];
+			imageWrites.push_back(w);
+		}
+		return *this;
+	}
+
+	DescriptorSet& DescriptorSet::WriteCombinedImageSampler(uint32_t binding, VkImageView imageView, VkSampler sampler, VkImageLayout layout, uint32_t arrayElement)
+	{
+		return WriteImage(
+			binding,
+			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			imageView, sampler, layout,
+			arrayElement
+		);
+	}
+
+	DescriptorSet& DescriptorSet::WriteUniformBuffer(uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range, uint32_t arrayElement)
+	{
+		return WriteBuffer(
+			binding,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			buffer, offset, range,
+			arrayElement
+		);
+	}
+
+	DescriptorSet& DescriptorSet::WriteStorageBuffer(uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range, uint32_t arrayElement)
+	{
+		return WriteBuffer(
+			binding,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			buffer, offset, range,
+			arrayElement
+		);
+	}
+
+	void DescriptorSet::Update(VkDevice device)
 	{
 		if (handle == VK_NULL_HANDLE) 
 			throw std::runtime_error("DescriptorSet::Update: descriptor set is null.");
@@ -174,6 +250,45 @@ namespace VK
 		std::vector<VkDescriptorImageInfo>  imageInfos;
 		bufferInfos.reserve(bufferWrites.size());
 		imageInfos.reserve(imageWrites.size());
+
+		std::vector<VkWriteDescriptorSet> writes;
+		writes.reserve(bufferWrites.size() + imageWrites.size());
+
+		for (const auto& bw : bufferWrites) 
+		{
+			bufferInfos.push_back(bw.info);
+			VkWriteDescriptorSet w{};
+			w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			w.dstSet = handle;
+			w.dstBinding = bw.binding;
+			w.dstArrayElement = bw.arrayElement;
+			w.descriptorType = bw.type;
+			w.descriptorCount = 1;
+			w.pBufferInfo = &bufferInfos.back();
+			writes.push_back(w);
+		}
+
+		for (const auto& iw : imageWrites) 
+		{
+			imageInfos.push_back(iw.info);
+			VkWriteDescriptorSet w{};
+			w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			w.dstSet = handle;
+			w.dstBinding = iw.binding;
+			w.dstArrayElement = iw.arrayElement;
+			w.descriptorType = iw.type;
+			w.descriptorCount = 1;
+			w.pImageInfo = &imageInfos.back();
+			writes.push_back(w);
+		}
+
+		if (!writes.empty())
+		{
+			vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+		}
+
+		bufferWrites.clear();
+		imageWrites.clear();
 	}
 
 }

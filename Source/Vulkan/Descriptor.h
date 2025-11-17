@@ -150,7 +150,34 @@ namespace VK
             const VkDescriptorImageInfo& info,
             uint32_t arrayElement = 0);
 
-        DescriptorSet& Update();
+        DescriptorSet& WriteImageArray(
+            uint32_t binding,
+            VkDescriptorType type,
+            const std::vector<VkDescriptorImageInfo>& infos,
+            uint32_t firstArrayElement = 0);
+
+        DescriptorSet& WriteCombinedImageSampler(
+            uint32_t binding,
+            VkImageView imageView,
+            VkSampler sampler,
+            VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            uint32_t arrayElement = 0);
+
+		DescriptorSet& WriteUniformBuffer(
+			uint32_t binding,
+			VkBuffer buffer,
+			VkDeviceSize offset,
+			VkDeviceSize range,
+			uint32_t arrayElement = 0);
+
+        DescriptorSet& WriteStorageBuffer(
+            uint32_t binding,
+            VkBuffer buffer,
+            VkDeviceSize offset,
+            VkDeviceSize range,
+            uint32_t arrayElement = 0);
+
+        void Update(VkDevice device);
 
     private:
         struct BufferWrite {
