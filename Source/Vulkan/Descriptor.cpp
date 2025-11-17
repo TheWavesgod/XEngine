@@ -9,75 +9,77 @@ namespace VK
 		DestroyHandleBy(vkDestroyDescriptorSetLayout);
 	}
 
-	result_t DescriptorSetLayout::Create(VkDescriptorSetLayoutCreateInfo& createInfo)
+	DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::SetFlags(VkDescriptorSetLayoutCreateFlags flags)
 	{
-		createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		VkResult result = vkCreateDescriptorSetLayout(VkBase::Base().Device(), &createInfo, nullptr, &handle);
-		if (result)
-			outStream << std::format("[ descriptorSetLayout ] ERROR\nFailed to create a descriptor set layout!\nError code: {}\n", int32_t(result));
-		return result;
+		flags_ = flags;
+		return *this;
 	}
 
-	void DescriptorSet::Write(arrayRef<const VkDescriptorImageInfo> descriptorInfos, VkDescriptorType descriptorType, 
-		uint32_t dstBinding, uint32_t dstArrayElement) const
+	DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddBinding(
+		uint32_t binding, VkDescriptorType descriptorType,
+		VkShaderStageFlags stageFlags, uint32_t descriptorCount,
+		const VkSampler* pImmutableSamplers)
 	{
-		VkWriteDescriptorSet writeDescriptorSet = {
-			.dstSet = handle,
-			.dstBinding = dstBinding,
-			.dstArrayElement = dstArrayElement,
-			.descriptorCount = uint32_t(descriptorInfos.Count()),
-			.descriptorType = descriptorType,
-			.pImageInfo = descriptorInfos.Pointer()
-		};
-		Update(writeDescriptorSet);
+		VkDescriptorSetLayoutBinding b{};
+		b.binding = binding;
+		b.descriptorType = descriptorType;
+		b.descriptorCount = descriptorCount;
+		b.stageFlags = stageFlags;
+		b.pImmutableSamplers = pImmutableSamplers;
+		bindings_.push_back(b);
+		return *this;
 	}
 
-	void DescriptorSet::Write(arrayRef<const VkDescriptorBufferInfo> descriptorInfos, VkDescriptorType descriptorType, 
-		uint32_t dstBinding, uint32_t dstArrayElement) const 
+	DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddUniformBuffer(
+		uint32_t binding, VkShaderStageFlags stageFlags, uint32_t descriptorCount)
 	{
-		VkWriteDescriptorSet writeDescriptorSet = {
-			.dstSet = handle,
-			.dstBinding = dstBinding,
-			.dstArrayElement = dstArrayElement,
-			.descriptorCount = uint32_t(descriptorInfos.Count()),
-			.descriptorType = descriptorType,
-			.pBufferInfo = descriptorInfos.Pointer()
-		};
-		Update(writeDescriptorSet);
+		return AddBinding(binding,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			stageFlags,
+			descriptorCount);
 	}
 
-	void DescriptorSet::Write(arrayRef<const VkBufferView> descriptorInfos, VkDescriptorType descriptorType, 
-		uint32_t dstBinding, uint32_t dstArrayElement) const 
+	DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddUniformBufferDynamic(
+		uint32_t binding, VkShaderStageFlags stageFlags, uint32_t descriptorCount)
 	{
-		VkWriteDescriptorSet writeDescriptorSet = {
-			.dstSet = handle,
-			.dstBinding = dstBinding,
-			.dstArrayElement = dstArrayElement,
-			.descriptorCount = uint32_t(descriptorInfos.Count()),
-			.descriptorType = descriptorType,
-			.pTexelBufferView = descriptorInfos.Pointer()
-		};
-		Update(writeDescriptorSet);
+		return AddBinding(binding,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+			stageFlags,
+			descriptorCount);
 	}
 
-	void DescriptorSet::Write(arrayRef<const BufferView> descriptorInfos, VkDescriptorType descriptorType,
-		uint32_t dstBinding, uint32_t dstArrayElement) const 
+	DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddCombinedImageSampler(
+		uint32_t binding, VkShaderStageFlags stageFlags, uint32_t descriptorCount, const VkSampler* pImmutableSamplers)
 	{
-		Write({ descriptorInfos[0].Address(), descriptorInfos.Count() }, descriptorType, dstBinding, dstArrayElement);
+		return AddBinding(binding,
+			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			stageFlags,
+			descriptorCount,
+			pImmutableSamplers);
 	}
 
-	void DescriptorSet::Update(arrayRef<VkWriteDescriptorSet> writes, arrayRef<VkCopyDescriptorSet> copies)
+	DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddStorageBuffer(
+		uint32_t binding, VkShaderStageFlags stageFlags, uint32_t descriptorCount)
 	{
-		for (auto& i : writes)
-		{
-			i.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		}
-		for (auto& i : copies)
-		{
-			i.sType = VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET;
+		return AddBinding(binding,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			stageFlags,
+			descriptorCount);
+	}
 
-		}
-		vkUpdateDescriptorSets(VkBase::Base().Device(), writes.Count(), writes.Pointer(), copies.Count(), copies.Pointer());
+	DescriptorSetLayout DescriptorSetLayout::Builder::Build()
+	{
+		VkDescriptorSetLayoutCreateInfo info{};
+		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		info.flags = flags_;
+		info.bindingCount = static_cast<uint32_t>(bindings_.size());
+		info.pBindings = bindings_.data();
+
+		VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+		if (vkCreateDescriptorSetLayout(device_, &info, nullptr, &layout) != VK_SUCCESS)
+			throw std::runtime_error("DescriptorSetLayout::Builder: failed to create VkDescriptorSetLayout.");
+
+		return DescriptorSetLayout(layout);
 	}
 
 	DescriptorPool::~DescriptorPool()
@@ -85,84 +87,94 @@ namespace VK
 		DestroyHandleBy(vkDestroyDescriptorPool);
 	}
 
-	result_t DescriptorPool::AllocateSets(arrayRef<VkDescriptorSet> sets, arrayRef<const VkDescriptorSetLayout> setLayouts) const
+	void DescriptorPool::Reset() const
 	{
-		if (sets.Count() != setLayouts.Count())
+		if (handle != VK_NULL_HANDLE) 
 		{
-			if (sets.Count() < setLayouts.Count()) 
-			{
-				outStream << std::format("[ descriptorPool ] ERROR\nFor each descriptor set, must provide a corresponding layout!\n");
-				return VK_RESULT_MAX_ENUM;
-			}
-			else
-				outStream << std::format("[ descriptorPool ] WARNING\nProvided layouts are more than sets!\n");
+			vkResetDescriptorPool(device, handle, 0);
 		}
-
-		VkDescriptorSetAllocateInfo allocateInfo = {
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-			.descriptorPool = handle,
-			.descriptorSetCount = uint32_t(sets.Count()),
-			.pSetLayouts = setLayouts.Pointer()
-		};
-
-		VkResult result = vkAllocateDescriptorSets(VkBase::Base().Device(), &allocateInfo, sets.Pointer());
-		if (result)
-			outStream << std::format("[ descriptorPool ] ERROR\nFailed to allocate descriptor sets!\nError code: {}\n", int32_t(result));
-		return result;
 	}
 
-	result_t DescriptorPool::AllocateSets(arrayRef<VkDescriptorSet> sets, arrayRef<const DescriptorSetLayout> setLayouts) const 
+	DescriptorPool::Builder& DescriptorPool::Builder::SetFlags(VkDescriptorPoolCreateFlags flags)
 	{
-		return AllocateSets(
-			sets,
-			{ setLayouts[0].Address(), setLayouts.Count() }
-		);
+		flags_ = flags;
+		return *this;
 	}
 
-	result_t DescriptorPool::AllocateSets(arrayRef<DescriptorSet> sets, arrayRef<const VkDescriptorSetLayout> setLayouts) const 
+	DescriptorPool::Builder& DescriptorPool::Builder::SetMaxSets(uint32_t maxSets)
 	{
-		return AllocateSets(
-			{ &sets[0].handle, sets.Count() },
-			setLayouts);
+		maxSets_ = maxSets;
+		return *this;
 	}
 
-	result_t DescriptorPool::AllocateSets(arrayRef<DescriptorSet> sets, arrayRef<const DescriptorSetLayout> setLayouts) const 
-	{
-		return AllocateSets(
-			{ &sets[0].handle, sets.Count() },
-			{ setLayouts[0].Address(), setLayouts.Count() }
-		);
+	DescriptorPool::Builder& DescriptorPool::Builder::AddPoolSize(VkDescriptorType type, uint32_t count) {
+		VkDescriptorPoolSize size{};
+		size.type = type;
+		size.descriptorCount = count;
+		poolSizes_.push_back(size);
+		return *this;
 	}
 
-	result_t DescriptorPool::FreeSets(arrayRef<VkDescriptorSet> sets) const 
+	DescriptorPool DescriptorPool::Builder::Build()
 	{
-		VkResult result = vkFreeDescriptorSets(VkBase::Base().Device(), handle, sets.Count(), sets.Pointer());
-		memset(sets.Pointer(), 0, sets.Count() * sizeof(VkDescriptorSet));
-		return result;//Though vkFreeDescriptorSets(...) can only return VK_SUCCESS
+		if (maxSets_ == 0)
+			throw std::runtime_error("DescriptorPool::Builder: maxSets is 0.");
+
+		if (poolSizes_.empty()) 
+			throw std::runtime_error("DescriptorPool::Builder: no pool sizes specified.");
+
+		VkDescriptorPoolCreateInfo info{};
+		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		info.flags = flags_;
+		info.maxSets = maxSets_;
+		info.poolSizeCount = static_cast<uint32_t>(poolSizes_.size());
+		info.pPoolSizes = poolSizes_.data();
+
+		VkDescriptorPool pool = VK_NULL_HANDLE;
+		if (vkCreateDescriptorPool(device_, &info, nullptr, &pool) != VK_SUCCESS)
+			throw std::runtime_error("DescriptorPool::Builder: failed to create VkDescriptorPool.");
+
+		return DescriptorPool(pool, device_);
 	}
 
-	result_t DescriptorPool::FreeSets(arrayRef<DescriptorSet> sets) const 
+	DescriptorSet DescriptorSet::Allocate(VkDevice device, const VkDescriptorPool& pool, VkDescriptorSetLayout layout)
 	{
-		return FreeSets({ &sets[0].handle, sets.Count() });
-	}
-	
-	result_t DescriptorPool::Create(VkDescriptorPoolCreateInfo& createInfo)
-	{
-		createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		VkResult result = vkCreateDescriptorPool(VkBase::Base().Device(), &createInfo, nullptr, &handle);
-		if (result)
-			outStream << std::format("[ descriptorPool ] ERROR\nFailed to create a descriptor pool!\nError code: {}\n", int32_t(result));
-		return result;
+		VkDescriptorSetAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocInfo.descriptorPool = pool;
+		allocInfo.descriptorSetCount = 1;
+		allocInfo.pSetLayouts = &layout;
+
+		VkDescriptorSet set;
+		if (vkAllocateDescriptorSets(device, &allocInfo, &set) != VK_SUCCESS)
+			throw std::runtime_error("DescriptorSet allocated failed!");
+
+		return DescriptorSet(set);
 	}
 
-	result_t DescriptorPool::Create(uint32_t maxSetCount, arrayRef<const VkDescriptorPoolSize> poolSizes, VkDescriptorPoolCreateFlags flags)
+	DescriptorSet& DescriptorSet::WriteBuffer(uint32_t binding, VkDescriptorType type, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range, uint32_t arrayElement)
 	{
-		VkDescriptorPoolCreateInfo createInfo = {
-			.flags = flags,
-			.maxSets = maxSetCount,
-			.poolSizeCount = uint32_t(poolSizes.Count()),
-			.pPoolSizes = poolSizes.Pointer()
-		};
-		return Create(createInfo);
+		BufferWrite w{};
+		w.binding = binding;
+		w.arrayElement = arrayElement;
+		w.type = type;
+		w.info.buffer = buffer;
+		w.info.offset = offset;
+		w.info.range = range;
+		bufferWrites.push_back(w);
+		return *this;
 	}
+
+	DescriptorSet& DescriptorSet::Update()
+	{
+		if (handle == VK_NULL_HANDLE) 
+			throw std::runtime_error("DescriptorSet::Update: descriptor set is null.");
+		
+		std::vector<VkDescriptorBufferInfo> bufferInfos;
+		std::vector<VkDescriptorImageInfo>  imageInfos;
+		bufferInfos.reserve(bufferWrites.size());
+		imageInfos.reserve(imageWrites.size());
+	}
+
 }
+	

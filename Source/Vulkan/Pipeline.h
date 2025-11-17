@@ -4,106 +4,6 @@
 
 namespace VK
 {
-    struct GraphicsPipelineCreateInfoPack
-    {
-        VkGraphicsPipelineCreateInfo createInfo = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-
-        std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-
-        // Vertex Input
-        VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
-
-        std::vector<VkVertexInputBindingDescription> vertexInputBindings;
-        std::vector<VkVertexInputAttributeDescription> vertexInputAttributes;
-
-        // Input Assembly 
-        VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-
-        // Tessellation
-        VkPipelineTessellationStateCreateInfo tessellationStateCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO };
-
-        // Viewport
-        VkPipelineViewportStateCreateInfo viewportStateCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
-
-        std::vector<VkViewport> viewports;
-        std::vector<VkRect2D> scissors;
-        uint32_t dynamicViewportCount = 1; 
-        uint32_t dynamicScissorCount = 1;
-
-        // Rasterization
-        VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
-
-        // Multisample
-        VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-
-        // Depth & Stencil
-        VkPipelineDepthStencilStateCreateInfo depthStencilStateCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-
-        // Color Blend
-        VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-
-        std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachmentStates;
-
-        // Dynamic
-        VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
-
-        std::vector<VkDynamicState> dynamicStates;
-
-
-        // -------------------------------------------------------------------------
-        GraphicsPipelineCreateInfoPack()
-        {
-            SetCreateInfos();
-            // if it's not a derived pipeline,createInfo.basePipelineIndex can't be 0, set -1
-            createInfo.basePipelineIndex = -1;
-        }
-
-        GraphicsPipelineCreateInfoPack(const GraphicsPipelineCreateInfoPack& other) noexcept;
-
-        //Getter
-        operator VkGraphicsPipelineCreateInfo& () { return createInfo; }
-
-        //Non-const Function
-        void UpdateAllArrays()
-        {
-            createInfo.stageCount = shaderStages.size();
-
-            vertexInputStateCreateInfo.vertexBindingDescriptionCount = vertexInputBindings.size();
-            vertexInputStateCreateInfo.vertexAttributeDescriptionCount = vertexInputAttributes.size();
-
-            viewportStateCreateInfo.viewportCount = viewports.size() ? uint32_t(viewports.size()) : dynamicViewportCount;
-            viewportStateCreateInfo.scissorCount = scissors.size() ? uint32_t(scissors.size()) : dynamicScissorCount;
-            colorBlendStateCreateInfo.attachmentCount = colorBlendAttachmentStates.size();
-            dynamicStateCreateInfo.dynamicStateCount = dynamicStates.size();
-            UpdateAllArrayAddresses();
-        }
-
-    private:
-        void SetCreateInfos()
-        {
-            createInfo.pVertexInputState = &vertexInputStateCreateInfo;
-            createInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;
-            createInfo.pTessellationState = &tessellationStateCreateInfo;
-            createInfo.pViewportState = &viewportStateCreateInfo;
-            createInfo.pRasterizationState = &rasterizationStateCreateInfo;
-            createInfo.pMultisampleState = &multisampleStateCreateInfo;
-            createInfo.pDepthStencilState = &depthStencilStateCreateInfo;
-            createInfo.pColorBlendState = &colorBlendStateCreateInfo;
-            createInfo.pDynamicState = &dynamicStateCreateInfo;
-        }
-
-        void UpdateAllArrayAddresses()
-        {
-            createInfo.pStages = shaderStages.data();
-            vertexInputStateCreateInfo.pVertexBindingDescriptions = vertexInputBindings.data();
-            vertexInputStateCreateInfo.pVertexAttributeDescriptions = vertexInputAttributes.data();
-            viewportStateCreateInfo.pViewports = viewports.data();
-            viewportStateCreateInfo.pScissors = scissors.data();
-            colorBlendStateCreateInfo.pAttachments = colorBlendAttachmentStates.data();
-            dynamicStateCreateInfo.pDynamicStates = dynamicStates.data();
-        }
-    };
-
 	/*
 	 * Layout contains the way of how pipeline uses descriptors and push constant
 	 */
@@ -113,7 +13,7 @@ namespace VK
 
 	public:
 		PipelineLayout() = default;
-		PipelineLayout(VkPipelineLayoutCreateInfo& createInfo) { Create(createInfo); }
+        PipelineLayout(VkPipelineLayout layout) : handle(layout) {}
 
 		PipelineLayout(PipelineLayout&& other) noexcept { MoveHandle; }
 		~PipelineLayout();
@@ -122,8 +22,33 @@ namespace VK
 		DefineHandleTypeOperator;
 		DefineAddressFunction;
 
-		// Non-const Function
-		result_t Create(VkPipelineLayoutCreateInfo& createInfo);
+        PipelineLayout(const PipelineLayout&) = delete;
+        PipelineLayout& operator=(const PipelineLayout&) = delete;
+
+    public:
+        class Builder
+        {
+        public:
+            explicit Builder(VkDevice device) : device_(device) {}
+
+            Builder& SetFlags(VkPipelineLayoutCreateFlags flags);
+            Builder& AddDescriptorSetLayout(VkDescriptorSetLayout layout);
+            Builder& AddPushConstantRange(VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size);
+            
+            template <typename T>
+            Builder& AddPushConstantRangeTyped(VkShaderStageFlags stageFlags, uint32_t offset = 0)
+            {
+                return addPushConstantRange(stageFlags, offset, sizeof(T));
+            }
+
+            PipelineLayout Build();
+
+        private:
+            VkDevice device_;
+            VkPipelineLayoutCreateFlags flags_ = 0;
+            std::vector<VkDescriptorSetLayout> setLayouts_;
+            std::vector<VkPushConstantRange> pushConstants_;
+        };
 	};
 
 
@@ -132,12 +57,12 @@ namespace VK
 	 */
 	class Pipeline
 	{
+    protected:
 		VkPipeline handle = VK_NULL_HANDLE;
 
 	public:
 		Pipeline() = default;
-		Pipeline(VkGraphicsPipelineCreateInfo& createInfo) { Create(createInfo); }
-		Pipeline(VkComputePipelineCreateInfo& createInfo) { Create(createInfo); }
+        Pipeline(VkPipeline pipeline) : handle(pipeline) {}
 
 		Pipeline(Pipeline&& other) noexcept { MoveHandle; }
 		~Pipeline();
@@ -145,9 +70,129 @@ namespace VK
 		// Getter
 		DefineHandleTypeOperator;
 		DefineAddressFunction;
-
-		//Non-const Function
-		result_t Create(VkGraphicsPipelineCreateInfo& createInfo);
-		result_t Create(VkComputePipelineCreateInfo& createInfo);
 	};
+
+    class GraphicsPipeline : public Pipeline
+    {
+    public:
+        using Pipeline::Pipeline;
+
+        class Builder
+        {
+        public:
+            explicit Builder(VkDevice device);
+
+            Builder& AddShaderStage(
+                VkShaderStageFlagBits stage,
+                VkShaderModule module,
+                const char* entryName = "main");
+
+            Builder& AddVertexBinding(
+                uint32_t binding,
+                uint32_t stride,
+                VkVertexInputRate inputRate = VK_VERTEX_INPUT_RATE_VERTEX);
+
+            Builder& AddVertexAttribute(
+                uint32_t location,
+                uint32_t binding,
+                VkFormat format,
+                uint32_t offset);
+
+            Builder& SetVertexInputState(const VkPipelineVertexInputStateCreateInfo& info); 
+
+            Builder& SetInputAssembly(VkPrimitiveTopology topology, VkBool32 primitiveRestartEnable = VK_FALSE);
+
+            Builder& SetViewport(const VkViewport& viewport);
+
+            Builder& SetScissor(const VkRect2D& scissor);
+
+            Builder& SetRasterizationState(
+                VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL,
+                VkCullModeFlags cullMode = VK_CULL_MODE_BACK_BIT,
+                VkFrontFace frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE);
+
+            Builder& SetDepthClamp(VkBool32 enable);
+
+            Builder& SetSampleCount(VkSampleCountFlagBits samples);
+
+            Builder& EnableDepthTest(
+                VkBool32 enableTest = true, 
+                VkBool32 enableWrite = true, 
+                VkCompareOp compareOp = VK_COMPARE_OP_LESS);
+
+            Builder& AddColorBlendAttachment(
+                VkBool32 blendEnable,
+                VkColorComponentFlags colorWriteMask =
+                VK_COLOR_COMPONENT_R_BIT |
+                VK_COLOR_COMPONENT_G_BIT |
+                VK_COLOR_COMPONENT_B_BIT |
+                VK_COLOR_COMPONENT_A_BIT);
+
+            Builder& AddDynamicState(VkDynamicState state);
+
+            Builder& SetPipelineLayout(VkPipelineLayout layout);
+            Builder& SetRenderPass(VkRenderPass renderPass, uint32_t subpass = 0);
+
+            GraphicsPipeline Build();
+
+        private:
+            VkDevice device_ = VK_NULL_HANDLE;
+
+            // Object Ref
+            VkPipelineLayout layout_ = VK_NULL_HANDLE;
+            VkRenderPass     renderPass_ = VK_NULL_HANDLE;
+            uint32_t         subpass_ = 0;
+
+            // Shader 
+            std::vector<VkPipelineShaderStageCreateInfo> shaderStages_;
+
+            // Vertex input
+            std::vector<VkVertexInputBindingDescription> vertexBindings_;
+            std::vector<VkVertexInputAttributeDescription> vertexAttributes_;
+            VkPipelineVertexInputStateCreateInfo customVertexInput_{};
+            bool useCustomVertexInput_ = false;
+
+            // Fixed function status
+            VkPipelineInputAssemblyStateCreateInfo  inputAssembly_{};
+            VkPipelineRasterizationStateCreateInfo  rasterization_{};
+            VkPipelineMultisampleStateCreateInfo    multisample_{};
+            VkPipelineDepthStencilStateCreateInfo   depthStencil_{};
+            VkPipelineColorBlendStateCreateInfo     colorBlend_{};
+
+            std::vector<VkPipelineColorBlendAttachmentState> colorAttachments_;
+            std::vector<VkDynamicState> dynamicStates_;
+
+            // viewport / scissor
+            VkViewport viewport_{};
+            VkRect2D   scissor_{};
+            bool hasViewport_ = false;
+            bool hasScissor_ = false ;
+        };
+    };
+
+    class ComputePipeline : public Pipeline
+    {
+    public:
+        using Pipeline::Pipeline;
+
+        class Builder 
+        {
+        public:
+            explicit Builder(VkDevice device) : device_(device) {}
+
+            Builder& SetPipelineLayout(VkPipelineLayout layout);
+            Builder& SetShader( VkShaderModule module, const char* entryName = "main");
+            Builder& SetFlags(VkPipelineCreateFlags flags);
+
+            ComputePipeline build();
+
+        private:
+            VkDevice device_ = VK_NULL_HANDLE;
+
+            VkPipelineLayout layout_ = VK_NULL_HANDLE;
+            VkPipelineShaderStageCreateInfo stage_;
+            VkPipelineCreateFlags flags_ = 0;
+        };
+    };
+
 }

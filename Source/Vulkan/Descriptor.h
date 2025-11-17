@@ -10,7 +10,7 @@ namespace VK
 
     public:
         DescriptorSetLayout() = default;
-        DescriptorSetLayout(VkDescriptorSetLayoutCreateInfo& createInfo) { Create(createInfo); }
+        DescriptorSetLayout(VkDescriptorSetLayout layout) : handle(layout) {}
 
         DescriptorSetLayout(DescriptorSetLayout&& other) noexcept { MoveHandle; }
         ~DescriptorSetLayout();
@@ -19,61 +19,155 @@ namespace VK
         DefineHandleTypeOperator;
         DefineAddressFunction;
 
-        //Non-const Function
-        result_t Create(VkDescriptorSetLayoutCreateInfo& createInfo);
+    public:
+        class Builder
+        {
+        public:
+            explicit Builder(VkDevice device) : device_(device) {}
+
+            Builder& SetFlags(VkDescriptorSetLayoutCreateFlags flags);
+
+            Builder& AddBinding(
+                uint32_t binding,
+                VkDescriptorType descriptorType,
+                VkShaderStageFlags stageFlags,
+                uint32_t descriptorCount = 1,
+                const VkSampler* pImmutableSamplers = nullptr);
+
+            Builder& AddUniformBuffer(
+                uint32_t binding,
+                VkShaderStageFlags stageFlags,
+                uint32_t descriptorCount = 1);
+
+            Builder& AddUniformBufferDynamic(
+                uint32_t binding,
+                VkShaderStageFlags stageFlags,
+                uint32_t descriptorCount = 1);
+
+            Builder& AddCombinedImageSampler(
+                uint32_t binding,
+                VkShaderStageFlags stageFlags,
+                uint32_t descriptorCount = 1,
+                const VkSampler* pImmutableSamplers = nullptr);
+
+            Builder& AddStorageBuffer(
+                uint32_t binding,
+                VkShaderStageFlags stageFlags,
+                uint32_t descriptorCount = 1);
+
+            DescriptorSetLayout Build();
+
+        private:
+            VkDevice device_ = VK_NULL_HANDLE;
+            VkDescriptorSetLayoutCreateFlags flags_ = 0;
+            std::vector<VkDescriptorSetLayoutBinding> bindings_;
+        };
     };
 
-    class DescriptorSet 
+    class DescriptorPool 
+    {
+        VkDescriptorPool handle = VK_NULL_HANDLE;
+        VkDevice device = VK_NULL_HANDLE;
+
+    public:
+        DescriptorPool() = default;
+        DescriptorPool(VkDescriptorPool pool, VkDevice device) : handle(pool), device(device) {}
+       
+        DescriptorPool(DescriptorPool&& other) noexcept { MoveHandle; }
+        ~DescriptorPool();
+
+        DescriptorPool(const DescriptorPool&) = delete;
+        DescriptorPool& operator=(const DescriptorPool&) = delete;
+
+        // Getter
+        DefineHandleTypeOperator;
+        DefineAddressFunction;
+
+        void Reset() const;
+
+    public:
+        class Builder
+        {
+        public:
+            explicit Builder(VkDevice device) : device_(device) {}
+
+            Builder& SetFlags(VkDescriptorPoolCreateFlags flags);
+            Builder& SetMaxSets(uint32_t maxSets);
+            Builder& AddPoolSize(VkDescriptorType type, uint32_t count);
+
+            DescriptorPool Build();
+
+        private:
+            VkDevice device_ = VK_NULL_HANDLE;
+
+            VkDescriptorPoolCreateFlags flags_ = 0;
+            uint32_t maxSets_ = 0;
+            std::vector<VkDescriptorPoolSize> poolSizes_;
+        };
+    };
+
+    class DescriptorSet
     {
         VkDescriptorSet handle = VK_NULL_HANDLE;
-        
-        friend class DescriptorPool;
 
     public:
         DescriptorSet() = default;
+        DescriptorSet(VkDescriptorSet set) : handle(set) {}
+
         DescriptorSet(DescriptorSet&& other) noexcept { MoveHandle; }
 
         //Getter
         DefineHandleTypeOperator;
         DefineAddressFunction;
 
-        //Const Function
-        void Write(arrayRef<const VkDescriptorImageInfo> descriptorInfos, VkDescriptorType descriptorType, uint32_t dstBinding = 0, uint32_t dstArrayElement = 0) const;        
-        void Write(arrayRef<const VkDescriptorBufferInfo> descriptorInfos, VkDescriptorType descriptorType, uint32_t dstBinding = 0, uint32_t dstArrayElement = 0) const;
-        void Write(arrayRef<const VkBufferView> descriptorInfos, VkDescriptorType descriptorType, uint32_t dstBinding = 0, uint32_t dstArrayElement = 0) const;
-        void Write(arrayRef<const BufferView> descriptorInfos, VkDescriptorType descriptorType, uint32_t dstBinding = 0, uint32_t dstArrayElement = 0) const;
+        static DescriptorSet Allocate(VkDevice device, const VkDescriptorPool& pool,VkDescriptorSetLayout layout);
 
-        //Static Function
-        static void Update(arrayRef<VkWriteDescriptorSet> writes, arrayRef<VkCopyDescriptorSet> copies = {});
-    };
+        DescriptorSet& WriteBuffer(
+            uint32_t binding,
+            VkDescriptorType type,
+            VkBuffer buffer,
+            VkDeviceSize offset,
+            VkDeviceSize range,
+            uint32_t arrayElement = 0);
 
-    class DescriptorPool 
-    {
-        VkDescriptorPool handle = VK_NULL_HANDLE;
+        DescriptorSet& WriteBuffer(
+            uint32_t binding,
+            VkDescriptorType type,
+            const VkDescriptorBufferInfo& info,
+            uint32_t arrayElement = 0);
 
-    public:
-        DescriptorPool() = default;
-        DescriptorPool(VkDescriptorPoolCreateInfo& createInfo) { Create(createInfo); }
-        DescriptorPool(uint32_t maxSetCount, arrayRef<const VkDescriptorPoolSize> poolSizes, VkDescriptorPoolCreateFlags flags = 0) { Create(maxSetCount, poolSizes, flags); }
-       
-        DescriptorPool(DescriptorPool&& other) noexcept { MoveHandle; }
-        ~DescriptorPool();
+        DescriptorSet& WriteImage(
+            uint32_t binding,
+            VkDescriptorType type,
+            VkImageView imageView,
+            VkSampler sampler,
+            VkImageLayout layout,
+            uint32_t arrayElement = 0);
 
-        // Getter
-        DefineHandleTypeOperator;
-        DefineAddressFunction;
-        
-        // Const Function
-        result_t AllocateSets(arrayRef<VkDescriptorSet> sets, arrayRef<const VkDescriptorSetLayout> setLayouts) const;
-        result_t AllocateSets(arrayRef<VkDescriptorSet> sets, arrayRef<const DescriptorSetLayout> setLayouts) const;
-        result_t AllocateSets(arrayRef<DescriptorSet> sets, arrayRef<const VkDescriptorSetLayout> setLayouts) const;
-        result_t AllocateSets(arrayRef<DescriptorSet> sets, arrayRef<const DescriptorSetLayout> setLayouts) const;
+        DescriptorSet& WriteImage(
+            uint32_t binding,
+            VkDescriptorType type,
+            const VkDescriptorImageInfo& info,
+            uint32_t arrayElement = 0);
 
-        result_t FreeSets(arrayRef<VkDescriptorSet> sets) const;
-        result_t FreeSets(arrayRef<DescriptorSet> sets) const;
+        DescriptorSet& Update();
 
-        //Non-const Function
-        result_t Create(VkDescriptorPoolCreateInfo& createInfo);
-        result_t Create(uint32_t maxSetCount, arrayRef<const VkDescriptorPoolSize> poolSizes, VkDescriptorPoolCreateFlags flags = 0);
+    private:
+        struct BufferWrite {
+            uint32_t binding;
+            uint32_t arrayElement;
+            VkDescriptorType type;
+            VkDescriptorBufferInfo info;
+        };
+
+        struct ImageWrite {
+            uint32_t binding;
+            uint32_t arrayElement;
+            VkDescriptorType type;
+            VkDescriptorImageInfo info;
+        };
+
+        std::vector<BufferWrite> bufferWrites;
+        std::vector<ImageWrite>  imageWrites;
     };
 }
