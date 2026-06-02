@@ -13,4 +13,3 @@ namespace XEngine
         WindowDesc m_Desc;
     };
 }
-

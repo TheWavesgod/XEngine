@@ -15,17 +15,31 @@ target_include_directories(XEngineFoundation
 
 target_compile_features(XEngineFoundation PUBLIC cxx_std_20)
 
+target_link_libraries(XEngineFoundation
+    PRIVATE
+        spdlog::spdlog
+)
+
 file(GLOB_RECURSE XENGINE_RUNTIME_SOURCES CONFIGURE_DEPENDS
     Source/Runtime/*.h
     Source/Runtime/*.cpp
 )
 
-if(NOT XENGINE_ENABLE_VULKAN)
-    list(FILTER XENGINE_RUNTIME_SOURCES EXCLUDE REGEX "/Vulkan/")
-endif()
+set(XENGINE_EXCLUDED_RUNTIME_SOURCES)
+foreach(sourceFile IN LISTS XENGINE_RUNTIME_SOURCES)
+    file(TO_CMAKE_PATH "${sourceFile}" normalizedSourceFile)
 
-if(NOT XENGINE_ENABLE_SDL)
-    list(FILTER XENGINE_RUNTIME_SOURCES EXCLUDE REGEX "/SDL/")
+    if(NOT XENGINE_ENABLE_VULKAN AND normalizedSourceFile MATCHES "/Vulkan/")
+        list(APPEND XENGINE_EXCLUDED_RUNTIME_SOURCES "${sourceFile}")
+    endif()
+
+    if(NOT XENGINE_ENABLE_SDL AND normalizedSourceFile MATCHES "/SDL/")
+        list(APPEND XENGINE_EXCLUDED_RUNTIME_SOURCES "${sourceFile}")
+    endif()
+endforeach()
+
+if(XENGINE_EXCLUDED_RUNTIME_SOURCES)
+    list(REMOVE_ITEM XENGINE_RUNTIME_SOURCES ${XENGINE_EXCLUDED_RUNTIME_SOURCES})
 endif()
 
 add_library(XEngineRuntime ${XENGINE_RUNTIME_SOURCES})

@@ -1,3 +1,5 @@
-﻿# Third-party dependencies are intentionally not vendored in V0.1.
-# Future integrations can be added here behind explicit options.
-
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/spdlog/CMakeLists.txt")
+    add_subdirectory(spdlog)
+else()
+    message(FATAL_ERROR "spdlog is required for Stage 0. Please place spdlog under ThirdParty/spdlog.")
+endif()

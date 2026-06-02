@@ -1,4 +1,6 @@
-﻿#pragma once
+#pragma once
+
+#define XENGINE_DEBUG_MARKER(name) ((void)0)
 
 namespace XEngine
 {
@@ -7,6 +9,3 @@ namespace XEngine
         const char* Name = "";
     };
 }
-
-
-

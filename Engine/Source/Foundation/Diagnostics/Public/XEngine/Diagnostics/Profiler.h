@@ -1,14 +1,5 @@
-﻿#pragma once
+#pragma once
 
-namespace XEngine
-{
-    class Profiler
-    {
-    public:
-        void BeginFrame() {}
-        void EndFrame() {}
-    };
-}
-
-
-
+#define XENGINE_PROFILE_SCOPE(name) ((void)0)
+#define XENGINE_PROFILE_FUNCTION() ((void)0)
+#define XENGINE_PROFILE_FRAME() ((void)0)
