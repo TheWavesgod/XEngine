@@ -96,6 +96,8 @@ if(XENGINE_ENABLE_SDL)
 endif()
 
 if(XENGINE_ENABLE_VULKAN)
+    find_package(Vulkan REQUIRED)
+
     target_compile_definitions(XEngineRuntime
         PRIVATE
             XENGINE_ENABLE_VULKAN

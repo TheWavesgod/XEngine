@@ -62,6 +62,8 @@ namespace XEngine
 
             VulkanDeviceCreateInfo createInfo;
             createInfo.NativeWindow = mainWindow->GetNativeHandle();
+            createInfo.Width = mainWindow->GetWidth();
+            createInfo.Height = mainWindow->GetHeight();
             createInfo.EnableValidation = context.Config != nullptr ? context.Config->EnableValidation : true;
             createInfo.EnableVSync = context.Config != nullptr ? context.Config->EnableVSync : true;
 
@@ -129,10 +131,15 @@ namespace XEngine
                 message += std::to_string(event.Width);
                 message += "x";
                 message += std::to_string(event.Height);
-                message += ". Swapchain recreation is TODO for Stage 2B-2.";
                 XENGINE_LOG_INFO(message);
+
+                if (m_Device)
+                {
+                    m_Device->RequestResize(event.Width, event.Height);
+                }
             }
         }
+
     }
 
     RHIDevice* RHISystem::GetDevice()

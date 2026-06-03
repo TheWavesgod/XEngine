@@ -5,6 +5,7 @@
 #include <XEngine/Logging/Log.h>
 #include <XEngine/Platform/PlatformSystem.h>
 #include <XEngine/RHI/RHISystem.h>
+#include <XEngine/Renderer/RenderSystem.h>
 
 #include <string>
 
@@ -46,6 +47,7 @@ namespace XEngine
         if (m_Config.CreateGraphicsDevice)
         {
             m_SubsystemManager.AddSubsystem<RHISystem>();
+            m_SubsystemManager.AddSubsystem<RenderSystem>();
         }
 
         SubsystemContext context;

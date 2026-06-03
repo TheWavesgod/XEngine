@@ -56,6 +56,30 @@ Stage 2B-1 does not render.
 Stage 2B-1 does not clear the screen.
 Swapchain and clear screen are planned for Stage 2B-2.
 
+Stage 2B-2 adds:
+- Vulkan swapchain creation
+- Swapchain image views
+- One-frame command resources
+- `vkCmdClearColorImage`-based clear
+- Queue submit
+- Present
+- Basic resize / out-of-date handling
+
+Stage 2B-2 still does not include Renderer or RenderGraph.
+Clear screen is temporarily handled by RHISystem / RHIDevice for backend validation.
+Stage 3 will move frame execution into RenderGraph.
+
+Stage 3 adds:
+- RenderSystem subsystem
+- Linear RenderGraph V0
+- ClearPass
+- PresentPass placeholder
+- Pass type categories: Graphics / Compute / Transfer / Present / External
+- RHISystem no longer directly clears every frame
+
+Stage 3 does not implement shaders, triangle rendering, RenderGraph resource dependencies, async compute, neural rendering, or GPU-driven rendering.
+Future neural rendering features should be represented as Compute or External passes.
+
 V0.1 does not implement:
 - Full Vulkan renderer
 - D3D12

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 namespace XEngine
 {
@@ -7,6 +7,3 @@ namespace XEngine
         Forward
     };
 }
-
-
-

@@ -150,6 +150,30 @@ namespace XEngine
             return false;
         }
 
+        m_EnableVSync = createInfo.EnableVSync;
+        m_PendingResizeWidth = createInfo.Width;
+        m_PendingResizeHeight = createInfo.Height;
+
+        VulkanSwapchainCreateInfo swapchainCreateInfo;
+        swapchainCreateInfo.PhysicalDevice = m_PhysicalDevice;
+        swapchainCreateInfo.Device = m_Device;
+        swapchainCreateInfo.Surface = m_Surface.GetHandle();
+        swapchainCreateInfo.GraphicsQueueFamilyIndex = m_GraphicsFamilyIndex;
+        swapchainCreateInfo.PresentQueueFamilyIndex = m_PresentFamilyIndex;
+        swapchainCreateInfo.Width = createInfo.Width;
+        swapchainCreateInfo.Height = createInfo.Height;
+        swapchainCreateInfo.EnableVSync = m_EnableVSync;
+
+        if (!m_Swapchain.Create(swapchainCreateInfo))
+        {
+            return false;
+        }
+
+        if (!m_FrameResources.Create(m_Device, m_GraphicsFamilyIndex, m_Swapchain.GetImageCount()))
+        {
+            return false;
+        }
+
         m_Initialized = true;
         return true;
     }
@@ -163,6 +187,8 @@ namespace XEngine
 
         WaitIdle();
 
+        m_FrameResources.Destroy();
+        m_Swapchain.Destroy();
         m_Allocator.Destroy();
 
         if (m_Device != VK_NULL_HANDLE)
@@ -178,6 +204,11 @@ namespace XEngine
         m_PhysicalDevice = VK_NULL_HANDLE;
         m_GraphicsQueue = VulkanQueue {};
         m_PresentQueue = VulkanQueue {};
+        m_CurrentImageIndex = 0;
+        m_FrameActive = false;
+        m_ResizeRequested = false;
+        m_PendingResizeWidth = 0;
+        m_PendingResizeHeight = 0;
         m_Initialized = false;
     }
 
@@ -191,6 +222,208 @@ namespace XEngine
         return m_Initialized && m_Device != VK_NULL_HANDLE;
     }
 
+    void VulkanDevice::BeginFrame()
+    {
+        m_FrameActive = false;
+
+        if (!IsValid())
+        {
+            return;
+        }
+
+        if (m_ResizeRequested)
+        {
+            if (m_PendingResizeWidth == 0 || m_PendingResizeHeight == 0)
+            {
+                return;
+            }
+
+            RecreateSwapchain(m_PendingResizeWidth, m_PendingResizeHeight);
+            if (m_ResizeRequested)
+            {
+                return;
+            }
+        }
+
+        const VkExtent2D extent = m_Swapchain.GetExtent();
+        if (extent.width == 0 || extent.height == 0)
+        {
+            return;
+        }
+
+        VkFence inFlightFence = m_FrameResources.GetInFlightFence();
+        XENGINE_VK_CHECK(vkWaitForFences(m_Device, 1, &inFlightFence, VK_TRUE, UINT64_MAX));
+
+        VkSemaphore imageAvailableSemaphore = m_FrameResources.GetImageAvailableSemaphore();
+        VkResult result = vkAcquireNextImageKHR(
+            m_Device,
+            m_Swapchain.GetHandle(),
+            UINT64_MAX,
+            imageAvailableSemaphore,
+            VK_NULL_HANDLE,
+            &m_CurrentImageIndex);
+
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+        {
+            m_ResizeRequested = true;
+            return;
+        }
+
+        if (result != VK_SUCCESS)
+        {
+            std::string message = "Failed to acquire Vulkan swapchain image: ";
+            message += VulkanResultToString(result);
+            XENGINE_LOG_ERROR(message);
+            return;
+        }
+
+        XENGINE_VK_CHECK(vkResetFences(m_Device, 1, &inFlightFence));
+        XENGINE_VK_CHECK(vkResetCommandPool(m_Device, m_FrameResources.GetCommandPool(), 0));
+
+        VkCommandBufferBeginInfo beginInfo {};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        XENGINE_VK_CHECK(vkBeginCommandBuffer(m_FrameResources.GetCommandBuffer(), &beginInfo));
+        m_FrameActive = true;
+    }
+
+    void VulkanDevice::ClearSwapchain(const RHIColor& color)
+    {
+        if (!m_FrameActive)
+        {
+            return;
+        }
+
+        VkCommandBuffer commandBuffer = m_FrameResources.GetCommandBuffer();
+        VkImage image = m_Swapchain.GetImage(m_CurrentImageIndex);
+
+        VkImageSubresourceRange range {};
+        range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        range.baseMipLevel = 0;
+        range.levelCount = 1;
+        range.baseArrayLayer = 0;
+        range.layerCount = 1;
+
+        VkImageMemoryBarrier toTransferBarrier {};
+        toTransferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        toTransferBarrier.srcAccessMask = 0;
+        toTransferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        toTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        toTransferBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        toTransferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        toTransferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        toTransferBarrier.image = image;
+        toTransferBarrier.subresourceRange = range;
+
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0,
+            0,
+            nullptr,
+            0,
+            nullptr,
+            1,
+            &toTransferBarrier);
+
+        VkClearColorValue clearValue {};
+        clearValue.float32[0] = color.R;
+        clearValue.float32[1] = color.G;
+        clearValue.float32[2] = color.B;
+        clearValue.float32[3] = color.A;
+
+        vkCmdClearColorImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearValue, 1, &range);
+
+        VkImageMemoryBarrier toPresentBarrier {};
+        toPresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        toPresentBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        toPresentBarrier.dstAccessMask = 0;
+        toPresentBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        toPresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        toPresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        toPresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        toPresentBarrier.image = image;
+        toPresentBarrier.subresourceRange = range;
+
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            0,
+            0,
+            nullptr,
+            0,
+            nullptr,
+            1,
+            &toPresentBarrier);
+    }
+
+    void VulkanDevice::EndFrame()
+    {
+        if (!m_FrameActive)
+        {
+            return;
+        }
+
+        VkCommandBuffer commandBuffer = m_FrameResources.GetCommandBuffer();
+        XENGINE_VK_CHECK(vkEndCommandBuffer(commandBuffer));
+
+        VkSemaphore imageAvailableSemaphore = m_FrameResources.GetImageAvailableSemaphore();
+        VkSemaphore renderFinishedSemaphore = m_FrameResources.GetRenderFinishedSemaphore(m_CurrentImageIndex);
+        VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+        VkSubmitInfo submitInfo {};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = &imageAvailableSemaphore;
+        submitInfo.pWaitDstStageMask = &waitStage;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
+
+        XENGINE_VK_CHECK(vkQueueSubmit(m_GraphicsQueue.GetHandle(), 1, &submitInfo, m_FrameResources.GetInFlightFence()));
+
+        VkSwapchainKHR swapchain = m_Swapchain.GetHandle();
+
+        VkPresentInfoKHR presentInfo {};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = &renderFinishedSemaphore;
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = &swapchain;
+        presentInfo.pImageIndices = &m_CurrentImageIndex;
+
+        VkResult result = vkQueuePresentKHR(m_PresentQueue.GetHandle(), &presentInfo);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+        {
+            m_ResizeRequested = true;
+        }
+        else if (result != VK_SUCCESS)
+        {
+            std::string message = "Failed to present Vulkan swapchain image: ";
+            message += VulkanResultToString(result);
+            XENGINE_LOG_ERROR(message);
+        }
+
+        m_FrameActive = false;
+    }
+
+    void VulkanDevice::RequestResize(u32 width, u32 height)
+    {
+        m_PendingResizeWidth = width;
+        m_PendingResizeHeight = height;
+        m_ResizeRequested = true;
+
+        std::string message = "Vulkan swapchain resize requested: ";
+        message += std::to_string(width);
+        message += "x";
+        message += std::to_string(height);
+        XENGINE_LOG_INFO(message);
+    }
+
     void VulkanDevice::WaitIdle()
     {
         if (m_Device == VK_NULL_HANDLE)
@@ -199,6 +432,47 @@ namespace XEngine
         }
 
         vkDeviceWaitIdle(m_Device);
+    }
+
+    void VulkanDevice::RecreateSwapchain(u32 width, u32 height)
+    {
+        if (width == 0 || height == 0)
+        {
+            return;
+        }
+
+        std::string message = "Recreating Vulkan swapchain: ";
+        message += std::to_string(width);
+        message += "x";
+        message += std::to_string(height);
+        XENGINE_LOG_INFO(message);
+
+        vkDeviceWaitIdle(m_Device);
+
+        VulkanSwapchainCreateInfo swapchainCreateInfo;
+        swapchainCreateInfo.PhysicalDevice = m_PhysicalDevice;
+        swapchainCreateInfo.Device = m_Device;
+        swapchainCreateInfo.Surface = m_Surface.GetHandle();
+        swapchainCreateInfo.GraphicsQueueFamilyIndex = m_GraphicsFamilyIndex;
+        swapchainCreateInfo.PresentQueueFamilyIndex = m_PresentFamilyIndex;
+        swapchainCreateInfo.Width = width;
+        swapchainCreateInfo.Height = height;
+        swapchainCreateInfo.EnableVSync = m_EnableVSync;
+
+        if (m_Swapchain.Recreate(swapchainCreateInfo))
+        {
+            if (m_FrameResources.GetRenderFinishedSemaphoreCount() != m_Swapchain.GetImageCount())
+            {
+                m_FrameResources.Destroy();
+                if (!m_FrameResources.Create(m_Device, m_GraphicsFamilyIndex, m_Swapchain.GetImageCount()))
+                {
+                    m_ResizeRequested = true;
+                    return;
+                }
+            }
+
+            m_ResizeRequested = false;
+        }
     }
 
     bool VulkanDevice::PickPhysicalDevice()

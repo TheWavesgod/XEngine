@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 namespace XEngine
 {
     class RenderGraphBuilder
     {
     public:
-        void Execute();
+        // TODO Stage 4+: ReadTexture(), WriteTexture(), ReadBuffer(), WriteBuffer().
     };
 }
-

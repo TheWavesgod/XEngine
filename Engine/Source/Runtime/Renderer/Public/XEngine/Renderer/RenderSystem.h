@@ -1,17 +1,25 @@
-﻿#pragma once
+#pragma once
 
 #include <XEngine/Engine/Subsystem.h>
 
 namespace XEngine
 {
-    struct RenderScene;
+    class RHISystem;
 
-    class RenderSystem : public ISubsystem
+    class RenderSystem final : public ISubsystem
     {
     public:
-        void BeginFrame();
-        void Submit(const RenderScene& scene);
+        RenderSystem();
+        ~RenderSystem() override;
+
+        void OnCreate(const SubsystemContext& context) override;
+        void OnDestroy() override;
+        void OnUpdate(float deltaTime) override;
+
+    private:
         void Render();
-        void EndFrame();
+
+        RHISystem* m_RHISystem = nullptr;
+        bool m_Initialized = false;
     };
 }
