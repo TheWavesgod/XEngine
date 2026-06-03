@@ -1,11 +1,13 @@
-﻿#pragma once
+#pragma once
 
 namespace XEngine
 {
     class VulkanSampler
     {
     public:
-        void Initialize();
+        VulkanSampler() = default;
+        ~VulkanSampler() = default;
+
+        // TODO(Stage 2B): Own VkSampler handles.
     };
 }
-

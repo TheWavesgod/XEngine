@@ -1,11 +1,8 @@
-﻿#pragma once
+#pragma once
+
+#include <volk.h>
 
 namespace XEngine
 {
-    class VulkanUtils
-    {
-    public:
-        void Initialize();
-    };
+    const char* VulkanResultToString(VkResult result);
 }
-

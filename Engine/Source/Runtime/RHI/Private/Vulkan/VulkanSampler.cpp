@@ -1,7 +1,5 @@
-﻿#include "VulkanSampler.h"
+#include "VulkanSampler.h"
 
 namespace XEngine
 {
-    void VulkanSampler::Initialize() {}
 }
-

@@ -1,7 +1,5 @@
-﻿#include "VulkanShader.h"
+#include "VulkanShader.h"
 
 namespace XEngine
 {
-    void VulkanShader::Initialize() {}
 }
-

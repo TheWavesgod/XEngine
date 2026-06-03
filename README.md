@@ -24,9 +24,21 @@ Stage 1 adds:
 - Window close handling
 - SubsystemContext
 
-Vulkan is not implemented yet.
 SDL is hidden inside Platform/Private/SDL.
 Public headers do not expose SDL types.
+
+Stage 2A adds:
+- Vulkan SDK detection through find_package(Vulkan)
+- volk source integration from ThirdParty/volk
+- VMA header integration from ThirdParty/VulkanMemoryAllocator
+- RHI public API skeleton
+- RHISystem skeleton
+- Vulkan backend skeleton
+
+Stage 2A does not create a Vulkan instance yet.
+Stage 2A does not create a swapchain yet.
+Stage 2A does not render or clear the screen yet.
+Actual Vulkan initialization starts in Stage 2B.
 
 V0.1 does not implement:
 - Full Vulkan renderer

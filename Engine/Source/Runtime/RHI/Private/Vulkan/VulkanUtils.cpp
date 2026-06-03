@@ -1,7 +1,27 @@
-﻿#include "VulkanUtils.h"
+#include "VulkanUtils.h"
 
 namespace XEngine
 {
-    void VulkanUtils::Initialize() {}
+    const char* VulkanResultToString(VkResult result)
+    {
+        switch (result)
+        {
+        case VK_SUCCESS:
+            return "VK_SUCCESS";
+        case VK_NOT_READY:
+            return "VK_NOT_READY";
+        case VK_TIMEOUT:
+            return "VK_TIMEOUT";
+        case VK_ERROR_INITIALIZATION_FAILED:
+            return "VK_ERROR_INITIALIZATION_FAILED";
+        case VK_ERROR_DEVICE_LOST:
+            return "VK_ERROR_DEVICE_LOST";
+        case VK_ERROR_OUT_OF_HOST_MEMORY:
+            return "VK_ERROR_OUT_OF_HOST_MEMORY";
+        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+            return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+        default:
+            return "VK_UNKNOWN";
+        }
+    }
 }
-

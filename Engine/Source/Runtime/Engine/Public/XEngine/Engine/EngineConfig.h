@@ -6,6 +6,12 @@
 
 namespace XEngine
 {
+    enum class GraphicsBackend
+    {
+        None,
+        Vulkan
+    };
+
     struct EngineConfig
     {
         std::string ApplicationName = "XEngine";
@@ -22,5 +28,9 @@ namespace XEngine
         bool WindowResizable = true;
         bool WindowMaximized = false;
         bool CreateMainWindow = true;
+
+        bool CreateGraphicsDevice = true;
+        bool EnableVSync = true;
+        GraphicsBackend Backend = GraphicsBackend::Vulkan;
     };
 }

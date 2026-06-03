@@ -95,6 +95,28 @@ if(XENGINE_ENABLE_SDL)
     endif()
 endif()
 
+if(XENGINE_ENABLE_VULKAN)
+    target_compile_definitions(XEngineRuntime
+        PRIVATE
+            XENGINE_ENABLE_VULKAN
+            VK_NO_PROTOTYPES
+    )
+
+    target_include_directories(XEngineRuntime
+        PRIVATE
+            ${Vulkan_INCLUDE_DIRS}
+            ${CMAKE_SOURCE_DIR}/ThirdParty/VulkanMemoryAllocator/include
+    )
+
+    if(TARGET volk::volk)
+        target_link_libraries(XEngineRuntime PRIVATE volk::volk)
+    elseif(TARGET volk)
+        target_link_libraries(XEngineRuntime PRIVATE volk)
+    else()
+        message(FATAL_ERROR "volk target not found.")
+    endif()
+endif()
+
 if(XENGINE_ENABLE_EDITOR)
     file(GLOB_RECURSE XENGINE_EDITOR_SOURCES CONFIGURE_DEPENDS
         Source/Editor/*.h

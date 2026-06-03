@@ -1,7 +1,5 @@
-﻿#include "VulkanDescriptor.h"
+#include "VulkanDescriptor.h"
 
 namespace XEngine
 {
-    void VulkanDescriptor::Initialize() {}
 }
-

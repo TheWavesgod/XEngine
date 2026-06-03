@@ -1,4 +1,6 @@
-﻿#pragma once
+#pragma once
+
+#include <XEngine/RHI/RHITypes.h>
 
 namespace XEngine
 {
@@ -6,6 +8,7 @@ namespace XEngine
     {
     public:
         virtual ~RHIQueue() = default;
+
+        virtual RHIQueueType GetType() const = 0;
     };
 }
-

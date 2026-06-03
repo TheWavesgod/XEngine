@@ -1,11 +1,13 @@
-﻿#pragma once
+#pragma once
 
 namespace XEngine
 {
     class VulkanCommandList
     {
     public:
-        void Initialize();
+        VulkanCommandList() = default;
+        ~VulkanCommandList() = default;
+
+        // TODO(Stage 2B): Wrap VkCommandBuffer recording.
     };
 }
-

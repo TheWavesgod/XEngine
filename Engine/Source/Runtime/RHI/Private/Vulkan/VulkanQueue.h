@@ -1,11 +1,13 @@
-﻿#pragma once
+#pragma once
 
 namespace XEngine
 {
     class VulkanQueue
     {
     public:
-        void Initialize();
+        VulkanQueue() = default;
+        ~VulkanQueue() = default;
+
+        // TODO(Stage 2B): Wrap VkQueue handles.
     };
 }
-

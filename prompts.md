@@ -1,4 +1,4 @@
-﻿# XEngine Stage 1 Prompt - SDL Platform Layer + SubsystemContext
+﻿# XEngine Stage 2B-1 Prompt - Vulkan Instance / Surface / Device / Allocator + PlatformEvent Queue
 
 ## Role
 
@@ -6,53 +6,69 @@ You are a senior C++ game engine architecture assistant.
 
 You are working inside an existing C++20 project named **XEngine**.
 
-Stage 0 has already been completed:
+Previous stages are complete:
 
 ```text
-Foundation
-Logging through spdlog
-Assert
-Time
-SubsystemManager
-Engine lifecycle
-Sandbox run loop
+Stage 0:
+- Foundation
+- spdlog logging
+- Assert
+- Time
+- SubsystemManager
+- Engine lifecycle
+
+Stage 1:
+- SDL3 platform layer
+- SDLWindow
+- PlatformSystem
+- SubsystemContext
+- Window close event requests Engine shutdown
+
+Stage 2A:
+- Vulkan SDK detection
+- volk integration
+- VMA integration
+- RHI public API skeleton
+- RHISystem skeleton
+- Vulkan backend skeleton
 ```
 
-Your task is to implement **Stage 1: SDL Platform Layer + SubsystemContext**.
+Your task is to implement **Stage 2B-1: Vulkan Instance / Surface / Device / Allocator + PlatformEvent Queue**.
 
-Do not implement Vulkan, Slang, ImGui, RenderGraph, Asset loading, Scene ECS, or Renderer logic yet.
+Do not implement swapchain, command buffers, clear screen, present, RenderGraph, Renderer, Slang, pipelines, descriptors, buffers, textures, ImGui, or asset loading yet.
 
 ---
 
-# Stage 1 Goal
+# Stage 2B-1 Goal
 
-Implement a clean SDL3-based platform layer while keeping SDL hidden inside the private Platform implementation.
+This stage should initialize the Vulkan backend far enough to prove that XEngine can create:
+
+```text
+volk loader
+VkInstance
+VkDebugUtilsMessengerEXT
+VkSurfaceKHR from SDL window
+VkPhysicalDevice selection
+VkDevice
+graphics queue
+present queue
+VmaAllocator
+```
+
+It should also introduce a minimal platform event queue so future swapchain resize handling has a clean path.
 
 After this stage:
 
 ```text
 XEngineSandbox starts
-Engine initializes Log and SubsystemManager
-Engine creates PlatformSystem
-PlatformSystem initializes SDL
-PlatformSystem creates the main window
-Engine loop runs until the window close event
-Closing the SDL window calls Engine::RequestShutdown()
-PlatformSystem destroys the window
-SDL shuts down cleanly
-```
-
-The main focus is:
-
-```text
-Engine
-  -> SubsystemManager
-  -> SubsystemContext
-  -> PlatformSystem
-  -> SDLWindow
-  -> Event polling
-  -> Window close
-  -> Engine::RequestShutdown()
+SDL window opens
+RHISystem creates VulkanDevice
+VulkanDevice creates instance / surface / device / queues / VMA allocator
+Closing the window exits cleanly
+Window resize events are recorded as PlatformEvent::WindowResize
+RHISystem can observe resize events and mark a pending resize flag
+No swapchain exists yet
+No rendering happens yet
 ```
 
 ---
@@ -62,291 +78,85 @@ Engine
 Follow these decisions strictly:
 
 ```text
-1. Engine owns SubsystemManager.
-2. Engine owns Time.
-3. Logging remains a static service, not a subsystem.
-4. PlatformSystem is a subsystem.
-5. PlatformSystem owns the main Window.
-6. SDL3 is an implementation detail of Platform/Private/SDL.
-7. Public Platform headers must not expose SDL types.
-8. Engine registers PlatformSystem in Stage 1.
-9. Subsystem creation order remains registration order.
-10. Subsystem destruction order remains reverse registration order.
-11. Vulkan must not be implemented in this stage.
-12. Renderer must not be implemented in this stage.
-13. SDL3 is built from source under ThirdParty/SDL.
-14. Do not use find_package(SDL3).
-15. Link SDL3 dynamically by default.
+1. Vulkan appears only under Runtime/RHI/Private/Vulkan.
+2. Public RHI headers must not include volk, Vulkan, SDL, or VMA.
+3. SDL may be included inside RHI/Private/Vulkan only for Vulkan surface creation.
+4. PlatformSystem does not depend on RHISystem.
+5. RHISystem may query PlatformSystem through SubsystemManager.
+6. Resize handling is event/state based, not direct callback based.
+7. Do not introduce a full EventBus yet.
+8. Add only a minimal PlatformEvent queue.
+9. Do not create a swapchain in this stage.
+10. Do not render or clear the screen in this stage.
+11. MaxFramesInFlight will be 1 later, but no frame resources are created yet.
+12. VMA allocator is created in this stage, but no VMA allocations are made yet.
 ```
 
 ---
 
-# SDL Source Code Policy
+# Event System Scope
 
-The SDL3 source code will be manually copied from GitHub into:
+Do **not** implement a full engine-wide event system.
+
+Do **not** implement:
 
 ```text
-ThirdParty/SDL/
+EventBus
+Observer system
+Listener registration
+Callback dispatch
+Input action routing
+UI event capture
+Thread-safe event queues
 ```
 
-This directory is expected to contain SDL's own `CMakeLists.txt`.
-
-Do not fetch SDL automatically.
-
-Do not use `find_package(SDL3)`.
-
-Do not assume SDL is installed globally on the system.
-
-Use:
-
-```cmake
-add_subdirectory(ThirdParty/SDL)
-```
-
-or inside `ThirdParty/CMakeLists.txt`:
-
-```cmake
-add_subdirectory(SDL)
-```
-
-The intended dependency flow is:
+Implement only:
 
 ```text
-ThirdParty/SDL
-  -> SDL3::SDL3-shared
-  -> XEngineRuntime PRIVATE link
-  -> XEngineSandbox / XEngineEditorApp
+PlatformSystem-owned PlatformEvent queue
+Window::PollEvents(events)
+PlatformSystem::GetEvents()
+RHISystem reads PlatformSystem events
 ```
 
----
-
-# SDL Linking Policy
-
-SDL3 should be built together with XEngine.
-
-Default linking mode:
-
-```text
-Shared / dynamic linking
-```
-
-Use the explicit SDL shared target:
-
-```cmake
-SDL3::SDL3-shared
-```
-
-Do not link against the generic alias unless necessary:
-
-```cmake
-SDL3::SDL3
-```
-
-Prefer:
-
-```cmake
-target_link_libraries(XEngineRuntime
-    PRIVATE
-        SDL3::SDL3-shared
-)
-```
-
-Do not link SDL publicly.
-
-Forbidden:
-
-```cmake
-target_link_libraries(XEngineRuntime
-    PUBLIC
-        SDL3::SDL3-shared
-)
-```
-
-SDL is a private implementation detail of the Platform module.
-
----
-
-# SDL CMake Options
-
-Add these options in the root `CMakeLists.txt` if they do not already exist:
-
-```cmake
-option(XENGINE_ENABLE_VULKAN "Enable Vulkan backend" OFF)
-option(XENGINE_ENABLE_SDL "Enable SDL platform backend" ON)
-option(XENGINE_SDL_LINK_SHARED "Link SDL as a shared library" ON)
-option(XENGINE_ENABLE_EDITOR "Build XEngine editor" ON)
-option(XENGINE_ENABLE_TRACY "Enable Tracy profiler integration" OFF)
-```
-
-For Stage 1:
-
-```text
-XENGINE_ENABLE_SDL should default to ON.
-XENGINE_SDL_LINK_SHARED should default to ON.
-```
-
----
-
-# ThirdParty/CMakeLists.txt Requirements
-
-Update `ThirdParty/CMakeLists.txt`.
-
-Keep existing spdlog integration from Stage 0.
-
-Add SDL integration like this:
-
-```cmake
-if(XENGINE_ENABLE_SDL)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SDL/CMakeLists.txt")
-        set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
-        set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
-
-        if(XENGINE_SDL_LINK_SHARED)
-            set(SDL_SHARED ON CACHE BOOL "" FORCE)
-            set(SDL_STATIC OFF CACHE BOOL "" FORCE)
-        else()
-            set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-            set(SDL_STATIC ON CACHE BOOL "" FORCE)
-        endif()
-
-        add_subdirectory(SDL)
-    else()
-        message(FATAL_ERROR "SDL3 is required when XENGINE_ENABLE_SDL=ON. Please place SDL3 source under ThirdParty/SDL.")
-    endif()
-endif()
-```
-
-Do not add Vulkan, Slang, ImGui, EnTT, GLM, Tracy, or other third-party libraries yet.
-
----
-
-# Runtime SDL Linking Requirements
-
-Update `Engine/CMakeLists.txt`.
-
-If SDL is enabled:
-
-```cmake
-if(XENGINE_ENABLE_SDL)
-    target_compile_definitions(XEngineRuntime
-        PRIVATE
-            XENGINE_ENABLE_SDL
-    )
-
-    if(XENGINE_SDL_LINK_SHARED)
-        target_link_libraries(XEngineRuntime
-            PRIVATE
-                SDL3::SDL3-shared
-        )
-    else()
-        target_link_libraries(XEngineRuntime
-            PRIVATE
-                SDL3::SDL3-static
-        )
-    endif()
-endif()
-```
-
-If the vendored SDL project exposes slightly different target names, adapt to the actual SDL3 CMake target names, but prefer `SDL3::SDL3-shared` for dynamic linking.
-
----
-
-# Runtime Dependency Copy Requirements
-
-Because SDL is dynamically linked by default, app executables must be able to find the SDL runtime library.
-
-Add a CMake helper function, preferably in `Apps/CMakeLists.txt` or a small CMake utility file:
-
-```cmake
-function(xengine_copy_sdl_runtime target)
-    if(XENGINE_ENABLE_SDL AND XENGINE_SDL_LINK_SHARED)
-        if(WIN32)
-            add_custom_command(TARGET ${target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    $<TARGET_FILE:SDL3::SDL3-shared>
-                    $<TARGET_FILE_DIR:${target}>
-            )
-        endif()
-    endif()
-endfunction()
-```
-
-Call this for:
-
-```cmake
-xengine_copy_sdl_runtime(XEngineSandbox)
-xengine_copy_sdl_runtime(XEngineEditorApp)
-```
-
-Only call it if the target exists.
-
-For macOS/Linux, do not overcomplicate RPATH in Stage 1 unless needed.
-If you add RPATH, keep it minimal and clean.
-
----
-
-# Coding Style
-
-Follow the existing XEngine style:
-
-```text
-Namespace: XEngine
-Files: PascalCase.h / PascalCase.cpp
-Types: PascalCase
-Functions: PascalCase
-Local variables: camelCase
-Members: m_PascalCase
-Static members: s_PascalCase
-Macros: XENGINE_...
-Braces: Allman
-Indentation: 4 spaces
-Column limit: 120
-```
-
-Use:
-
-```cpp
-#pragma once
-```
-
-Public include style:
-
-```cpp
-#include <XEngine/Core/Types.h>
-#include <XEngine/Engine/Engine.h>
-#include <XEngine/Platform/Window.h>
-```
-
-Do not use long relative includes.
+This is a temporary minimal event path for window close and window resize.
 
 ---
 
 # Strict Include Boundaries
 
-Allowed SDL includes:
-
-```text
-Engine/Source/Runtime/Platform/Private/SDL/
-```
-
-Forbidden SDL includes:
-
-```text
-Engine/Source/Runtime/Platform/Public/
-Engine/Source/Runtime/Engine/Public/
-Engine/Source/Runtime/RHI/Public/
-Engine/Source/Runtime/Renderer/Public/
-Apps/
-```
-
 Public headers must not include:
 
 ```cpp
+#include <volk.h>
+#include <vulkan/vulkan.h>
+#include <vk_mem_alloc.h>
 #include <SDL3/SDL.h>
-#include <SDL.h>
+#include <SDL3/SDL_vulkan.h>
 ```
 
-Only private SDL implementation files may include SDL.
+Forbidden locations for Vulkan / SDL / VMA includes:
+
+```text
+Engine/Source/Runtime/RHI/Public/
+Engine/Source/Runtime/Platform/Public/
+Engine/Source/Runtime/Renderer/Public/
+Engine/Source/Runtime/Engine/Public/
+Apps/
+```
+
+Allowed locations:
+
+```text
+Engine/Source/Runtime/RHI/Private/Vulkan/
+Engine/Source/Runtime/Platform/Private/SDL/
+```
+
+Specific rule:
+
+```text
+RHI/Private/Vulkan may include SDL_vulkan only for Vulkan surface creation.
+```
 
 ---
 
@@ -355,260 +165,90 @@ Only private SDL implementation files may include SDL.
 Implement or update these files:
 
 ```text
-Engine/Source/Runtime/Engine/Public/XEngine/Engine/Subsystem.h
-Engine/Source/Runtime/Engine/Public/XEngine/Engine/SubsystemContext.h
-Engine/Source/Runtime/Engine/Public/XEngine/Engine/SubsystemManager.h
-Engine/Source/Runtime/Engine/Private/SubsystemManager.cpp
-
-Engine/Source/Runtime/Engine/Public/XEngine/Engine/EngineConfig.h
-Engine/Source/Runtime/Engine/Public/XEngine/Engine/Engine.h
-Engine/Source/Runtime/Engine/Private/Engine.cpp
-
-Engine/Source/Runtime/Platform/Public/XEngine/Platform/Window.h
-Engine/Source/Runtime/Platform/Public/XEngine/Platform/WindowDesc.h
-Engine/Source/Runtime/Platform/Public/XEngine/Platform/NativeWindowHandle.h
 Engine/Source/Runtime/Platform/Public/XEngine/Platform/PlatformEvents.h
+Engine/Source/Runtime/Platform/Public/XEngine/Platform/Window.h
 Engine/Source/Runtime/Platform/Public/XEngine/Platform/PlatformSystem.h
-
 Engine/Source/Runtime/Platform/Private/PlatformSystem.cpp
-Engine/Source/Runtime/Platform/Private/Window.cpp
-
 Engine/Source/Runtime/Platform/Private/SDL/SDLWindow.h
 Engine/Source/Runtime/Platform/Private/SDL/SDLWindow.cpp
-Engine/Source/Runtime/Platform/Private/SDL/SDLPlatformUtils.h
-Engine/Source/Runtime/Platform/Private/SDL/SDLPlatformUtils.cpp
 
-ThirdParty/CMakeLists.txt
+Engine/Source/Runtime/RHI/Public/XEngine/RHI/RHISystem.h
+Engine/Source/Runtime/RHI/Public/XEngine/RHI/RHIDevice.h
+Engine/Source/Runtime/RHI/Public/XEngine/RHI/RHITypes.h
+
+Engine/Source/Runtime/RHI/Private/RHISystem.cpp
+
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanInstance.h
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanInstance.cpp
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanSurface.h
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanSurface.cpp
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanDevice.h
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanDevice.cpp
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanQueue.h
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanQueue.cpp
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanAllocator.h
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanAllocator.cpp
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanUtils.h
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanUtils.cpp
+
 Engine/CMakeLists.txt
-Apps/CMakeLists.txt
-Apps/Sandbox/CMakeLists.txt
-Apps/EditorApp/CMakeLists.txt
-Apps/Sandbox/Source/main.cpp
-Apps/EditorApp/Source/main.cpp
 README.md
 ```
 
-If some files already exist, update them cleanly.
+If these files already exist, update them cleanly.
 
-Do not modify unrelated RHI, Renderer, Shader, Asset, Scene, or UI files unless needed to keep the project building.
-
----
-
-# Required SubsystemContext Refactor
-
-Stage 1 introduces a lightweight `SubsystemContext`.
-
-Create:
-
-```text
-Engine/Source/Runtime/Engine/Public/XEngine/Engine/SubsystemContext.h
-```
-
-Content:
-
-```cpp
-#pragma once
-
-namespace XEngine
-{
-    class Engine;
-    struct EngineConfig;
-
-    struct SubsystemContext
-    {
-        Engine* Engine = nullptr;
-        const EngineConfig* Config = nullptr;
-    };
-}
-```
-
-Update `Subsystem.h` so `OnCreate` receives context:
-
-```cpp
-#pragma once
-
-#include <XEngine/Engine/SubsystemContext.h>
-
-namespace XEngine
-{
-    class ISubsystem
-    {
-    public:
-        virtual ~ISubsystem() = default;
-
-        virtual void OnCreate(const SubsystemContext& context) {}
-        virtual void OnDestroy() {}
-
-        virtual void OnBeginFrame() {}
-        virtual void OnUpdate(float deltaTime) {}
-        virtual void OnEndFrame() {}
-    };
-}
-```
-
-Update `SubsystemManager`:
-
-```cpp
-void CreateAll(const SubsystemContext& context);
-```
-
-Create order remains registration order.
-Destroy order remains reverse registration order.
-
-Do not add dependency graph, priority sorting, parallel updates, or runtime removal yet.
+Do not modify Renderer, Shader, Asset, Scene, UI, or Editor code unless absolutely required for build consistency.
 
 ---
 
-# Required EngineConfig Updates
+# PlatformEvent Queue Requirements
 
-Update `EngineConfig.h` to include window settings:
+## PlatformEvents.h
+
+Update:
 
 ```cpp
 #pragma once
 
 #include <XEngine/Core/Types.h>
 
-#include <string>
-
 namespace XEngine
 {
-    struct EngineConfig
+    enum class PlatformEventType
     {
-        std::string ApplicationName = "XEngine";
+        None,
+        WindowClose,
+        WindowResize,
+        WindowMinimized,
+        WindowRestored
+    };
 
-        bool EnableValidation = true;
-        bool EnableEditor = false;
+    struct PlatformEvent
+    {
+        PlatformEventType Type = PlatformEventType::None;
 
-        // 0 means run until RequestShutdown().
-        u32 MaxFrames = 0;
-
-        u32 WindowWidth = 1280;
-        u32 WindowHeight = 720;
-
-        bool WindowResizable = true;
-        bool WindowMaximized = false;
-        bool CreateMainWindow = true;
+        u32 Width = 0;
+        u32 Height = 0;
     };
 }
 ```
-
-Stage 1 apps should set:
-
-```cpp
-config.MaxFrames = 0;
-config.CreateMainWindow = true;
-```
-
----
-
-# Required Engine Updates
-
-Update `Engine` so it registers `PlatformSystem` when a main window is requested.
-
-Expected behavior:
-
-```text
-Initialize:
-- Log::Initialize()
-- Store EngineConfig
-- Reset Time
-- Register PlatformSystem if Config.CreateMainWindow is true
-- Build SubsystemContext
-- Call SubsystemManager.CreateAll(context)
-- Set initialized true
-
-Run:
-- Assert initialized
-- Set running true
-- While running:
-  - Time.Tick()
-  - SubsystemManager.BeginFrame()
-  - SubsystemManager.Update(deltaTime)
-  - SubsystemManager.EndFrame()
-  - Stop if MaxFrames > 0 and frame count reaches MaxFrames
-- Log stopped
-
-Shutdown:
-- RequestShutdown()
-- Destroy all subsystems
-- Log shutdown complete
-- Log::Shutdown() last
-```
-
-Add or keep:
-
-```cpp
-void RequestShutdown();
-bool IsRunning() const;
-SubsystemManager& GetSubsystemManager();
-const Time& GetTime() const;
-```
-
-The `PlatformSystem` should call `Engine::RequestShutdown()` when the window close event is received.
-
----
-
-# Required Platform Public API
-
-## WindowDesc.h
-
-Create:
-
-```cpp
-#pragma once
-
-#include <XEngine/Core/Types.h>
-
-#include <string>
-
-namespace XEngine
-{
-    struct WindowDesc
-    {
-        std::string Title = "XEngine";
-        u32 Width = 1280;
-        u32 Height = 720;
-        bool Resizable = true;
-        bool Maximized = false;
-    };
-}
-```
-
----
-
-## NativeWindowHandle.h
-
-Create or update:
-
-```cpp
-#pragma once
-
-namespace XEngine
-{
-    struct NativeWindowHandle
-    {
-        void* Window = nullptr;
-        void* Display = nullptr;
-    };
-}
-```
-
-Do not expose SDL types here.
 
 ---
 
 ## Window.h
 
-Create or update:
+Update `Window::PollEvents` to accept an event output container.
 
 ```cpp
 #pragma once
 
 #include <XEngine/Core/Types.h>
 #include <XEngine/Platform/NativeWindowHandle.h>
+#include <XEngine/Platform/PlatformEvents.h>
 #include <XEngine/Platform/WindowDesc.h>
 
 #include <string_view>
+#include <vector>
 
 namespace XEngine
 {
@@ -617,7 +257,7 @@ namespace XEngine
     public:
         virtual ~Window() = default;
 
-        virtual void PollEvents() = 0;
+        virtual void PollEvents(std::vector<PlatformEvent>& events) = 0;
 
         virtual bool ShouldClose() const = 0;
 
@@ -633,49 +273,45 @@ namespace XEngine
 
 ---
 
-## PlatformEvents.h
+## SDLWindow Behavior
 
-Keep this minimal for now.
+Update `SDLWindow`:
 
-Create:
-
-```cpp
-#pragma once
-
-#include <XEngine/Core/Types.h>
-
-namespace XEngine
-{
-    enum class PlatformEventType
-    {
-        None,
-        WindowClose,
-        WindowResize
-    };
-
-    struct PlatformEvent
-    {
-        PlatformEventType Type = PlatformEventType::None;
-        u32 Width = 0;
-        u32 Height = 0;
-    };
-}
+```text
+- Poll SDL events into std::vector<PlatformEvent>& events.
+- On SDL_EVENT_QUIT:
+  - Set m_ShouldClose = true.
+  - Push PlatformEventType::WindowClose.
+- On SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+  - Set m_ShouldClose = true.
+  - Push PlatformEventType::WindowClose.
+- On SDL_EVENT_WINDOW_RESIZED:
+  - Update m_Width and m_Height.
+  - Push PlatformEventType::WindowResize with Width and Height.
+- On minimize/restored events if available in SDL3:
+  - Push WindowMinimized / WindowRestored.
 ```
 
-Do not build a full event bus yet.
+Use SDL3 event constants, not SDL2 constants.
+
+If local SDL3 event names differ, adapt correctly to SDL3.
+
+Do not implement input events yet.
 
 ---
 
 ## PlatformSystem.h
 
-Create:
+Update:
 
 ```cpp
 #pragma once
 
 #include <XEngine/Engine/Subsystem.h>
+#include <XEngine/Platform/PlatformEvents.h>
 
 #include <memory>
+#include <vector>
 
 namespace XEngine
 {
@@ -694,9 +330,13 @@ namespace XEngine
         Window* GetMainWindow();
         const Window* GetMainWindow() const;
 
+        const std::vector<PlatformEvent>& GetEvents() const;
+
     private:
         Engine* m_Engine = nullptr;
         std::unique_ptr<Window> m_MainWindow;
+        std::vector<PlatformEvent> m_Events;
+
         bool m_Initialized = false;
     };
 }
@@ -704,282 +344,607 @@ namespace XEngine
 
 ---
 
-# Required PlatformSystem Behavior
+## PlatformSystem.cpp Behavior
 
-`PlatformSystem::OnCreate`:
-
-```text
-- Save Engine pointer from context.
-- If XENGINE_ENABLE_SDL is enabled:
-  - Initialize SDL video subsystem.
-  - Create SDLWindow using config values.
-  - Log window creation.
-- If SDL is disabled:
-  - Log warning that no real platform window is created.
-```
-
-`PlatformSystem::OnBeginFrame`:
+`OnBeginFrame`:
 
 ```text
-- If main window exists:
-  - Poll window events.
-  - If window ShouldClose():
-    - Log window close requested.
-    - Call m_Engine->RequestShutdown().
+- Clear m_Events at the beginning of the frame.
+- Poll main window events into m_Events.
+- If any WindowClose event is present:
+  - Log window close requested.
+  - Call m_Engine->RequestShutdown().
 ```
 
-`PlatformSystem::OnDestroy`:
+Do not call RHISystem from PlatformSystem.
 
-```text
-- Destroy main window before SDL_Quit.
-- Quit SDL video subsystem.
-- Reset state.
-```
-
-Do not call SDL functions from public headers.
+Do not do Vulkan work from PlatformSystem.
 
 ---
 
-# Required SDLWindow Implementation
+# SDL Window Vulkan Flag Requirement
 
-Implement in:
+Stage 2B-1 needs SDL window to support Vulkan surface creation later in the same stage.
 
-```text
-Engine/Source/Runtime/Platform/Private/SDL/SDLWindow.h
-Engine/Source/Runtime/Platform/Private/SDL/SDLWindow.cpp
+Update SDL window creation flags to include:
+
+```cpp
+SDL_WINDOW_VULKAN
 ```
 
-`SDLWindow.h` may include SDL because it is private.
+Also keep existing flags:
 
-Suggested private class:
+```text
+Resizable
+Maximized
+```
+
+Do not create Vulkan surface in SDLWindow.
+
+SDLWindow should only own `SDL_Window*`.
+
+---
+
+# RHISystem Requirements
+
+`RHISystem` should now:
+
+```text
+- Store SubsystemContext or Engine pointer internally if needed.
+- OnCreate:
+  - Get PlatformSystem from SubsystemManager.
+  - Get main Window.
+  - Get NativeWindowHandle.
+  - Create VulkanDevice when backend is Vulkan and XENGINE_ENABLE_VULKAN is defined.
+- OnUpdate:
+  - Read PlatformSystem events.
+  - If WindowResize event:
+    - Set m_PendingResize = true.
+    - Store pending width/height.
+    - Log that resize was observed and swapchain recreation is TODO for Stage 2B-2.
+  - Do not render.
+- OnDestroy:
+  - If device exists, WaitIdle.
+  - Destroy device.
+```
+
+Add private members:
+
+```cpp
+Engine* m_Engine = nullptr;
+bool m_PendingResize = false;
+u32 m_PendingResizeWidth = 0;
+u32 m_PendingResizeHeight = 0;
+```
+
+Do not implement swapchain recreation yet.
+
+---
+
+# RHI Public API Updates
+
+## RHIDevice.h
+
+Update to include initialization-independent interface:
 
 ```cpp
 #pragma once
 
-#include <XEngine/Platform/Window.h>
-
-#if defined(XENGINE_ENABLE_SDL)
-    #include <SDL3/SDL.h>
-#endif
+#include <XEngine/RHI/RHITypes.h>
 
 namespace XEngine
 {
-    class SDLWindow final : public Window
+    class RHIDevice
     {
     public:
-        explicit SDLWindow(const WindowDesc& desc);
-        ~SDLWindow() override;
+        virtual ~RHIDevice() = default;
 
-        void PollEvents() override;
+        virtual RHIBackend GetBackend() const = 0;
 
-        bool ShouldClose() const override;
+        virtual bool IsValid() const = 0;
 
-        u32 GetWidth() const override;
-        u32 GetHeight() const override;
-
-        std::string_view GetTitle() const override;
-
-        NativeWindowHandle GetNativeHandle() const override;
-
-    private:
-#if defined(XENGINE_ENABLE_SDL)
-        SDL_Window* m_Window = nullptr;
-#endif
-
-        std::string m_Title;
-        u32 m_Width = 0;
-        u32 m_Height = 0;
-        bool m_ShouldClose = false;
+        virtual void WaitIdle() = 0;
     };
 }
 ```
 
-`SDLWindow.cpp` behavior:
+Do not expose Vulkan handles.
+
+---
+
+## RHITypes.h
+
+Keep it Vulkan-free.
+
+Ensure it contains:
+
+```cpp
+enum class RHIBackend
+{
+    None,
+    Vulkan,
+    D3D12,
+    Metal
+};
+```
+
+If needed, add:
+
+```cpp
+struct RHIPhysicalDeviceInfo
+{
+    const char* Name = "";
+    u32 VendorId = 0;
+    u32 DeviceId = 0;
+};
+```
+
+Do not include Vulkan types.
+
+---
+
+# Vulkan Backend Design
+
+Implement these classes:
 
 ```text
-Constructor:
-- Create SDL window with title, width, height, and flags.
-- Use resizable/maximized flags from WindowDesc.
-- Store width/height/title.
-- Log success or assertion failure.
-
-PollEvents:
-- Call SDL_PollEvent in a loop.
-- If SDL_EVENT_QUIT, set m_ShouldClose = true.
-- If SDL_EVENT_WINDOW_CLOSE_REQUESTED, set m_ShouldClose = true.
-- If SDL_EVENT_WINDOW_RESIZED, update width/height and log resize.
-
-Destructor:
-- Destroy SDL_Window if valid.
+VulkanInstance
+VulkanSurface
+VulkanDevice
+VulkanQueue
+VulkanAllocator
 ```
 
-Use SDL3 event names.
-Do not use SDL2 event constants.
-
-If exact SDL3 names differ in the local version, adapt to SDL3 correctly.
+Keep swapchain, command list, buffer, texture, shader, pipeline classes as skeletons.
 
 ---
 
-# SDL Initialization Ownership
+# Vulkan Initialization Order
 
-`SDL_Init` and `SDL_Quit` should be owned by `PlatformSystem`, not `SDLWindow`.
-
-`SDLWindow` should only create and destroy the window.
-
-This is important because later the platform system may manage more than one window.
-
----
-
-# SDLPlatformUtils
-
-Create placeholder helper files:
+Implement this order:
 
 ```text
-SDLPlatformUtils.h
-SDLPlatformUtils.cpp
+VulkanDevice::Initialize(...)
+  -> volkInitialize()
+  -> VulkanInstance::Create(...)
+      - Query required SDL Vulkan instance extensions
+      - Enable validation layers if requested
+      - Enable VK_EXT_debug_utils if validation is enabled
+      - Create VkInstance
+      - volkLoadInstance(instance)
+      - Create debug messenger if validation is enabled
+  -> VulkanSurface::Create(instance, nativeWindowHandle)
+      - Use SDL_Vulkan_CreateSurface
+  -> PickPhysicalDevice(instance, surface)
+      - Find a device with graphics queue and present support
+      - Require VK_KHR_swapchain support for future Stage 2B-2
+  -> CreateLogicalDevice(...)
+      - Create graphics queue
+      - Create present queue
+      - Enable VK_KHR_swapchain
+      - volkLoadDevice(device)
+  -> VulkanAllocator::Create(instance, physicalDevice, device)
+      - Create VmaAllocator
 ```
 
-For now, they can contain small utility functions or TODO comments.
-
-Do not overbuild utilities yet.
+Do not create swapchain yet.
 
 ---
 
-# Native Window Handle
+# SDL Vulkan Extension Query
 
-`SDLWindow::GetNativeHandle()` should return a generic handle without exposing SDL in public headers.
+Use SDL3 Vulkan helper functions to get required instance extensions.
 
-For Stage 1, it can simply return:
+Expected logic:
 
-```cpp
-NativeWindowHandle handle;
-handle.Window = static_cast<void*>(m_Window);
-handle.Display = nullptr;
-return handle;
+```text
+- Ask SDL for required Vulkan instance extensions.
+- Add those extensions to VkInstanceCreateInfo.
+- If validation is enabled, add VK_EXT_debug_utils.
 ```
 
-Later Vulkan/Metal/D3D12 can refine this if needed.
+Use the appropriate SDL3 API from `SDL3/SDL_vulkan.h`.
 
-Do not implement Vulkan surface creation in this stage.
+If exact function signatures differ by local SDL3 version, adapt correctly.
 
----
-
-# Input System
-
-Do not implement a full InputSystem yet.
-
-If an InputSystem already exists as a stub, leave it as a stub.
-
-Do not add input action mapping, keyboard state tracking, mouse state tracking, or gamepad support in Stage 1.
-
-Window close event handling is enough.
+Do not hardcode platform-specific Vulkan surface extensions unless absolutely necessary.
 
 ---
 
-# App Updates
+# SDL Vulkan Surface Creation
 
-## Apps/Sandbox/Source/main.cpp
+Create:
 
-Update:
+```text
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanSurface.h
+Engine/Source/Runtime/RHI/Private/Vulkan/VulkanSurface.cpp
+```
+
+`VulkanSurface` should:
+
+```text
+- Store VkSurfaceKHR.
+- Create surface from SDL_Window* using SDL_Vulkan_CreateSurface.
+- Destroy surface using vkDestroySurfaceKHR.
+```
+
+`VulkanSurface` may include:
 
 ```cpp
-#include <XEngine/Engine/Engine.h>
+#include <SDL3/SDL_vulkan.h>
+#include <volk.h>
+```
 
-int main()
+This is allowed because it is private Vulkan backend code.
+
+---
+
+# Physical Device Selection Requirements
+
+Implement a simple physical device selection.
+
+Requirements:
+
+```text
+- Enumerate physical devices.
+- Prefer discrete GPU if available.
+- Accept integrated GPU if no discrete GPU exists.
+- Require graphics queue family.
+- Require present queue family for the created surface.
+- Require VK_KHR_swapchain extension support.
+- Log selected GPU name.
+```
+
+Create a private struct if useful:
+
+```cpp
+struct VulkanQueueFamilyIndices
 {
-    XEngine::EngineConfig config;
-    config.ApplicationName = "XEngine Sandbox";
-    config.WindowWidth = 1280;
-    config.WindowHeight = 720;
-    config.WindowResizable = true;
-    config.CreateMainWindow = true;
-    config.MaxFrames = 0;
+    u32 GraphicsFamily = InvalidIndex;
+    u32 PresentFamily = InvalidIndex;
 
-    XEngine::Engine engine;
-    engine.Initialize(config);
-    engine.Run();
-    engine.Shutdown();
-
-    return 0;
-}
+    bool IsComplete() const;
+};
 ```
 
-## Apps/EditorApp/Source/main.cpp
+Use `InvalidIndex` from Core handle/constants or define a private Vulkan constant.
 
-Update:
-
-```cpp
-#include <XEngine/Engine/Engine.h>
-
-int main()
-{
-    XEngine::EngineConfig config;
-    config.ApplicationName = "XEngine Editor";
-    config.EnableEditor = true;
-    config.WindowWidth = 1600;
-    config.WindowHeight = 900;
-    config.WindowResizable = true;
-    config.CreateMainWindow = true;
-    config.MaxFrames = 0;
-
-    XEngine::Engine engine;
-    engine.Initialize(config);
-    engine.Run();
-    engine.Shutdown();
-
-    return 0;
-}
-```
-
-Do not initialize ImGui yet.
+Do not expose this in public RHI headers.
 
 ---
 
-# Expected Logs
+# Logical Device Requirements
 
-When running Sandbox, expected logs should be similar to:
+Create logical device with:
+
+```text
+- Required queue families
+- Graphics queue
+- Present queue
+- VK_KHR_swapchain extension enabled
+```
+
+Do not enable advanced features yet.
+
+Do not enable descriptor indexing yet.
+
+Do not enable synchronization2 yet.
+
+Those are future stages.
+
+---
+
+# Validation Layer Requirements
+
+If `EngineConfig.EnableValidation` is true:
+
+```text
+- Check that VK_LAYER_KHRONOS_validation is available.
+- Enable it if available.
+- If unavailable, log warning and continue or assert depending on current XEngine assert policy.
+```
+
+Recommended Stage 2B-1 behavior:
+
+```text
+Log warning and continue if validation layer is unavailable.
+```
+
+Enable debug messenger if possible.
+
+Debug callback should log:
+
+```text
+Trace / Info / Warn / Error based on Vulkan severity
+```
+
+Keep implementation simple.
+
+---
+
+# volk Requirements
+
+Use volk correctly:
+
+```text
+1. Call volkInitialize() before creating VkInstance.
+2. Create VkInstance.
+3. Call volkLoadInstance(instance).
+4. Create VkDevice.
+5. Call volkLoadDevice(device).
+```
+
+Do not include `<vulkan/vulkan.h>` directly.
+
+Use `<volk.h>`.
+
+---
+
+# VMA Allocator Requirements
+
+Create:
+
+```text
+VulkanAllocator.h
+VulkanAllocator.cpp
+```
+
+`VulkanAllocator` should own:
+
+```cpp
+VmaAllocator m_Allocator = VK_NULL_HANDLE;
+```
+
+Behavior:
+
+```text
+Create:
+- Fill VmaAllocatorCreateInfo.
+- Provide instance, physical device, device.
+- Provide VmaVulkanFunctions using vkGetInstanceProcAddr and vkGetDeviceProcAddr.
+- Call vmaCreateAllocator.
+
+Destroy:
+- Call vmaDestroyAllocator if valid.
+```
+
+Do not allocate buffers/images yet.
+
+Do not expose VMA in public headers.
+
+`VulkanAllocator.h` is private and may include:
+
+```cpp
+#include <volk.h>
+#include <vk_mem_alloc.h>
+```
+
+---
+
+# VulkanUtils Requirements
+
+Update `VulkanUtils.h/.cpp`.
+
+Add:
+
+```cpp
+const char* VulkanResultToString(VkResult result);
+```
+
+Add a private check macro usable inside Vulkan backend:
+
+```cpp
+#define XENGINE_VK_CHECK(expression) ...
+```
+
+Behavior:
+
+```text
+- Execute expression.
+- If result is not VK_SUCCESS:
+  - Log error with VulkanResultToString.
+  - Assert / DebugBreak.
+```
+
+Keep this macro private to Vulkan backend.
+
+Do not put it in public headers.
+
+---
+
+# VulkanDevice Requirements
+
+`VulkanDevice` should now own:
+
+```text
+VulkanInstance
+VulkanSurface
+VulkanAllocator
+
+VkPhysicalDevice
+VkDevice
+VkQueue graphics queue
+VkQueue present queue
+u32 graphics family index
+u32 present family index
+```
+
+Suggested public methods:
+
+```cpp
+class VulkanDevice final : public RHIDevice
+{
+public:
+    VulkanDevice();
+    ~VulkanDevice() override;
+
+    bool Initialize(const VulkanDeviceCreateInfo& createInfo);
+    void Shutdown();
+
+    RHIBackend GetBackend() const override;
+    bool IsValid() const override;
+    void WaitIdle() override;
+};
+```
+
+Create private `VulkanDeviceCreateInfo`:
+
+```cpp
+struct VulkanDeviceCreateInfo
+{
+    NativeWindowHandle NativeWindow;
+    bool EnableValidation = true;
+    bool EnableVSync = true;
+};
+```
+
+This is private, not public RHI API.
+
+---
+
+# RHISystem + PlatformSystem Interaction
+
+`RHISystem::OnCreate` should:
+
+```text
+- Use context.Engine.
+- Get PlatformSystem through context.Engine->GetSubsystemManager().GetSubsystem<PlatformSystem>().
+- Assert PlatformSystem exists when creating Vulkan backend.
+- Get main window.
+- Get NativeWindowHandle.
+- Create VulkanDevice.
+- Call VulkanDevice::Initialize(...).
+```
+
+Do not let PlatformSystem know about RHI.
+
+Do not let PlatformSystem call RHISystem.
+
+---
+
+# Window Resize Handling in Stage 2B-1
+
+This stage should only record resize events and mark pending resize.
+
+Behavior:
+
+```text
+On PlatformEventType::WindowResize:
+  - RHISystem sets m_PendingResize = true.
+  - Store width and height.
+  - Log:
+    "Window resized to WxH. Swapchain recreation is TODO for Stage 2B-2."
+```
+
+Do not recreate swapchain.
+
+Do not create swapchain.
+
+Do not allocate frame resources.
+
+If width or height is 0, still record it. Future stage can skip rendering while minimized.
+
+---
+
+# Engine Registration
+
+Ensure Engine registers systems in this order when appropriate:
+
+```text
+PlatformSystem
+RHISystem
+```
+
+Do not register Renderer.
+
+Do not register UI.
+
+Do not register Scene.
+
+---
+
+# CMake Requirements
+
+Ensure the following:
+
+```text
+- Vulkan backend files compile only when XENGINE_ENABLE_VULKAN=ON.
+- Files including volk / VMA are excluded when XENGINE_ENABLE_VULKAN=OFF.
+- XEngineRuntime privately links volk.
+- XEngineRuntime privately includes VMA.
+- XEngineRuntime does not expose Vulkan include paths publicly.
+- XEngineRuntime still privately links SDL from Stage 1.
+```
+
+If `VulkanSurface.cpp` includes SDL Vulkan headers, make sure SDL include paths are available privately through `XEngineRuntime` linkage.
+
+---
+
+# Runtime Behavior
+
+When running `XEngineSandbox`, expected logs should include something similar to:
 
 ```text
 [XEngine] Log initialized
 [XEngine] Initializing engine: XEngine Sandbox
 [XEngine] Creating SDL window: XEngine Sandbox 1280x720
-[XEngine] Engine initialized
+[XEngine] Creating RHI system
+[XEngine] Initializing Vulkan backend
+[XEngine] Vulkan instance created
+[XEngine] Vulkan surface created
+[XEngine] Selected GPU: <GPU name>
+[XEngine] Vulkan logical device created
+[XEngine] VMA allocator created
 [XEngine] Engine started
-[XEngine] Window close requested
+```
+
+On window resize:
+
+```text
+[XEngine] Window resized to 1400x900. Swapchain recreation is TODO for Stage 2B-2.
+```
+
+On shutdown:
+
+```text
 [XEngine] Engine stopped
-[XEngine] Engine shutting down
+[XEngine] Destroying RHI system
+[XEngine] Destroying VMA allocator
+[XEngine] Destroying Vulkan device
+[XEngine] Destroying Vulkan surface
+[XEngine] Destroying Vulkan instance
 [XEngine] Destroying SDL window
-[XEngine] Engine shutdown complete
 [XEngine] Log shutdown
 ```
 
-Exact formatting can differ based on spdlog pattern.
+Exact formatting can differ.
 
 ---
 
 # README Update
 
-Update `README.md` to mention Stage 1:
+Update `README.md` to mention Stage 2B-1:
 
 ```text
-Stage 1 adds:
-- SDL3 source vendored under ThirdParty/SDL
-- SDL3 built together with XEngine
-- SDL3 dynamically linked by default
-- SDL3 runtime copied beside app executables on Windows
-- SDL3 platform backend
-- Main window creation
-- Event polling
-- Window close handling
-- SubsystemContext
+Stage 2B-1 adds:
+- Minimal PlatformEvent queue
+- Window resize events
+- Vulkan loader initialization through volk
+- Vulkan instance creation
+- SDL Vulkan surface creation
+- Physical device selection
+- Logical device creation
+- Graphics / present queue discovery
+- VMA allocator creation
 ```
 
 Also mention:
 
 ```text
-Vulkan is not implemented yet.
-SDL is hidden inside Platform/Private/SDL.
-Public headers do not expose SDL types.
+Stage 2B-1 does not create a swapchain.
+Stage 2B-1 does not render.
+Stage 2B-1 does not clear the screen.
+Swapchain and clear screen are planned for Stage 2B-2.
 ```
 
 ---
@@ -989,76 +954,83 @@ Public headers do not expose SDL types.
 Do not implement:
 
 ```text
-Vulkan surface creation
-Vulkan instance/device/swapchain
-Renderer
+VkSwapchainKHR
+Swapchain image views
+Command pool
+Command buffers
+Semaphores
+Fences
+Clear screen
+Present
 RenderGraph
-ShaderSystem Slang compilation
-Asset loading
-Scene ECS
+Renderer
+Slang
+Pipeline
+Triangle
+Descriptor sets
+Buffers
+Textures
+Images
 ImGui
-Input action mapping
-File drag and drop
-Clipboard
-Multiple windows
-High-DPI scaling
-Gamepad support
+Scene
+Asset loading
+Full event bus
+Input system
 ```
 
-Do not add these third-party libraries yet:
+Do not enable advanced Vulkan features yet:
 
 ```text
-Vulkan SDK
-volk
-VMA
-Slang
-Dear ImGui
-GLM
-Tracy
-EnTT
-fastgltf
-stb_image
-nlohmann/json
-meshoptimizer
+VK_KHR_dynamic_rendering
+VK_KHR_synchronization2
+VK_EXT_descriptor_indexing
+VK_EXT_descriptor_buffer
+Ray tracing extensions
+Mesh shader extensions
 ```
 
-Only add SDL3 in this stage, assuming spdlog already exists from Stage 0.
+These are future stages.
 
 ---
 
 # Acceptance Criteria
 
-Stage 1 is complete when:
+Stage 2B-1 is complete when:
 
 ```text
-1. Project configures with CMake.
-2. Project builds successfully with XENGINE_ENABLE_SDL=ON.
-3. SDL3 is built from ThirdParty/SDL source.
-4. XEngineRuntime links SDL3 privately.
-5. XEngineRuntime links SDL3 dynamically by default using SDL3::SDL3-shared.
-6. Windows builds copy SDL3.dll next to XEngineSandbox and XEngineEditorApp.
-7. XEngineSandbox launches an SDL window.
-8. XEngineEditorApp launches an SDL window if editor build is enabled.
-9. Closing the window exits the engine loop.
-10. PlatformSystem is registered by Engine.
-11. PlatformSystem is an ISubsystem.
-12. SubsystemContext exists and is passed into OnCreate().
-13. SDL headers appear only under Platform/Private/SDL.
-14. Public Platform headers do not expose SDL types.
-15. Vulkan is not implemented.
-16. Renderer is not implemented.
-17. ImGui is not implemented.
-18. Shutdown order is clean: window destroyed before SDL_Quit, Log shutdown last.
+1. Project configures with XENGINE_ENABLE_VULKAN=ON.
+2. Project builds with XENGINE_ENABLE_VULKAN=ON.
+3. XEngineSandbox launches an SDL Vulkan-capable window.
+4. volkInitialize is called successfully.
+5. VkInstance is created successfully.
+6. volkLoadInstance is called successfully.
+7. Debug messenger is created when validation is enabled and available.
+8. VkSurfaceKHR is created from SDL window.
+9. Physical device is selected.
+10. Graphics queue family is found.
+11. Present queue family is found.
+12. VkDevice is created successfully.
+13. volkLoadDevice is called successfully.
+14. Graphics and present queues are retrieved.
+15. VmaAllocator is created successfully.
+16. RHISystem observes WindowResize events and logs pending swapchain recreation.
+17. Closing the SDL window exits cleanly.
+18. Shutdown destroys VMA allocator, device, surface, debug messenger, and instance in correct order.
+19. No swapchain is created.
+20. No command buffer is created.
+21. No clear screen or present is implemented.
+22. Public headers do not include Vulkan, volk, VMA, SDL, or SDL_vulkan.
+23. Vulkan/SDL/VMA includes appear only in allowed private implementation locations.
 ```
 
 ---
 
 # Final Task
 
-Implement Stage 1 now.
+Implement Stage 2B-1 now.
 
 Do not ask for confirmation.
 
 Keep the implementation minimal, clean, and architecture-focused.
 
-Where future platform features are not implemented yet, leave clear TODO comments.
+Where Stage 2B-2 functionality is expected, leave clear TODO comments.
