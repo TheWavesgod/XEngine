@@ -9,7 +9,7 @@ namespace XEngine
         DestroyAll();
     }
 
-    void SubsystemManager::CreateAll()
+    void SubsystemManager::CreateAll(const SubsystemContext& context)
     {
         if (m_Created)
         {
@@ -20,7 +20,7 @@ namespace XEngine
 
         for (const auto& subsystem : m_Subsystems)
         {
-            subsystem->OnCreate();
+            subsystem->OnCreate(context);
         }
 
         m_Created = true;

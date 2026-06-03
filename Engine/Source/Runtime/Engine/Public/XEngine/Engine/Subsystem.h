@@ -1,5 +1,7 @@
 #pragma once
 
+#include <XEngine/Engine/SubsystemContext.h>
+
 namespace XEngine
 {
     class ISubsystem
@@ -7,7 +9,7 @@ namespace XEngine
     public:
         virtual ~ISubsystem() = default;
 
-        virtual void OnCreate() {}
+        virtual void OnCreate(const SubsystemContext& context) {}
         virtual void OnDestroy() {}
 
         virtual void OnBeginFrame() {}

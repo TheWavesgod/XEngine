@@ -1,4 +1,7 @@
-﻿add_executable(XEngineEditorApp Source/main.cpp)
+add_executable(XEngineEditorApp Source/main.cpp)
 target_link_libraries(XEngineEditorApp PRIVATE XEngineEditor)
 target_compile_features(XEngineEditorApp PRIVATE cxx_std_20)
 
+if(TARGET XEngineEditorApp)
+    xengine_copy_sdl_runtime(XEngineEditorApp)
+endif()

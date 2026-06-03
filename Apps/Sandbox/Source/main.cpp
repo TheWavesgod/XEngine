@@ -4,7 +4,11 @@ int main()
 {
     XEngine::EngineConfig config;
     config.ApplicationName = "XEngine Sandbox";
-    config.MaxFrames = 3;
+    config.WindowWidth = 1280;
+    config.WindowHeight = 720;
+    config.WindowResizable = true;
+    config.CreateMainWindow = true;
+    config.MaxFrames = 0;
 
     XEngine::Engine engine;
     engine.Initialize(config);

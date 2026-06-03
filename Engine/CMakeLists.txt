@@ -76,6 +76,25 @@ target_include_directories(XEngineRuntime
 target_link_libraries(XEngineRuntime PUBLIC XEngineFoundation)
 target_compile_features(XEngineRuntime PUBLIC cxx_std_20)
 
+if(XENGINE_ENABLE_SDL)
+    target_compile_definitions(XEngineRuntime
+        PRIVATE
+            XENGINE_ENABLE_SDL
+    )
+
+    if(XENGINE_SDL_LINK_SHARED)
+        target_link_libraries(XEngineRuntime
+            PRIVATE
+                SDL3::SDL3-shared
+        )
+    else()
+        target_link_libraries(XEngineRuntime
+            PRIVATE
+                SDL3::SDL3-static
+        )
+    endif()
+endif()
+
 if(XENGINE_ENABLE_EDITOR)
     file(GLOB_RECURSE XENGINE_EDITOR_SOURCES CONFIGURE_DEPENDS
         Source/Editor/*.h

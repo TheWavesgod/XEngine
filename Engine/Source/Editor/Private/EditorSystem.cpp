@@ -2,7 +2,7 @@
 
 namespace XEngine
 {
-    void EditorSystem::OnCreate() {}
+    void EditorSystem::OnCreate(const SubsystemContext& context) {}
     void EditorSystem::OnDestroy() {}
 }
 

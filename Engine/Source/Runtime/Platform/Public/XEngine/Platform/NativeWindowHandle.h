@@ -4,7 +4,8 @@ namespace XEngine
 {
     struct NativeWindowHandle
     {
-        void* Handle = nullptr;
+        void* Window = nullptr;
+        void* Display = nullptr;
     };
 }
 

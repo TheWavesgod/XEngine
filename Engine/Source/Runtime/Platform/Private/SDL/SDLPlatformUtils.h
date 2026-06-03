@@ -1,6 +1,7 @@
-﻿#pragma once
+#pragma once
 
-namespace XEngine
+namespace XEngine::SDLPlatformUtils
 {
-    void InitializeSDLPlatform();
+    bool InitializeVideo();
+    void QuitVideo();
 }

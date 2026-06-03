@@ -5,7 +5,11 @@ int main()
     XEngine::EngineConfig config;
     config.ApplicationName = "XEngine Editor";
     config.EnableEditor = true;
-    config.MaxFrames = 3;
+    config.WindowWidth = 1600;
+    config.WindowHeight = 900;
+    config.WindowResizable = true;
+    config.CreateMainWindow = true;
+    config.MaxFrames = 0;
 
     XEngine::Engine engine;
     engine.Initialize(config);

@@ -11,6 +11,8 @@
 
 namespace XEngine
 {
+    struct SubsystemContext;
+
     class SubsystemManager
     {
     public:
@@ -46,7 +48,7 @@ namespace XEngine
             return static_cast<T*>(it->second);
         }
 
-        void CreateAll();
+        void CreateAll(const SubsystemContext& context);
         void DestroyAll();
 
         void BeginFrame();

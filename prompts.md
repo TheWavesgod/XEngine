@@ -1,4 +1,4 @@
-﻿# XEngine Stage 0 Prompt - Foundation + Engine Loop + spdlog
+﻿# XEngine Stage 1 Prompt - SDL Platform Layer + SubsystemContext
 
 ## Role
 
@@ -6,57 +6,53 @@ You are a senior C++ game engine architecture assistant.
 
 You are working inside an existing C++20 project named **XEngine**.
 
-The project scaffold already exists. Your task is to implement **Stage 0: Foundation + Engine Loop**.
-
-Do not implement SDL, Vulkan, Slang, ImGui, RenderGraph, Asset loading, or Scene logic yet.
-
-This stage focuses only on:
+Stage 0 has already been completed:
 
 ```text
 Foundation
-Logging
+Logging through spdlog
 Assert
 Time
-Subsystem lifecycle
+SubsystemManager
 Engine lifecycle
 Sandbox run loop
-Basic CMake cleanup
 ```
+
+Your task is to implement **Stage 1: SDL Platform Layer + SubsystemContext**.
+
+Do not implement Vulkan, Slang, ImGui, RenderGraph, Asset loading, Scene ECS, or Renderer logic yet.
 
 ---
 
-# Stage 0 Goal
+# Stage 1 Goal
 
-Implement a clean and stable runtime skeleton for XEngine.
+Implement a clean SDL3-based platform layer while keeping SDL hidden inside the private Platform implementation.
 
-After this stage, the following should work:
+After this stage:
 
 ```text
 XEngineSandbox starts
-XEngine::Engine initializes
-XEngine::Log initializes through spdlog
-Engine owns SubsystemManager
-Time updates every frame
-SubsystemManager calls lifecycle methods
-Engine runs a small loop
-Engine shuts down cleanly
+Engine initializes Log and SubsystemManager
+Engine creates PlatformSystem
+PlatformSystem initializes SDL
+PlatformSystem creates the main window
+Engine loop runs until the window close event
+Closing the SDL window calls Engine::RequestShutdown()
+PlatformSystem destroys the window
+SDL shuts down cleanly
 ```
 
-The output should show clear lifecycle logs.
-
-Example expected output:
+The main focus is:
 
 ```text
-[XEngine] Log initialized
-[XEngine] Initializing engine: XEngine Sandbox
-[XEngine] Engine initialized
-[XEngine] Engine started
-[XEngine] Frame 0
-[XEngine] Frame 1
-[XEngine] Frame 2
-[XEngine] Engine shutting down
-[XEngine] Engine shutdown complete
-[XEngine] Log shutdown
+Engine
+  -> SubsystemManager
+  -> SubsystemContext
+  -> PlatformSystem
+  -> SDLWindow
+  -> Event polling
+  -> Window close
+  -> Engine::RequestShutdown()
 ```
 
 ---
@@ -67,66 +63,225 @@ Follow these decisions strictly:
 
 ```text
 1. Engine owns SubsystemManager.
-2. Subsystem creation order is registration order.
-3. Subsystem destruction order is reverse registration order.
-4. Logging is a static service, not a subsystem.
-5. Assert is macro-based and calls DebugBreak.
-6. Time is an internal Engine service, not a subsystem.
-7. spdlog is stored under ThirdParty/spdlog and linked privately by XEngineFoundation.
-8. Public XEngine headers must not expose spdlog types.
-9. No SDL dependency in this stage.
-10. No Vulkan dependency in this stage.
+2. Engine owns Time.
+3. Logging remains a static service, not a subsystem.
+4. PlatformSystem is a subsystem.
+5. PlatformSystem owns the main Window.
+6. SDL3 is an implementation detail of Platform/Private/SDL.
+7. Public Platform headers must not expose SDL types.
+8. Engine registers PlatformSystem in Stage 1.
+9. Subsystem creation order remains registration order.
+10. Subsystem destruction order remains reverse registration order.
+11. Vulkan must not be implemented in this stage.
+12. Renderer must not be implemented in this stage.
+13. SDL3 is built from source under ThirdParty/SDL.
+14. Do not use find_package(SDL3).
+15. Link SDL3 dynamically by default.
 ```
 
 ---
 
-# ThirdParty Policy for spdlog
+# SDL Source Code Policy
 
-spdlog repo is already in path E:\Project\C++\spdlog, copy the needed file from there 
-
-Use this layout:
+The SDL3 source code will be manually copied from GitHub into:
 
 ```text
-ThirdParty/
-  spdlog/
+ThirdParty/SDL/
 ```
 
-The `XEngineFoundation` target should link spdlog privately:
+This directory is expected to contain SDL's own `CMakeLists.txt`.
+
+Do not fetch SDL automatically.
+
+Do not use `find_package(SDL3)`.
+
+Do not assume SDL is installed globally on the system.
+
+Use:
 
 ```cmake
-target_link_libraries(XEngineFoundation
+add_subdirectory(ThirdParty/SDL)
+```
+
+or inside `ThirdParty/CMakeLists.txt`:
+
+```cmake
+add_subdirectory(SDL)
+```
+
+The intended dependency flow is:
+
+```text
+ThirdParty/SDL
+  -> SDL3::SDL3-shared
+  -> XEngineRuntime PRIVATE link
+  -> XEngineSandbox / XEngineEditorApp
+```
+
+---
+
+# SDL Linking Policy
+
+SDL3 should be built together with XEngine.
+
+Default linking mode:
+
+```text
+Shared / dynamic linking
+```
+
+Use the explicit SDL shared target:
+
+```cmake
+SDL3::SDL3-shared
+```
+
+Do not link against the generic alias unless necessary:
+
+```cmake
+SDL3::SDL3
+```
+
+Prefer:
+
+```cmake
+target_link_libraries(XEngineRuntime
     PRIVATE
-        spdlog::spdlog
+        SDL3::SDL3-shared
 )
 ```
 
-Do not include spdlog in public headers.
-
-Allowed:
-
-```cpp
-// Engine/Source/Foundation/Logging/Private/Log.cpp
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
-```
+Do not link SDL publicly.
 
 Forbidden:
 
-```cpp
-// Public headers
-#include <spdlog/spdlog.h>
+```cmake
+target_link_libraries(XEngineRuntime
+    PUBLIC
+        SDL3::SDL3-shared
+)
 ```
 
-If `ThirdParty/spdlog/CMakeLists.txt` exists, add it with `add_subdirectory`.
+SDL is a private implementation detail of the Platform module.
 
-If spdlog is missing, CMake should fail with a clear message:
+---
+
+# SDL CMake Options
+
+Add these options in the root `CMakeLists.txt` if they do not already exist:
+
+```cmake
+option(XENGINE_ENABLE_VULKAN "Enable Vulkan backend" OFF)
+option(XENGINE_ENABLE_SDL "Enable SDL platform backend" ON)
+option(XENGINE_SDL_LINK_SHARED "Link SDL as a shared library" ON)
+option(XENGINE_ENABLE_EDITOR "Build XEngine editor" ON)
+option(XENGINE_ENABLE_TRACY "Enable Tracy profiler integration" OFF)
+```
+
+For Stage 1:
 
 ```text
-spdlog is required for Stage 0.
-Please place spdlog under ThirdParty/spdlog.
+XENGINE_ENABLE_SDL should default to ON.
+XENGINE_SDL_LINK_SHARED should default to ON.
 ```
 
-Do not silently fall back to std::cout in this stage.
+---
+
+# ThirdParty/CMakeLists.txt Requirements
+
+Update `ThirdParty/CMakeLists.txt`.
+
+Keep existing spdlog integration from Stage 0.
+
+Add SDL integration like this:
+
+```cmake
+if(XENGINE_ENABLE_SDL)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SDL/CMakeLists.txt")
+        set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+        set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
+
+        if(XENGINE_SDL_LINK_SHARED)
+            set(SDL_SHARED ON CACHE BOOL "" FORCE)
+            set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+        else()
+            set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+            set(SDL_STATIC ON CACHE BOOL "" FORCE)
+        endif()
+
+        add_subdirectory(SDL)
+    else()
+        message(FATAL_ERROR "SDL3 is required when XENGINE_ENABLE_SDL=ON. Please place SDL3 source under ThirdParty/SDL.")
+    endif()
+endif()
+```
+
+Do not add Vulkan, Slang, ImGui, EnTT, GLM, Tracy, or other third-party libraries yet.
+
+---
+
+# Runtime SDL Linking Requirements
+
+Update `Engine/CMakeLists.txt`.
+
+If SDL is enabled:
+
+```cmake
+if(XENGINE_ENABLE_SDL)
+    target_compile_definitions(XEngineRuntime
+        PRIVATE
+            XENGINE_ENABLE_SDL
+    )
+
+    if(XENGINE_SDL_LINK_SHARED)
+        target_link_libraries(XEngineRuntime
+            PRIVATE
+                SDL3::SDL3-shared
+        )
+    else()
+        target_link_libraries(XEngineRuntime
+            PRIVATE
+                SDL3::SDL3-static
+        )
+    endif()
+endif()
+```
+
+If the vendored SDL project exposes slightly different target names, adapt to the actual SDL3 CMake target names, but prefer `SDL3::SDL3-shared` for dynamic linking.
+
+---
+
+# Runtime Dependency Copy Requirements
+
+Because SDL is dynamically linked by default, app executables must be able to find the SDL runtime library.
+
+Add a CMake helper function, preferably in `Apps/CMakeLists.txt` or a small CMake utility file:
+
+```cmake
+function(xengine_copy_sdl_runtime target)
+    if(XENGINE_ENABLE_SDL AND XENGINE_SDL_LINK_SHARED)
+        if(WIN32)
+            add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:SDL3::SDL3-shared>
+                    $<TARGET_FILE_DIR:${target}>
+            )
+        endif()
+    endif()
+endfunction()
+```
+
+Call this for:
+
+```cmake
+xengine_copy_sdl_runtime(XEngineSandbox)
+xengine_copy_sdl_runtime(XEngineEditorApp)
+```
+
+Only call it if the target exists.
+
+For macOS/Linux, do not overcomplicate RPATH in Stage 1 unless needed.
+If you add RPATH, keep it minimal and clean.
 
 ---
 
@@ -159,439 +314,120 @@ Public include style:
 ```cpp
 #include <XEngine/Core/Types.h>
 #include <XEngine/Engine/Engine.h>
-#include <XEngine/Logging/Log.h>
+#include <XEngine/Platform/Window.h>
 ```
 
 Do not use long relative includes.
 
 ---
 
-# Files to Implement or Update
+# Strict Include Boundaries
 
-Implement or update these files.
+Allowed SDL includes:
 
 ```text
-Engine/Source/Foundation/Core/Public/XEngine/Core/Types.h
-Engine/Source/Foundation/Core/Public/XEngine/Core/Defines.h
-Engine/Source/Foundation/Core/Public/XEngine/Core/Assert.h
-Engine/Source/Foundation/Core/Private/Assert.cpp
-Engine/Source/Foundation/Core/Public/XEngine/Core/NonCopyable.h
-Engine/Source/Foundation/Core/Public/XEngine/Core/Result.h
-Engine/Source/Foundation/Core/Public/XEngine/Core/Handle.h
+Engine/Source/Runtime/Platform/Private/SDL/
+```
 
-Engine/Source/Foundation/Logging/Public/XEngine/Logging/Log.h
-Engine/Source/Foundation/Logging/Private/Log.cpp
+Forbidden SDL includes:
 
-Engine/Source/Foundation/Diagnostics/Public/XEngine/Diagnostics/Profiler.h
-Engine/Source/Foundation/Diagnostics/Public/XEngine/Diagnostics/ScopedTimer.h
-Engine/Source/Foundation/Diagnostics/Public/XEngine/Diagnostics/DebugMarker.h
-Engine/Source/Foundation/Diagnostics/Private/Profiler.cpp
+```text
+Engine/Source/Runtime/Platform/Public/
+Engine/Source/Runtime/Engine/Public/
+Engine/Source/Runtime/RHI/Public/
+Engine/Source/Runtime/Renderer/Public/
+Apps/
+```
 
-Engine/Source/Runtime/Engine/Public/XEngine/Engine/EngineConfig.h
+Public headers must not include:
+
+```cpp
+#include <SDL3/SDL.h>
+#include <SDL.h>
+```
+
+Only private SDL implementation files may include SDL.
+
+---
+
+# Files to Implement or Update
+
+Implement or update these files:
+
+```text
 Engine/Source/Runtime/Engine/Public/XEngine/Engine/Subsystem.h
+Engine/Source/Runtime/Engine/Public/XEngine/Engine/SubsystemContext.h
 Engine/Source/Runtime/Engine/Public/XEngine/Engine/SubsystemManager.h
 Engine/Source/Runtime/Engine/Private/SubsystemManager.cpp
-Engine/Source/Runtime/Engine/Public/XEngine/Engine/Time.h
-Engine/Source/Runtime/Engine/Private/Time.cpp
+
+Engine/Source/Runtime/Engine/Public/XEngine/Engine/EngineConfig.h
 Engine/Source/Runtime/Engine/Public/XEngine/Engine/Engine.h
 Engine/Source/Runtime/Engine/Private/Engine.cpp
 
-Apps/Sandbox/Source/main.cpp
-Apps/EditorApp/Source/main.cpp
+Engine/Source/Runtime/Platform/Public/XEngine/Platform/Window.h
+Engine/Source/Runtime/Platform/Public/XEngine/Platform/WindowDesc.h
+Engine/Source/Runtime/Platform/Public/XEngine/Platform/NativeWindowHandle.h
+Engine/Source/Runtime/Platform/Public/XEngine/Platform/PlatformEvents.h
+Engine/Source/Runtime/Platform/Public/XEngine/Platform/PlatformSystem.h
+
+Engine/Source/Runtime/Platform/Private/PlatformSystem.cpp
+Engine/Source/Runtime/Platform/Private/Window.cpp
+
+Engine/Source/Runtime/Platform/Private/SDL/SDLWindow.h
+Engine/Source/Runtime/Platform/Private/SDL/SDLWindow.cpp
+Engine/Source/Runtime/Platform/Private/SDL/SDLPlatformUtils.h
+Engine/Source/Runtime/Platform/Private/SDL/SDLPlatformUtils.cpp
 
 ThirdParty/CMakeLists.txt
 Engine/CMakeLists.txt
-CMakeLists.txt
+Apps/CMakeLists.txt
+Apps/Sandbox/CMakeLists.txt
+Apps/EditorApp/CMakeLists.txt
+Apps/Sandbox/Source/main.cpp
+Apps/EditorApp/Source/main.cpp
+README.md
 ```
 
-Do not modify unrelated renderer, RHI, shader, asset, scene, or UI implementation beyond what is required to keep the build working.
+If some files already exist, update them cleanly.
+
+Do not modify unrelated RHI, Renderer, Shader, Asset, Scene, or UI files unless needed to keep the project building.
 
 ---
 
-# Required Core Implementation
+# Required SubsystemContext Refactor
 
-## Types.h
-
-Ensure this exists:
-
-```cpp
-#pragma once
-
-#include <cstdint>
-
-namespace XEngine
-{
-    using u8 = std::uint8_t;
-    using u16 = std::uint16_t;
-    using u32 = std::uint32_t;
-    using u64 = std::uint64_t;
-
-    using i8 = std::int8_t;
-    using i16 = std::int16_t;
-    using i32 = std::int32_t;
-    using i64 = std::int64_t;
-
-    using f32 = float;
-    using f64 = double;
-}
-```
-
----
-
-## Defines.h
-
-Create or update with platform and build config helpers:
-
-```cpp
-#pragma once
-
-#if defined(_WIN32)
-    #define XENGINE_PLATFORM_WINDOWS 1
-#elif defined(__APPLE__)
-    #define XENGINE_PLATFORM_MACOS 1
-#elif defined(__linux__)
-    #define XENGINE_PLATFORM_LINUX 1
-#else
-    #define XENGINE_PLATFORM_UNKNOWN 1
-#endif
-
-#if defined(_DEBUG) || !defined(NDEBUG)
-    #define XENGINE_DEBUG 1
-#else
-    #define XENGINE_RELEASE 1
-#endif
-
-#if defined(XENGINE_DEBUG)
-    #define XENGINE_ENABLE_ASSERTS 1
-#endif
-```
-
-Do not overcomplicate platform detection in Stage 0.
-
----
-
-## NonCopyable.h
-
-Create a simple base class:
-
-```cpp
-#pragma once
-
-namespace XEngine
-{
-    class NonCopyable
-    {
-    public:
-        NonCopyable() = default;
-        ~NonCopyable() = default;
-
-        NonCopyable(const NonCopyable&) = delete;
-        NonCopyable& operator=(const NonCopyable&) = delete;
-
-        NonCopyable(NonCopyable&&) = default;
-        NonCopyable& operator=(NonCopyable&&) = default;
-    };
-}
-```
-
----
-
-## Result.h
-
-Create a lightweight placeholder result type.
-
-Do not build a full error system yet.
-
-Suggested design:
-
-```cpp
-#pragma once
-
-#include <string>
-
-namespace XEngine
-{
-    struct Result
-    {
-        bool Success = true;
-        std::string Message;
-
-        static Result Ok();
-        static Result Failure(std::string message);
-
-        explicit operator bool() const;
-    };
-}
-```
-
-Implement inline if simple.
-
----
-
-## Handle.h
-
-Create a simple strongly typed handle template:
-
-```cpp
-#pragma once
-
-#include <XEngine/Core/Types.h>
-
-namespace XEngine
-{
-    constexpr u32 InvalidHandleIndex = 0xFFFFFFFFu;
-
-    template<typename Tag>
-    struct Handle
-    {
-        u32 Index = InvalidHandleIndex;
-        u32 Generation = 0;
-
-        bool IsValid() const
-        {
-            return Index != InvalidHandleIndex;
-        }
-
-        explicit operator bool() const
-        {
-            return IsValid();
-        }
-
-        friend bool operator==(const Handle& lhs, const Handle& rhs)
-        {
-            return lhs.Index == rhs.Index && lhs.Generation == rhs.Generation;
-        }
-
-        friend bool operator!=(const Handle& lhs, const Handle& rhs)
-        {
-            return !(lhs == rhs);
-        }
-    };
-}
-```
-
----
-
-# Required Logging Implementation
-
-## Log.h
-
-Public header must not expose spdlog.
-
-Create this API:
-
-```cpp
-#pragma once
-
-#include <string_view>
-
-namespace XEngine
-{
-    enum class LogLevel
-    {
-        Trace,
-        Debug,
-        Info,
-        Warn,
-        Error,
-        Critical,
-        Off
-    };
-
-    class Log
-    {
-    public:
-        static void Initialize();
-        static void Shutdown();
-
-        static void SetLevel(LogLevel level);
-
-        static void Trace(std::string_view message);
-        static void Debug(std::string_view message);
-        static void Info(std::string_view message);
-        static void Warn(std::string_view message);
-        static void Error(std::string_view message);
-        static void Critical(std::string_view message);
-    };
-}
-
-#define XENGINE_LOG_TRACE(message) ::XEngine::Log::Trace(message)
-#define XENGINE_LOG_DEBUG(message) ::XEngine::Log::Debug(message)
-#define XENGINE_LOG_INFO(message) ::XEngine::Log::Info(message)
-#define XENGINE_LOG_WARN(message) ::XEngine::Log::Warn(message)
-#define XENGINE_LOG_ERROR(message) ::XEngine::Log::Error(message)
-#define XENGINE_LOG_CRITICAL(message) ::XEngine::Log::Critical(message)
-```
-
-For Stage 0, do not implement variadic formatting macros yet.
-
-This is allowed:
-
-```cpp
-XENGINE_LOG_INFO("Engine initialized");
-```
-
-This is not required yet:
-
-```cpp
-XENGINE_LOG_INFO("Engine initialized: {}", appName);
-```
-
----
-
-## Log.cpp
-
-Implement with spdlog.
-
-Requirements:
-
-```text
-Use stdout color sink.
-Set logger name to "XEngine".
-Set a readable pattern.
-Flush on warn or error.
-Initialize must be safe to call once.
-Shutdown should reset logger and call spdlog::shutdown().
-```
-
-Suggested pattern:
-
-```text
-[%T] [%n] [%^%l%$] %v
-```
-
-Implementation should store the logger internally in `Log.cpp`, for example:
-
-```cpp
-namespace
-{
-    std::shared_ptr<spdlog::logger> s_Logger;
-}
-```
-
-Do not expose this pointer.
-
----
-
-# Required Assert Implementation
-
-## Assert.h
-
-Create macro-based assert.
-
-Public API:
-
-```cpp
-#pragma once
-
-#include <XEngine/Core/Defines.h>
-
-namespace XEngine
-{
-    void DebugBreak();
-    void ReportAssertionFailure(const char* expression, const char* file, int line, const char* message);
-}
-
-#if defined(XENGINE_ENABLE_ASSERTS)
-    #define XENGINE_ASSERT(expression, message)                                                         \
-        do                                                                                              \
-        {                                                                                               \
-            if (!(expression))                                                                          \
-            {                                                                                           \
-                ::XEngine::ReportAssertionFailure(#expression, __FILE__, __LINE__, message);            \
-                ::XEngine::DebugBreak();                                                                \
-            }                                                                                           \
-        } while (false)
-#else
-    #define XENGINE_ASSERT(expression, message) ((void)0)
-#endif
-```
-
----
-
-## Assert.cpp
-
-Implement:
-
-```text
-ReportAssertionFailure should log:
-- expression
-- file
-- line
-- message
-
-DebugBreak should use:
-- __debugbreak() on MSVC
-- __builtin_trap() on Clang/GCC
-- std::abort() fallback
-```
-
-`Assert.cpp` may include `<XEngine/Logging/Log.h>`.
-
----
-
-# Required Time Implementation
-
-## Time.h
+Stage 1 introduces a lightweight `SubsystemContext`.
 
 Create:
 
+```text
+Engine/Source/Runtime/Engine/Public/XEngine/Engine/SubsystemContext.h
+```
+
+Content:
+
 ```cpp
 #pragma once
 
-#include <XEngine/Core/Types.h>
-
-#include <chrono>
-
 namespace XEngine
 {
-    class Time
+    class Engine;
+    struct EngineConfig;
+
+    struct SubsystemContext
     {
-    public:
-        void Reset();
-        void Tick();
-
-        f32 GetDeltaTime() const;
-        f32 GetTotalTime() const;
-        u64 GetFrameIndex() const;
-
-    private:
-        using Clock = std::chrono::steady_clock;
-
-        Clock::time_point m_StartTime {};
-        Clock::time_point m_PreviousTime {};
-
-        f32 m_DeltaTime = 0.0f;
-        f32 m_TotalTime = 0.0f;
-        u64 m_FrameIndex = 0;
+        Engine* Engine = nullptr;
+        const EngineConfig* Config = nullptr;
     };
 }
 ```
 
-## Time.cpp
-
-Implement with `std::chrono::steady_clock`.
-
-Requirements:
-
-```text
-Reset sets start time and previous time to now.
-Tick updates delta time, total time, and frame index.
-GetDeltaTime returns seconds.
-GetTotalTime returns seconds.
-GetFrameIndex returns current frame index.
-```
-
----
-
-# Required Subsystem Implementation
-
-## Subsystem.h
-
-Ensure this exists:
+Update `Subsystem.h` so `OnCreate` receives context:
 
 ```cpp
 #pragma once
+
+#include <XEngine/Engine/SubsystemContext.h>
 
 namespace XEngine
 {
@@ -600,7 +436,7 @@ namespace XEngine
     public:
         virtual ~ISubsystem() = default;
 
-        virtual void OnCreate() {}
+        virtual void OnCreate(const SubsystemContext& context) {}
         virtual void OnDestroy() {}
 
         virtual void OnBeginFrame() {}
@@ -610,124 +446,27 @@ namespace XEngine
 }
 ```
 
+Update `SubsystemManager`:
+
+```cpp
+void CreateAll(const SubsystemContext& context);
+```
+
+Create order remains registration order.
+Destroy order remains reverse registration order.
+
+Do not add dependency graph, priority sorting, parallel updates, or runtime removal yet.
+
 ---
 
-## SubsystemManager.h
+# Required EngineConfig Updates
 
-Implement simple manual registration.
-
-Required API:
+Update `EngineConfig.h` to include window settings:
 
 ```cpp
 #pragma once
 
-#include <XEngine/Engine/Subsystem.h>
-
-#include <memory>
-#include <type_traits>
-#include <typeindex>
-#include <unordered_map>
-#include <vector>
-
-namespace XEngine
-{
-    class SubsystemManager
-    {
-    public:
-        SubsystemManager() = default;
-        ~SubsystemManager();
-
-        SubsystemManager(const SubsystemManager&) = delete;
-        SubsystemManager& operator=(const SubsystemManager&) = delete;
-
-        template<typename T, typename... Args>
-        T& AddSubsystem(Args&&... args)
-        {
-            static_assert(std::is_base_of_v<ISubsystem, T>, "T must derive from ISubsystem");
-
-            auto subsystem = std::make_unique<T>(std::forward<Args>(args)...);
-            T* rawSubsystem = subsystem.get();
-
-            m_SubsystemLookup[typeid(T)] = rawSubsystem;
-            m_Subsystems.emplace_back(std::move(subsystem));
-
-            return *rawSubsystem;
-        }
-
-        template<typename T>
-        T* GetSubsystem()
-        {
-            auto it = m_SubsystemLookup.find(typeid(T));
-            if (it == m_SubsystemLookup.end())
-            {
-                return nullptr;
-            }
-
-            return static_cast<T*>(it->second);
-        }
-
-        void CreateAll();
-        void DestroyAll();
-
-        void BeginFrame();
-        void Update(float deltaTime);
-        void EndFrame();
-
-        bool IsCreated() const;
-
-    private:
-        std::vector<std::unique_ptr<ISubsystem>> m_Subsystems;
-        std::unordered_map<std::type_index, ISubsystem*> m_SubsystemLookup;
-
-        bool m_Created = false;
-    };
-}
-```
-
-## SubsystemManager.cpp
-
-Implement behavior:
-
-```text
-CreateAll:
-- If already created, return.
-- Call OnCreate in registration order.
-- Set m_Created = true.
-- Log lifecycle event.
-
-DestroyAll:
-- If not created, return.
-- Call OnDestroy in reverse registration order.
-- Set m_Created = false.
-- Clear containers only after destroying.
-- Log lifecycle event.
-
-BeginFrame:
-- Call OnBeginFrame in registration order.
-
-Update:
-- Call OnUpdate(deltaTime) in registration order.
-
-EndFrame:
-- Call OnEndFrame in registration order.
-```
-
-Do not implement dependency graph yet.
-
-Do not implement priority sorting yet.
-
-Do not implement parallel subsystem updates yet.
-
----
-
-# Required Engine Implementation
-
-## EngineConfig.h
-
-Create or update:
-
-```cpp
-#pragma once
+#include <XEngine/Core/Types.h>
 
 #include <string>
 
@@ -736,150 +475,404 @@ namespace XEngine
     struct EngineConfig
     {
         std::string ApplicationName = "XEngine";
+
         bool EnableValidation = true;
         bool EnableEditor = false;
-        u32 MaxFrames = 3;
+
+        // 0 means run until RequestShutdown().
+        u32 MaxFrames = 0;
+
+        u32 WindowWidth = 1280;
+        u32 WindowHeight = 720;
+
+        bool WindowResizable = true;
+        bool WindowMaximized = false;
+        bool CreateMainWindow = true;
     };
 }
 ```
 
-Remember to include `Types.h` for `u32`.
+Stage 1 apps should set:
+
+```cpp
+config.MaxFrames = 0;
+config.CreateMainWindow = true;
+```
 
 ---
 
-## Engine.h
+# Required Engine Updates
+
+Update `Engine` so it registers `PlatformSystem` when a main window is requested.
+
+Expected behavior:
+
+```text
+Initialize:
+- Log::Initialize()
+- Store EngineConfig
+- Reset Time
+- Register PlatformSystem if Config.CreateMainWindow is true
+- Build SubsystemContext
+- Call SubsystemManager.CreateAll(context)
+- Set initialized true
+
+Run:
+- Assert initialized
+- Set running true
+- While running:
+  - Time.Tick()
+  - SubsystemManager.BeginFrame()
+  - SubsystemManager.Update(deltaTime)
+  - SubsystemManager.EndFrame()
+  - Stop if MaxFrames > 0 and frame count reaches MaxFrames
+- Log stopped
+
+Shutdown:
+- RequestShutdown()
+- Destroy all subsystems
+- Log shutdown complete
+- Log::Shutdown() last
+```
+
+Add or keep:
+
+```cpp
+void RequestShutdown();
+bool IsRunning() const;
+SubsystemManager& GetSubsystemManager();
+const Time& GetTime() const;
+```
+
+The `PlatformSystem` should call `Engine::RequestShutdown()` when the window close event is received.
+
+---
+
+# Required Platform Public API
+
+## WindowDesc.h
+
+Create:
+
+```cpp
+#pragma once
+
+#include <XEngine/Core/Types.h>
+
+#include <string>
+
+namespace XEngine
+{
+    struct WindowDesc
+    {
+        std::string Title = "XEngine";
+        u32 Width = 1280;
+        u32 Height = 720;
+        bool Resizable = true;
+        bool Maximized = false;
+    };
+}
+```
+
+---
+
+## NativeWindowHandle.h
 
 Create or update:
 
 ```cpp
 #pragma once
 
-#include <XEngine/Engine/EngineConfig.h>
-#include <XEngine/Engine/SubsystemManager.h>
-#include <XEngine/Engine/Time.h>
+namespace XEngine
+{
+    struct NativeWindowHandle
+    {
+        void* Window = nullptr;
+        void* Display = nullptr;
+    };
+}
+```
+
+Do not expose SDL types here.
+
+---
+
+## Window.h
+
+Create or update:
+
+```cpp
+#pragma once
+
+#include <XEngine/Core/Types.h>
+#include <XEngine/Platform/NativeWindowHandle.h>
+#include <XEngine/Platform/WindowDesc.h>
+
+#include <string_view>
 
 namespace XEngine
 {
-    class Engine
+    class Window
     {
     public:
-        Engine();
-        ~Engine();
+        virtual ~Window() = default;
 
-        Engine(const Engine&) = delete;
-        Engine& operator=(const Engine&) = delete;
+        virtual void PollEvents() = 0;
 
-        void Initialize(const EngineConfig& config);
-        void Run();
-        void Shutdown();
+        virtual bool ShouldClose() const = 0;
 
-        void RequestShutdown();
+        virtual u32 GetWidth() const = 0;
+        virtual u32 GetHeight() const = 0;
 
-        bool IsRunning() const;
+        virtual std::string_view GetTitle() const = 0;
 
-        SubsystemManager& GetSubsystemManager();
-        const Time& GetTime() const;
-
-    private:
-        EngineConfig m_Config;
-        SubsystemManager m_SubsystemManager;
-        Time m_Time;
-
-        bool m_Initialized = false;
-        bool m_Running = false;
+        virtual NativeWindowHandle GetNativeHandle() const = 0;
     };
 }
 ```
 
 ---
 
-## Engine.cpp
+## PlatformEvents.h
 
-Implement behavior:
+Keep this minimal for now.
 
-```text
-Constructor:
-- Do minimal work.
-
-Destructor:
-- If initialized, call Shutdown().
-
-Initialize:
-- If already initialized, return or assert.
-- Store config.
-- Initialize Log.
-- Log application name.
-- Reset Time.
-- Register no real subsystems yet.
-- Call m_SubsystemManager.CreateAll().
-- Set initialized true.
-
-Run:
-- Assert initialized.
-- Set running true.
-- Log engine started.
-- Run a simple loop.
-- For Stage 0, loop until RequestShutdown() or until MaxFrames is reached.
-- Every frame:
-  - Time.Tick()
-  - SubsystemManager.BeginFrame()
-  - SubsystemManager.Update(deltaTime)
-  - SubsystemManager.EndFrame()
-  - Log frame index
-- Log engine stopped.
-
-Shutdown:
-- If not initialized, return.
-- Log shutting down.
-- RequestShutdown.
-- Destroy all subsystems.
-- Log shutdown complete.
-- Shutdown Log last.
-- Set initialized false.
-
-RequestShutdown:
-- Set m_Running = false.
-
-IsRunning:
-- Return m_Running.
-```
-
-Important:
-
-```text
-Log::Initialize() must happen before subsystem creation.
-Log::Shutdown() must happen after subsystem destruction.
-```
-
----
-
-# Diagnostics Placeholder
-
-Keep Diagnostics minimal.
-
-## Profiler.h
-
-Create placeholder macros:
+Create:
 
 ```cpp
 #pragma once
 
-#define XENGINE_PROFILE_SCOPE(name) ((void)0)
-#define XENGINE_PROFILE_FUNCTION() ((void)0)
-#define XENGINE_PROFILE_FRAME() ((void)0)
+#include <XEngine/Core/Types.h>
+
+namespace XEngine
+{
+    enum class PlatformEventType
+    {
+        None,
+        WindowClose,
+        WindowResize
+    };
+
+    struct PlatformEvent
+    {
+        PlatformEventType Type = PlatformEventType::None;
+        u32 Width = 0;
+        u32 Height = 0;
+    };
+}
 ```
 
-## ScopedTimer.h
+Do not build a full event bus yet.
 
-Create a small timer class or leave as a TODO stub.
+---
 
-Do not add Tracy yet.
+## PlatformSystem.h
 
-## DebugMarker.h
+Create:
 
-Create placeholder macros or empty class.
+```cpp
+#pragma once
 
-Do not add GPU debug markers yet.
+#include <XEngine/Engine/Subsystem.h>
+
+#include <memory>
+
+namespace XEngine
+{
+    class Window;
+
+    class PlatformSystem final : public ISubsystem
+    {
+    public:
+        PlatformSystem();
+        ~PlatformSystem() override;
+
+        void OnCreate(const SubsystemContext& context) override;
+        void OnDestroy() override;
+        void OnBeginFrame() override;
+
+        Window* GetMainWindow();
+        const Window* GetMainWindow() const;
+
+    private:
+        Engine* m_Engine = nullptr;
+        std::unique_ptr<Window> m_MainWindow;
+        bool m_Initialized = false;
+    };
+}
+```
+
+---
+
+# Required PlatformSystem Behavior
+
+`PlatformSystem::OnCreate`:
+
+```text
+- Save Engine pointer from context.
+- If XENGINE_ENABLE_SDL is enabled:
+  - Initialize SDL video subsystem.
+  - Create SDLWindow using config values.
+  - Log window creation.
+- If SDL is disabled:
+  - Log warning that no real platform window is created.
+```
+
+`PlatformSystem::OnBeginFrame`:
+
+```text
+- If main window exists:
+  - Poll window events.
+  - If window ShouldClose():
+    - Log window close requested.
+    - Call m_Engine->RequestShutdown().
+```
+
+`PlatformSystem::OnDestroy`:
+
+```text
+- Destroy main window before SDL_Quit.
+- Quit SDL video subsystem.
+- Reset state.
+```
+
+Do not call SDL functions from public headers.
+
+---
+
+# Required SDLWindow Implementation
+
+Implement in:
+
+```text
+Engine/Source/Runtime/Platform/Private/SDL/SDLWindow.h
+Engine/Source/Runtime/Platform/Private/SDL/SDLWindow.cpp
+```
+
+`SDLWindow.h` may include SDL because it is private.
+
+Suggested private class:
+
+```cpp
+#pragma once
+
+#include <XEngine/Platform/Window.h>
+
+#if defined(XENGINE_ENABLE_SDL)
+    #include <SDL3/SDL.h>
+#endif
+
+namespace XEngine
+{
+    class SDLWindow final : public Window
+    {
+    public:
+        explicit SDLWindow(const WindowDesc& desc);
+        ~SDLWindow() override;
+
+        void PollEvents() override;
+
+        bool ShouldClose() const override;
+
+        u32 GetWidth() const override;
+        u32 GetHeight() const override;
+
+        std::string_view GetTitle() const override;
+
+        NativeWindowHandle GetNativeHandle() const override;
+
+    private:
+#if defined(XENGINE_ENABLE_SDL)
+        SDL_Window* m_Window = nullptr;
+#endif
+
+        std::string m_Title;
+        u32 m_Width = 0;
+        u32 m_Height = 0;
+        bool m_ShouldClose = false;
+    };
+}
+```
+
+`SDLWindow.cpp` behavior:
+
+```text
+Constructor:
+- Create SDL window with title, width, height, and flags.
+- Use resizable/maximized flags from WindowDesc.
+- Store width/height/title.
+- Log success or assertion failure.
+
+PollEvents:
+- Call SDL_PollEvent in a loop.
+- If SDL_EVENT_QUIT, set m_ShouldClose = true.
+- If SDL_EVENT_WINDOW_CLOSE_REQUESTED, set m_ShouldClose = true.
+- If SDL_EVENT_WINDOW_RESIZED, update width/height and log resize.
+
+Destructor:
+- Destroy SDL_Window if valid.
+```
+
+Use SDL3 event names.
+Do not use SDL2 event constants.
+
+If exact SDL3 names differ in the local version, adapt to SDL3 correctly.
+
+---
+
+# SDL Initialization Ownership
+
+`SDL_Init` and `SDL_Quit` should be owned by `PlatformSystem`, not `SDLWindow`.
+
+`SDLWindow` should only create and destroy the window.
+
+This is important because later the platform system may manage more than one window.
+
+---
+
+# SDLPlatformUtils
+
+Create placeholder helper files:
+
+```text
+SDLPlatformUtils.h
+SDLPlatformUtils.cpp
+```
+
+For now, they can contain small utility functions or TODO comments.
+
+Do not overbuild utilities yet.
+
+---
+
+# Native Window Handle
+
+`SDLWindow::GetNativeHandle()` should return a generic handle without exposing SDL in public headers.
+
+For Stage 1, it can simply return:
+
+```cpp
+NativeWindowHandle handle;
+handle.Window = static_cast<void*>(m_Window);
+handle.Display = nullptr;
+return handle;
+```
+
+Later Vulkan/Metal/D3D12 can refine this if needed.
+
+Do not implement Vulkan surface creation in this stage.
+
+---
+
+# Input System
+
+Do not implement a full InputSystem yet.
+
+If an InputSystem already exists as a stub, leave it as a stub.
+
+Do not add input action mapping, keyboard state tracking, mouse state tracking, or gamepad support in Stage 1.
+
+Window close event handling is enough.
 
 ---
 
@@ -887,7 +880,7 @@ Do not add GPU debug markers yet.
 
 ## Apps/Sandbox/Source/main.cpp
 
-Should be:
+Update:
 
 ```cpp
 #include <XEngine/Engine/Engine.h>
@@ -896,7 +889,11 @@ int main()
 {
     XEngine::EngineConfig config;
     config.ApplicationName = "XEngine Sandbox";
-    config.MaxFrames = 3;
+    config.WindowWidth = 1280;
+    config.WindowHeight = 720;
+    config.WindowResizable = true;
+    config.CreateMainWindow = true;
+    config.MaxFrames = 0;
 
     XEngine::Engine engine;
     engine.Initialize(config);
@@ -909,7 +906,7 @@ int main()
 
 ## Apps/EditorApp/Source/main.cpp
 
-Should be:
+Update:
 
 ```cpp
 #include <XEngine/Engine/Engine.h>
@@ -919,7 +916,11 @@ int main()
     XEngine::EngineConfig config;
     config.ApplicationName = "XEngine Editor";
     config.EnableEditor = true;
-    config.MaxFrames = 3;
+    config.WindowWidth = 1600;
+    config.WindowHeight = 900;
+    config.WindowResizable = true;
+    config.CreateMainWindow = true;
+    config.MaxFrames = 0;
 
     XEngine::Engine engine;
     engine.Initialize(config);
@@ -930,76 +931,56 @@ int main()
 }
 ```
 
-EditorApp should not initialize ImGui yet.
+Do not initialize ImGui yet.
 
 ---
 
-# CMake Requirements
+# Expected Logs
 
-## Root CMakeLists.txt
-
-Ensure project uses C++20:
-
-```cmake
-cmake_minimum_required(VERSION 3.25)
-
-project(XEngine LANGUAGES CXX)
-
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-option(XENGINE_ENABLE_VULKAN "Enable Vulkan backend" OFF)
-option(XENGINE_ENABLE_SDL "Enable SDL platform backend" OFF)
-option(XENGINE_ENABLE_EDITOR "Build XEngine editor" ON)
-option(XENGINE_ENABLE_TRACY "Enable Tracy profiler integration" OFF)
-
-add_subdirectory(ThirdParty)
-add_subdirectory(Engine)
-add_subdirectory(Apps)
-```
-
-## ThirdParty/CMakeLists.txt
-
-Add spdlog:
-
-```cmake
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/spdlog/CMakeLists.txt")
-    add_subdirectory(spdlog)
-else()
-    message(FATAL_ERROR "spdlog is required for Stage 0. Please place spdlog under ThirdParty/spdlog.")
-endif()
-```
-
-Do not add SDL, Vulkan, Slang, ImGui, EnTT, or other dependencies yet.
-
-## Engine/CMakeLists.txt
-
-Ensure:
-
-```cmake
-target_link_libraries(XEngineFoundation
-    PRIVATE
-        spdlog::spdlog
-)
-```
-
-Do not expose spdlog publicly.
-
-Ensure `XEngineRuntime` links to `XEngineFoundation`.
-
-Ensure `XEngineEditor` links to `XEngineRuntime`.
-
-## Apps CMake
-
-Ensure:
+When running Sandbox, expected logs should be similar to:
 
 ```text
-XEngineSandbox links XEngineRuntime
-XEngineEditorApp links XEngineEditor
+[XEngine] Log initialized
+[XEngine] Initializing engine: XEngine Sandbox
+[XEngine] Creating SDL window: XEngine Sandbox 1280x720
+[XEngine] Engine initialized
+[XEngine] Engine started
+[XEngine] Window close requested
+[XEngine] Engine stopped
+[XEngine] Engine shutting down
+[XEngine] Destroying SDL window
+[XEngine] Engine shutdown complete
+[XEngine] Log shutdown
 ```
 
-If `XENGINE_ENABLE_EDITOR` is OFF, EditorApp can be skipped.
+Exact formatting can differ based on spdlog pattern.
+
+---
+
+# README Update
+
+Update `README.md` to mention Stage 1:
+
+```text
+Stage 1 adds:
+- SDL3 source vendored under ThirdParty/SDL
+- SDL3 built together with XEngine
+- SDL3 dynamically linked by default
+- SDL3 runtime copied beside app executables on Windows
+- SDL3 platform backend
+- Main window creation
+- Event polling
+- Window close handling
+- SubsystemContext
+```
+
+Also mention:
+
+```text
+Vulkan is not implemented yet.
+SDL is hidden inside Platform/Private/SDL.
+Public headers do not expose SDL types.
+```
 
 ---
 
@@ -1008,23 +989,25 @@ If `XENGINE_ENABLE_EDITOR` is OFF, EditorApp can be skipped.
 Do not implement:
 
 ```text
-SDL window creation
-Input system
-Vulkan RHI
+Vulkan surface creation
+Vulkan instance/device/swapchain
+Renderer
 RenderGraph
 ShaderSystem Slang compilation
 Asset loading
 Scene ECS
 ImGui
-Tracy
-FileSystem
-JobSystem
+Input action mapping
+File drag and drop
+Clipboard
+Multiple windows
+High-DPI scaling
+Gamepad support
 ```
 
 Do not add these third-party libraries yet:
 
 ```text
-SDL3
 Vulkan SDK
 volk
 VMA
@@ -1039,41 +1022,43 @@ nlohmann/json
 meshoptimizer
 ```
 
-Only integrate spdlog in this stage.
+Only add SDL3 in this stage, assuming spdlog already exists from Stage 0.
 
 ---
 
 # Acceptance Criteria
 
-The stage is complete when:
+Stage 1 is complete when:
 
 ```text
 1. Project configures with CMake.
-2. Project builds successfully.
-3. XEngineSandbox runs.
-4. XEngineEditorApp runs if editor build is enabled.
-5. Logs are printed through spdlog.
-6. spdlog is only included in Log.cpp.
-7. XEngine public headers do not expose spdlog types.
-8. Engine owns SubsystemManager.
-9. SubsystemManager creates subsystems in registration order.
-10. SubsystemManager destroys subsystems in reverse registration order.
-11. Engine loop calculates delta time.
-12. Engine loop calls BeginFrame / Update / EndFrame.
-13. Engine shuts down cleanly.
-14. No SDL, Vulkan, Slang, ImGui, or RenderGraph implementation is added.
+2. Project builds successfully with XENGINE_ENABLE_SDL=ON.
+3. SDL3 is built from ThirdParty/SDL source.
+4. XEngineRuntime links SDL3 privately.
+5. XEngineRuntime links SDL3 dynamically by default using SDL3::SDL3-shared.
+6. Windows builds copy SDL3.dll next to XEngineSandbox and XEngineEditorApp.
+7. XEngineSandbox launches an SDL window.
+8. XEngineEditorApp launches an SDL window if editor build is enabled.
+9. Closing the window exits the engine loop.
+10. PlatformSystem is registered by Engine.
+11. PlatformSystem is an ISubsystem.
+12. SubsystemContext exists and is passed into OnCreate().
+13. SDL headers appear only under Platform/Private/SDL.
+14. Public Platform headers do not expose SDL types.
+15. Vulkan is not implemented.
+16. Renderer is not implemented.
+17. ImGui is not implemented.
+18. Shutdown order is clean: window destroyed before SDL_Quit, Log shutdown last.
 ```
 
 ---
 
 # Final Task
 
-Implement Stage 0 now.
+Implement Stage 1 now.
 
 Do not ask for confirmation.
 
 Keep the implementation minimal, clean, and architecture-focused.
 
-Where future systems are not implemented yet, leave clear TODO comments.
-
-
+Where future platform features are not implemented yet, leave clear TODO comments.

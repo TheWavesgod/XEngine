@@ -7,7 +7,7 @@ namespace XEngine
     class EditorSystem : public ISubsystem
     {
     public:
-        void OnCreate() override;
+        void OnCreate(const SubsystemContext& context) override;
         void OnDestroy() override;
     };
 }

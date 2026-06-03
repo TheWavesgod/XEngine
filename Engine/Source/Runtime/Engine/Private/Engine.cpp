@@ -1,7 +1,9 @@
 #include <XEngine/Engine/Engine.h>
 
 #include <XEngine/Core/Assert.h>
+#include <XEngine/Engine/SubsystemContext.h>
 #include <XEngine/Logging/Log.h>
+#include <XEngine/Platform/PlatformSystem.h>
 
 #include <string>
 
@@ -34,7 +36,16 @@ namespace XEngine
         XENGINE_LOG_INFO(message);
 
         m_Time.Reset();
-        m_SubsystemManager.CreateAll();
+
+        if (m_Config.CreateMainWindow)
+        {
+            m_SubsystemManager.AddSubsystem<PlatformSystem>();
+        }
+
+        SubsystemContext context;
+        context.Engine = this;
+        context.Config = &m_Config;
+        m_SubsystemManager.CreateAll(context);
 
         m_Initialized = true;
         XENGINE_LOG_INFO("Engine initialized");
@@ -54,23 +65,18 @@ namespace XEngine
         u32 frame = 0;
         while (m_Running)
         {
-            if (frame >= m_Config.MaxFrames)
-            {
-                RequestShutdown();
-                break;
-            }
-
             m_Time.Tick();
 
             m_SubsystemManager.BeginFrame();
             m_SubsystemManager.Update(m_Time.GetDeltaTime());
             m_SubsystemManager.EndFrame();
 
-            std::string frameMessage = "Frame ";
-            frameMessage += std::to_string(frame);
-            XENGINE_LOG_INFO(frameMessage);
-
             ++frame;
+
+            if (m_Config.MaxFrames > 0 && frame >= m_Config.MaxFrames)
+            {
+                RequestShutdown();
+            }
         }
 
         XENGINE_LOG_INFO("Engine stopped");

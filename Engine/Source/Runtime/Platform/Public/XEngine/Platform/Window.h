@@ -1,23 +1,27 @@
-﻿#pragma once
+#pragma once
 
+#include <XEngine/Core/Types.h>
 #include <XEngine/Platform/NativeWindowHandle.h>
+#include <XEngine/Platform/WindowDesc.h>
 
-#include <string>
+#include <string_view>
 
 namespace XEngine
 {
-    struct WindowDesc
-    {
-        std::string Title = "XEngine";
-        int Width = 1280;
-        int Height = 720;
-    };
-
     class Window
     {
     public:
         virtual ~Window() = default;
-        virtual void PollEvents() {}
-        virtual NativeWindowHandle GetNativeHandle() const { return {}; }
+
+        virtual void PollEvents() = 0;
+
+        virtual bool ShouldClose() const = 0;
+
+        virtual u32 GetWidth() const = 0;
+        virtual u32 GetHeight() const = 0;
+
+        virtual std::string_view GetTitle() const = 0;
+
+        virtual NativeWindowHandle GetNativeHandle() const = 0;
     };
 }
