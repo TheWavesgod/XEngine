@@ -17,7 +17,7 @@ namespace XEngine
         explicit SDLWindow(const WindowDesc& desc);
         ~SDLWindow() override;
 
-        void PollEvents() override;
+        void PollEvents(std::vector<PlatformEvent>& events) override;
 
         bool ShouldClose() const override;
 

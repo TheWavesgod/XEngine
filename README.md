@@ -40,6 +40,22 @@ Stage 2A does not create a swapchain yet.
 Stage 2A does not render or clear the screen yet.
 Actual Vulkan initialization starts in Stage 2B.
 
+Stage 2B-1 adds:
+- Minimal PlatformEvent queue
+- Window resize events
+- Vulkan loader initialization through volk
+- Vulkan instance creation
+- SDL Vulkan surface creation
+- Physical device selection
+- Logical device creation
+- Graphics / present queue discovery
+- VMA allocator creation
+
+Stage 2B-1 does not create a swapchain.
+Stage 2B-1 does not render.
+Stage 2B-1 does not clear the screen.
+Swapchain and clear screen are planned for Stage 2B-2.
+
 V0.1 does not implement:
 - Full Vulkan renderer
 - D3D12

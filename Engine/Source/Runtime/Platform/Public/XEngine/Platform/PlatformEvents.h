@@ -8,7 +8,9 @@ namespace XEngine
     {
         None,
         WindowClose,
-        WindowResize
+        WindowResize,
+        WindowMinimized,
+        WindowRestored
     };
 
     struct PlatformEvent

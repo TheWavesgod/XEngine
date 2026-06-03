@@ -11,6 +11,8 @@ namespace XEngine
 
         virtual RHIBackend GetBackend() const = 0;
 
+        virtual bool IsValid() const = 0;
+
         virtual void WaitIdle() = 0;
     };
 }

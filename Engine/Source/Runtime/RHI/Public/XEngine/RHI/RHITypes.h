@@ -35,4 +35,11 @@ namespace XEngine
         f32 B = 0.0f;
         f32 A = 1.0f;
     };
+
+    struct RHIPhysicalDeviceInfo
+    {
+        const char* Name = "";
+        u32 VendorId = 0;
+        u32 DeviceId = 0;
+    };
 }

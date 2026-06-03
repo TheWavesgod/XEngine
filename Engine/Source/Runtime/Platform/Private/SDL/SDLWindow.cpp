@@ -13,7 +13,7 @@ namespace XEngine
         , m_Height(desc.Height)
     {
 #if defined(XENGINE_ENABLE_SDL)
-        SDL_WindowFlags flags = static_cast<SDL_WindowFlags>(0);
+        SDL_WindowFlags flags = SDL_WINDOW_VULKAN;
         if (desc.Resizable)
         {
             flags |= SDL_WINDOW_RESIZABLE;
@@ -47,7 +47,7 @@ namespace XEngine
 #endif
     }
 
-    void SDLWindow::PollEvents()
+    void SDLWindow::PollEvents(std::vector<PlatformEvent>& events)
     {
 #if defined(XENGINE_ENABLE_SDL)
         SDL_Event event;
@@ -56,6 +56,10 @@ namespace XEngine
             if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
             {
                 m_ShouldClose = true;
+
+                PlatformEvent platformEvent;
+                platformEvent.Type = PlatformEventType::WindowClose;
+                events.push_back(platformEvent);
             }
             else if (event.type == SDL_EVENT_WINDOW_RESIZED)
             {
@@ -67,6 +71,28 @@ namespace XEngine
                 message += "x";
                 message += std::to_string(m_Height);
                 XENGINE_LOG_INFO(message);
+
+                PlatformEvent platformEvent;
+                platformEvent.Type = PlatformEventType::WindowResize;
+                platformEvent.Width = m_Width;
+                platformEvent.Height = m_Height;
+                events.push_back(platformEvent);
+            }
+            else if (event.type == SDL_EVENT_WINDOW_MINIMIZED)
+            {
+                PlatformEvent platformEvent;
+                platformEvent.Type = PlatformEventType::WindowMinimized;
+                platformEvent.Width = m_Width;
+                platformEvent.Height = m_Height;
+                events.push_back(platformEvent);
+            }
+            else if (event.type == SDL_EVENT_WINDOW_RESTORED)
+            {
+                PlatformEvent platformEvent;
+                platformEvent.Type = PlatformEventType::WindowRestored;
+                platformEvent.Width = m_Width;
+                platformEvent.Height = m_Height;
+                events.push_back(platformEvent);
             }
         }
 #endif

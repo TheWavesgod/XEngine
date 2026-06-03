@@ -81,20 +81,27 @@ namespace XEngine
 
     void PlatformSystem::OnBeginFrame()
     {
+        m_Events.clear();
+
         if (!m_MainWindow)
         {
             return;
         }
 
-        m_MainWindow->PollEvents();
+        m_MainWindow->PollEvents(m_Events);
 
-        if (m_MainWindow->ShouldClose())
+        for (const PlatformEvent& event : m_Events)
         {
-            XENGINE_LOG_INFO("Window close requested");
-
-            if (m_Engine != nullptr)
+            if (event.Type == PlatformEventType::WindowClose)
             {
-                m_Engine->RequestShutdown();
+                XENGINE_LOG_INFO("Window close requested");
+
+                if (m_Engine != nullptr)
+                {
+                    m_Engine->RequestShutdown();
+                }
+
+                break;
             }
         }
     }
@@ -107,5 +114,10 @@ namespace XEngine
     const Window* PlatformSystem::GetMainWindow() const
     {
         return m_MainWindow.get();
+    }
+
+    const std::vector<PlatformEvent>& PlatformSystem::GetEvents() const
+    {
+        return m_Events;
     }
 }
