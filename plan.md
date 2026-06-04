@@ -1,0 +1,1490 @@
+# XEngine Development Plan
+
+## Project Positioning
+
+**XEngine** is a renderer-first learning engine.
+
+The goal is not to clone Unreal Engine or Unity.
+The goal is to build a clean, modular, modern rendering engine architecture step by step.
+
+Core direction:
+
+```text
+C++20
+SDL3 platform layer
+Vulkan-first RHI
+Future D3D12 / Metal backend
+Slang-first shader system
+RenderGraph-managed frame
+Bindless-ready material system
+GPU-driven-ready renderer
+Editor-ready runtime structure
+```
+
+---
+
+# Current Status
+
+```text
+Stage 0  - Foundation + Engine Loop                     DONE
+Stage 1  - SDL Platform Layer                            DONE
+Stage 2A - Vulkan Dependencies + RHI Skeleton            DONE
+Stage 2B-1 - Vulkan Instance / Surface / Device          DONE
+Stage 2B-2 - Vulkan Swapchain / Clear / Present          DONE
+Stage 3  - RenderSystem + Linear RenderGraph V0          DONE
+
+Next:
+Stage 4A - ShaderSystem + Slang Integration
+Stage 4B - RHIShader / Pipeline / TrianglePass
+```
+
+---
+
+# Major Architecture Principles
+
+## Subsystem Ownership
+
+```text
+Engine owns SubsystemManager.
+Subsystem creation order is registration order.
+Subsystem destruction order is reverse registration order.
+Logging is a static service, not a subsystem.
+Time is an internal Engine service.
+```
+
+Current subsystem order:
+
+```text
+PlatformSystem
+RHISystem
+RenderSystem
+```
+
+Future subsystem order:
+
+```text
+FileSystem
+PlatformSystem
+InputSystem
+JobSystem
+AssetSystem
+ShaderSystem
+RHISystem
+RenderSystem
+SceneSystem
+UISystem
+EditorSystem
+```
+
+---
+
+## Rendering Architecture Direction
+
+Long-term renderer layering:
+
+```text
+RenderSystem
+  -> RenderPipeline
+      -> RenderFeature
+          -> RenderPass
+              -> RenderGraph
+                  -> RHI
+```
+
+Meaning:
+
+```text
+RenderSystem:
+  Owns high-level renderer lifecycle.
+
+RenderPipeline:
+  Assembles a full frame, such as ForwardPipeline, DeferredPipeline, EditorPipeline.
+
+RenderFeature:
+  Represents configurable renderer features, such as Bloom, FXAA, TAA, SSAO, Shadows.
+
+RenderPass:
+  Represents concrete GPU work, such as ClearPass, ForwardPass, TonemapPass.
+
+RenderGraph:
+  Records, compiles, and executes passes.
+
+RHI:
+  Executes backend-specific graphics commands.
+```
+
+Important distinction:
+
+```text
+RenderPass is the execution unit.
+RenderFeature is the configurable feature module.
+RenderPipeline is the frame assembly strategy.
+RenderGraph is the execution and dependency system.
+RenderSettings stores user/project/camera configuration.
+```
+
+---
+
+# Stage 0 - Foundation + Engine Loop
+
+## Status
+
+```text
+DONE
+```
+
+## Goal
+
+Create a stable engine runtime skeleton before integrating rendering dependencies.
+
+## Systems
+
+```text
+Core
+Logging
+Assert
+Time
+Subsystem
+SubsystemManager
+Engine
+EngineConfig
+Diagnostics placeholder
+```
+
+## Features
+
+```text
+Basic type aliases
+Assertion macros
+spdlog-based logging
+Engine initialization
+Engine shutdown
+Main loop
+Subsystem lifecycle management
+Delta time calculation
+```
+
+## Completion Criteria
+
+```text
+SandboxApp starts.
+Engine.Initialize() works.
+Engine.Run() works.
+Engine.Shutdown() works.
+SubsystemManager creates subsystems in registration order.
+SubsystemManager destroys subsystems in reverse registration order.
+Logs show lifecycle events.
+```
+
+---
+
+# Stage 1 - SDL Platform Layer
+
+## Status
+
+```text
+DONE
+```
+
+## Goal
+
+Add SDL3 as the platform backend while keeping SDL hidden inside private Platform implementation.
+
+## Systems
+
+```text
+PlatformSystem
+Window
+SDLWindow
+NativeWindowHandle
+PlatformEvent queue
+```
+
+## Third-party Libraries
+
+```text
+SDL3
+```
+
+## Features
+
+```text
+Create native SDL window
+Poll events
+Handle close event
+Track window size
+Expose NativeWindowHandle without leaking SDL_Window
+SDL3 built from ThirdParty/SDL
+SDL3 dynamically linked by default
+```
+
+## Completion Criteria
+
+```text
+Sandbox opens a window.
+Closing the window exits the engine loop.
+SDL headers only appear in Platform/Private/SDL.
+Public Platform headers do not expose SDL types.
+```
+
+---
+
+# Stage 2A - Vulkan Dependencies + RHI Skeleton
+
+## Status
+
+```text
+DONE
+```
+
+## Goal
+
+Prepare Vulkan dependencies and create the first RHI skeleton.
+
+## Dependency Policy
+
+```text
+Vulkan SDK:
+  System SDK, detected by find_package(Vulkan REQUIRED) inside Engine/CMakeLists.txt.
+
+volk:
+  ThirdParty/volk, built with add_subdirectory.
+
+VMA:
+  ThirdParty/VulkanMemoryAllocator, privately included by XEngineRuntime.
+```
+
+## Systems
+
+```text
+RHI public API skeleton
+RHISystem skeleton
+Vulkan backend private skeleton
+```
+
+## Completion Criteria
+
+```text
+XENGINE_ENABLE_VULKAN=ON configures successfully.
+Vulkan SDK is detected inside Engine/CMakeLists.txt.
+volk is privately linked.
+VMA is privately included.
+No Vulkan / volk / VMA types appear in public headers.
+```
+
+---
+
+# Stage 2B-1 - Vulkan Instance / Surface / Device / Allocator
+
+## Status
+
+```text
+DONE
+```
+
+## Goal
+
+Create the Vulkan backend up to logical device and allocator creation.
+
+## Features
+
+```text
+volkInitialize()
+VkInstance
+VkDebugUtilsMessengerEXT
+VkSurfaceKHR from SDL window
+VkPhysicalDevice selection
+VkDevice
+Graphics queue
+Present queue
+VmaAllocator
+```
+
+## Completion Criteria
+
+```text
+SDL window opens.
+Vulkan instance is created.
+SDL Vulkan surface is created.
+Physical device is selected.
+Logical device is created.
+VMA allocator is created.
+Shutdown destroys Vulkan resources in correct order.
+```
+
+---
+
+# Stage 2B-2 - Vulkan Swapchain / Command / Clear / Present
+
+## Status
+
+```text
+DONE
+```
+
+## Goal
+
+Create a Vulkan swapchain and clear it every frame.
+
+## Features
+
+```text
+VulkanSwapchain
+Swapchain image views
+Command pool
+Primary command buffer
+ImageAvailable semaphore
+RenderFinished semaphore
+InFlight fence
+vkAcquireNextImageKHR
+vkCmdClearColorImage
+vkQueueSubmit
+vkQueuePresentKHR
+Basic resize / out-of-date handling
+```
+
+## Important Choice
+
+Stage 2B-2 uses:
+
+```text
+vkCmdClearColorImage
+```
+
+It does not use:
+
+```text
+Render pass
+Framebuffer
+Graphics pipeline
+Shader
+Triangle
+```
+
+## Completion Criteria
+
+```text
+Window clears to fixed color.
+Window close exits cleanly.
+Resize does not crash.
+RenderDoc can capture the clear frame.
+```
+
+---
+
+# Stage 3 - RenderSystem + Linear RenderGraph V0
+
+## Status
+
+```text
+DONE
+```
+
+## Goal
+
+Move frame rendering ownership from RHISystem into RenderSystem + RenderGraph.
+
+## Systems
+
+```text
+RenderSystem
+RenderGraph V0
+RenderGraphBuilder placeholder
+RenderGraphContext
+ClearPass
+PresentPass placeholder
+RenderSettings initial version
+```
+
+## Current RenderGraph Scope
+
+```text
+Linear pass list
+Insertion-order execution
+Single-threaded execution
+No resource dependency analysis
+No automatic barriers
+No resource aliasing
+No async compute
+```
+
+## RenderGraph Pass Types
+
+```cpp
+enum class RenderGraphPassType
+{
+    Graphics,
+    Compute,
+    Transfer,
+    Present,
+    External
+};
+```
+
+## Important Design Decision
+
+Do not create a `NeuralPass` class.
+
+Future neural rendering features should be represented as:
+
+```text
+Compute pass
+External pass
+```
+
+Examples:
+
+```text
+NeuralDenoisePass       -> Compute / External
+NeuralTextureDecodePass -> Compute
+DLSS / FSR / XeSS       -> External
+```
+
+## Completion Criteria
+
+```text
+Engine registers PlatformSystem -> RHISystem -> RenderSystem.
+RHISystem no longer directly clears every frame.
+RenderSystem builds RenderGraph every frame.
+ClearPass calls RHIDevice::ClearSwapchain.
+PresentPass exists as placeholder.
+Window still clears to fixed color.
+No shaders, triangle, pipeline, or RenderFeature system yet.
+```
+
+---
+
+# Stage 4A - ShaderSystem + Slang Integration
+
+## Status
+
+```text
+NEXT
+```
+
+## Goal
+
+Introduce Slang as the primary shader language and compile `.slang` files to SPIR-V.
+
+## Systems
+
+```text
+ShaderSystem
+ShaderCompiler
+ShaderTypes
+ShaderReflection
+ShaderModule
+SlangCompiler
+```
+
+## Third-party Libraries
+
+```text
+Slang
+```
+
+## Features
+
+```text
+Read .slang files
+Compile vertex / fragment / compute entry points
+Output SPIR-V bytecode
+Create CompiledShader objects
+Keep Slang types private
+```
+
+## Public API Direction
+
+```cpp
+enum class ShaderStage
+{
+    Vertex,
+    Fragment,
+    Compute
+};
+
+enum class ShaderTarget
+{
+    VulkanSPIRV,
+    D3D12DXIL,
+    MetalMSL
+};
+```
+
+## Completion Criteria
+
+```text
+ShaderSystem can compile Triangle.slang to SPIR-V.
+ShaderSystem public headers do not expose Slang.
+No Vulkan pipeline creation yet.
+No triangle draw yet.
+```
+
+---
+
+# Stage 4B - RHIShader / Pipeline / TrianglePass
+
+## Status
+
+```text
+PLANNED
+```
+
+## Goal
+
+Draw the first triangle using Slang-compiled shaders.
+
+## Systems
+
+```text
+RHIShader
+RHIPipeline
+RHICommandList minimal draw API
+VulkanShader
+VulkanPipeline
+VulkanCommandList
+TrianglePass
+```
+
+## Features
+
+```text
+Create VkShaderModule
+Create minimal graphics pipeline
+Use dynamic rendering if available
+Use vertex ID triangle
+No vertex buffer
+No descriptor set
+No material
+No texture
+```
+
+## RenderGraph Flow
+
+```text
+ClearPass
+TrianglePass
+PresentPass
+```
+
+## Completion Criteria
+
+```text
+Triangle.slang compiles.
+Vulkan shader modules are created.
+Graphics pipeline is created.
+TrianglePass draws a triangle.
+No mesh, material, texture, scene, or asset system yet.
+```
+
+---
+
+# Stage 5 - Basic Mesh Forward Renderer
+
+## Status
+
+```text
+PLANNED
+```
+
+## Goal
+
+Move from hardcoded triangle rendering to basic mesh rendering.
+
+## Systems
+
+```text
+RHI buffer abstraction
+Basic mesh representation
+Camera data
+RenderView
+RenderScene initial version
+ForwardOpaquePass
+```
+
+## Features
+
+```text
+Vertex buffer
+Index buffer
+Depth buffer
+Depth test
+Camera uniform data
+Draw cube or hardcoded mesh
+```
+
+## GPU-driven Preparation
+
+Start designing render data as IDs and indices:
+
+```cpp
+struct RenderObject
+{
+    u32 ObjectId = 0;
+    u32 MeshId = 0;
+    u32 MaterialId = 0;
+
+    Mat4 World;
+    Mat4 PreviousWorld;
+
+    AABB Bounds;
+};
+```
+
+## Completion Criteria
+
+```text
+A basic 3D mesh renders.
+Depth testing works.
+Renderer uses RenderScene / RenderObject direction, not direct immediate hardcoding only.
+```
+
+---
+
+# Stage 6 - Material + Texture + Basic PBR
+
+## Status
+
+```text
+PLANNED
+```
+
+## Goal
+
+Introduce material data, texture sampling, and basic physically based shading.
+
+## Systems
+
+```text
+TextureManager
+MaterialSystem
+Sampler
+MaterialAsset initial version
+GPU material data placeholder
+```
+
+## Third-party Libraries
+
+```text
+stb_image
+nlohmann/json optional
+```
+
+## Features
+
+```text
+Texture loading
+Sampler creation
+Unlit textured shader
+Basic PBR shader
+BaseColor texture
+Normal texture
+Metallic/Roughness texture
+AO texture optional
+Directional light
+```
+
+## Bindless Preparation
+
+Material data should be index-based where possible:
+
+```cpp
+struct GPUMaterialData
+{
+    u32 BaseColorTextureIndex;
+    u32 NormalTextureIndex;
+    u32 MetallicRoughnessTextureIndex;
+    u32 AOTextureIndex;
+
+    Vec4 BaseColorFactor;
+    f32 MetallicFactor;
+    f32 RoughnessFactor;
+};
+```
+
+## Completion Criteria
+
+```text
+A mesh can render with texture.
+A mesh can render with basic PBR material.
+MaterialAsset does not hold Vulkan handles.
+```
+
+---
+
+# Stage 7 - glTF Asset + Scene Integration
+
+## Status
+
+```text
+PLANNED
+```
+
+## Goal
+
+Load real assets and connect them to the scene system.
+
+## Systems
+
+```text
+AssetSystem
+MeshAsset
+TextureAsset
+MaterialAsset
+SceneSystem
+Entity
+Components
+RenderExtractionSystem
+```
+
+## Third-party Libraries
+
+```text
+fastgltf
+stb_image
+EnTT
+nlohmann/json
+meshoptimizer optional
+```
+
+## Features
+
+```text
+Load glTF mesh
+Load glTF material
+Load texture references
+Create scene entity
+TransformComponent
+MeshRendererComponent
+CameraComponent
+LightComponent
+Extract RenderScene from Scene
+```
+
+## Important Architecture Rule
+
+Scene must not directly call renderer draw functions.
+
+Correct direction:
+
+```text
+Scene
+  -> RenderExtractionSystem
+  -> RenderScene
+  -> RenderSystem
+```
+
+## Completion Criteria
+
+```text
+Scene entity renders a glTF mesh.
+Scene does not depend on RHI.
+Asset system does not expose Vulkan resources.
+Renderer receives RenderScene as input.
+```
+
+---
+
+# Stage 8 - Lighting + Shadow
+
+## Status
+
+```text
+PLANNED
+```
+
+## Goal
+
+Add basic real-time lighting and shadows.
+
+## Systems
+
+```text
+Light system
+Shadow pass
+Shadow map resources
+RenderGraph texture read/write
+```
+
+## Features
+
+```text
+Directional light
+Point light optional
+ShadowMapPass
+Directional shadow map
+PCF filtering
+Cascaded shadow maps later
+```
+
+## RenderPipeline Preparation
+
+At this stage, start preparing the idea of:
+
+```text
+ForwardPipeline
+```
+
+But do not introduce a full RenderFeature system yet unless necessary.
+
+## Completion Criteria
+
+```text
+Directional light affects PBR shading.
+A shadow map is rendered.
+ForwardPBRPass reads shadow map.
+RenderGraph tracks shadow pass dependency.
+```
+
+---
+
+# Stage 9 - HDR + Post-processing + RenderFeature V0
+
+## Status
+
+```text
+PLANNED
+```
+
+## Goal
+
+Introduce HDR rendering, post-processing, and the first real RenderFeature system.
+
+This is the recommended stage to formally introduce:
+
+```text
+RenderPipeline
+RenderFeature
+RenderSettings expansion
+```
+
+because this is the first stage where multiple configurable rendering features become meaningful.
+
+## Systems
+
+```text
+ForwardPipeline
+RenderFeature base concept
+RenderSettings expanded
+PostProcess system
+TonemapPass
+Bloom passes
+FXAAPass optional
+```
+
+## Why RenderFeature Starts Here
+
+Stage 9 introduces several configurable features:
+
+```text
+Bloom on/off
+Tone mapping mode
+FXAA on/off
+Exposure settings
+Color grading optional
+```
+
+This is the right time to move away from hardcoding pass order directly in RenderSystem.
+
+## Recommended Layering
+
+```text
+RenderSystem
+  -> ForwardPipeline
+      -> RenderFeature
+          -> RenderPass
+              -> RenderGraph
+```
+
+## Initial RenderFeature Candidates
+
+```text
+BloomFeature
+TonemapFeature
+AntiAliasingFeature V0
+```
+
+## AntiAliasing V0
+
+Start small:
+
+```cpp
+enum class AntiAliasingMode
+{
+    None,
+    FXAA
+};
+```
+
+Do not implement TAA yet.
+
+## Features
+
+```text
+HDR color target
+Tonemapping
+Gamma correction
+Bloom downsample
+Bloom upsample
+FXAA optional
+Color grading optional
+```
+
+## Completion Criteria
+
+```text
+Scene renders into HDRColor.
+TonemapPass writes LDR output.
+Bloom can be toggled.
+FXAA can be toggled if implemented.
+RenderFeature V0 can add one or more passes to RenderGraph.
+RenderSystem delegates frame assembly to ForwardPipeline.
+```
+
+---
+
+# Stage 10 - GPUScene + RenderQueue
+
+## Status
+
+```text
+PLANNED
+```
+
+## Goal
+
+Refactor renderer data into GPU-friendly buffers and prepare for GPU-driven rendering.
+
+## Systems
+
+```text
+GPUScene
+RenderQueue
+DrawList
+ObjectBuffer
+MaterialBuffer
+MeshBuffer
+LightBuffer
+```
+
+## Features
+
+```text
+GPUObjectData
+GPUMaterialData
+GPUMeshData
+Opaque render queue
+Transparent render queue placeholder
+CPU frustum culling
+Draw sorting
+```
+
+## GPU-driven Preparation
+
+This is the real foundation for GPU-driven rendering.
+
+The renderer should move toward:
+
+```text
+ObjectBuffer
+MaterialBuffer
+MeshBuffer
+DrawList
+```
+
+instead of immediate per-object CPU binding.
+
+## Completion Criteria
+
+```text
+Objects are uploaded into structured GPU buffers.
+Render queue controls draw order.
+Foundation for indirect drawing exists.
+```
+
+---
+
+# Stage 11 - Bindless Resource Model
+
+## Status
+
+```text
+PLANNED
+```
+
+## Goal
+
+Introduce a modern resource binding model.
+
+## Systems
+
+```text
+BindlessResourceManager
+Texture heap
+Sampler heap
+Material texture indices
+```
+
+## Features
+
+```text
+Global texture array
+Global sampler table
+Material stores texture indices
+Descriptor indexing
+Non-uniform indexing
+```
+
+## Why This Matters
+
+Bindless is a major prerequisite for scalable GPU-driven rendering.
+
+GPU-driven draw should be able to resolve:
+
+```text
+object id -> material id -> texture indices
+```
+
+without CPU-side per-material descriptor rebinding.
+
+## Completion Criteria
+
+```text
+Material no longer requires per-material descriptor set binding.
+Textures are accessed by index.
+Bindless manager owns descriptor allocation/update.
+```
+
+---
+
+# Stage 12 - Forward+ / Clustered Lighting
+
+## Status
+
+```text
+PLANNED
+```
+
+## Goal
+
+Support many dynamic lights efficiently and mature compute-pass infrastructure.
+
+## Systems
+
+```text
+LightCullingPass
+Cluster data
+Tile light list
+Compute pipeline
+```
+
+## Features
+
+```text
+Depth prepass
+Light culling compute shader
+Forward+ tile lighting
+Clustered lighting optional
+Many point lights
+```
+
+## GPU-driven Preparation
+
+This stage trains the renderer for:
+
+```text
+Compute pass
+Storage buffers
+Compute-to-graphics dependency
+GPU-generated lists
+```
+
+These are also required by later GPU-driven culling.
+
+## Completion Criteria
+
+```text
+Many lights render with reasonable performance.
+Light culling runs as a compute pass.
+ForwardPBRPass reads light lists.
+RenderGraph handles compute-to-graphics dependency.
+```
+
+---
+
+# Stage 13 - Editor Base
+
+## Status
+
+```text
+PLANNED
+```
+
+## Goal
+
+Build the first editor interface.
+
+## Systems
+
+```text
+UISystem
+ImGuiRenderer
+EditorSystem
+ViewportPanel
+SceneHierarchyPanel
+InspectorPanel
+AssetBrowserPanel
+ProfilerPanel
+RenderGraphPanel
+```
+
+## Third-party Libraries
+
+```text
+Dear ImGui docking branch
+```
+
+## Features
+
+```text
+DockSpace
+Viewport panel
+Scene hierarchy placeholder
+Inspector placeholder
+Asset browser placeholder
+Profiler panel placeholder
+RenderGraph panel placeholder
+```
+
+## Completion Criteria
+
+```text
+EditorApp launches with dockable UI.
+SandboxApp does not depend on Editor.
+ImGui does not appear in public runtime headers.
+Viewport can display renderer output.
+```
+
+---
+
+# Stage 14 - Temporal Renderer
+
+## Status
+
+```text
+PLANNED
+```
+
+## Goal
+
+Introduce temporal rendering infrastructure.
+
+## Systems
+
+```text
+Frame history
+Motion vector pass
+History resource manager
+Temporal resolve pass
+TAAFeature
+```
+
+## Features
+
+```text
+Previous view-projection matrix
+Previous object transform
+Jittered projection
+Motion vector buffer
+TAA
+History color
+History depth
+Temporal accumulation
+```
+
+## AntiAliasing Expansion
+
+Expand:
+
+```cpp
+enum class AntiAliasingMode
+{
+    None,
+    FXAA,
+    TAA
+};
+```
+
+## Completion Criteria
+
+```text
+Renderer stores current and previous frame data.
+Motion vectors render correctly.
+TAA improves image stability.
+History resources are managed safely.
+TAA is implemented as a RenderFeature.
+```
+
+---
+
+# Stage 15 - Advanced Renderer Experiments
+
+## Status
+
+```text
+PLANNED
+```
+
+## Goal
+
+Explore modern and experimental rendering techniques after the renderer architecture is stable.
+
+## Candidate Features
+
+```text
+SSAO / GTAO
+SSR
+Deferred rendering
+Visibility buffer
+GPU-driven rendering
+GPU frustum culling
+GPU occlusion culling
+Indirect draw
+Meshlet rendering
+Mesh shader path
+Ray traced shadows
+Ray traced reflections
+Simple path tracing mode
+Virtual shadow maps
+Virtual texturing
+External upscalers
+Neural rendering experiments
+```
+
+---
+
+## Stage 15A - GPU-driven V0: CPU-generated Indirect Draw
+
+```text
+CPU builds VkDrawIndexedIndirectCommand buffer.
+GPU executes indirect draw.
+No GPU culling yet.
+```
+
+## Stage 15B - GPU-driven V1: GPU Frustum Culling
+
+```text
+Compute shader tests object bounds.
+Visible objects write indirect draw commands.
+Graphics pass executes indirect draw.
+```
+
+## Stage 15C - GPU-driven V2: GPU Draw Count
+
+```text
+Atomic counter / count buffer.
+vkCmdDrawIndexedIndirectCount.
+```
+
+## Stage 15D - GPU-driven V3: Hi-Z Occlusion Culling
+
+```text
+Build depth pyramid.
+Compute shader tests object bounds against Hi-Z.
+Cull hidden objects.
+```
+
+## Stage 15E - Meshlet / Cluster Culling
+
+```text
+meshoptimizer meshlets.
+Cluster bounds.
+Cluster cone culling.
+Compute fallback first.
+Mesh shader path later.
+```
+
+## Stage 15F - External / Neural Features
+
+Use `RenderGraphPassType::External` or `RenderGraphPassType::Compute`.
+
+Candidate features:
+
+```text
+DLSS
+FSR
+XeSS
+Neural denoising
+Neural texture decoding
+Neural material approximation
+Neural radiance cache experiments
+```
+
+Do not introduce these before the renderer has:
+
+```text
+Motion vectors
+Depth
+History resources
+RenderFeature system
+External pass support
+Stable RenderGraph resources
+```
+
+---
+
+# Multithreading Plan
+
+## Stage 0-3
+
+```text
+No real multithreading.
+RenderGraph execution is single-threaded.
+```
+
+## Stage 4.5 - JobSystem V0
+
+Introduce after ShaderSystem is working.
+
+```text
+Worker thread pool
+Submit()
+Wait()
+ParallelFor()
+Used by shader compilation later
+```
+
+Do not implement work stealing or complex task graphs yet.
+
+## Stage 7.5 - Async Asset Loading V0
+
+```text
+Texture decoding
+glTF parsing
+Mesh optimization
+CPU-side asset import on workers
+GPU resource creation stays on render/RHI thread
+```
+
+## Stage 10.5 - Parallel Render Preparation
+
+```text
+Parallel scene extraction
+Parallel CPU frustum culling
+Parallel draw list building
+```
+
+## Stage 12.5+ - RenderGraph Task Scheduling
+
+```text
+Pass preparation tasks
+Parallel command recording
+Async compute groundwork
+```
+
+---
+
+# RenderFeature System Plan
+
+The RenderFeature system should **not** be implemented too early.
+
+## Not in Stage 3
+
+Stage 3 only contains:
+
+```text
+RenderSystem
+RenderGraph V0
+ClearPass
+PresentPass
+RenderSettings initial clear color
+```
+
+Do not implement:
+
+```text
+BloomFeature
+AntiAliasingFeature
+ShadowFeature
+SSAOFeature
+```
+
+## Formal Introduction
+
+RenderFeature should be formally introduced in:
+
+```text
+Stage 9 - HDR + Post-processing + RenderFeature V0
+```
+
+Reason:
+
+```text
+Stage 9 is the first time XEngine has multiple configurable rendering features:
+- Bloom
+- Tonemap
+- FXAA
+- Exposure
+- Color grading
+```
+
+## Future Expansion
+
+```text
+Stage 14:
+  TAAFeature
+
+Stage 15:
+  External upscalers
+  Neural rendering experiments
+  GPU-driven features
+```
+
+---
+
+# Recommended Development Sequence From Now
+
+```text
+1. Stage 4A - ShaderSystem + Slang Integration
+2. Stage 4B - RHIShader / Pipeline / TrianglePass
+3. Stage 4.5 - JobSystem V0
+4. Stage 5 - Basic Mesh Forward Renderer
+5. Stage 6 - Material + Texture + Basic PBR
+6. Stage 7 - glTF Asset + Scene Integration
+7. Stage 7.5 - Async Asset Loading V0
+8. Stage 8 - Lighting + Shadow
+9. Stage 9 - HDR + Post-processing + RenderFeature V0
+10. Stage 10 - GPUScene + RenderQueue
+11. Stage 11 - Bindless Resource Model
+12. Stage 12 - Forward+ / Clustered Lighting
+13. Stage 13 - Editor Base
+14. Stage 14 - Temporal Renderer
+15. Stage 15 - Advanced Renderer Experiments
+```
+
+---
+
+# Immediate Next Step
+
+The next practical stage is:
+
+```text
+Stage 4A - ShaderSystem + Slang Integration
+```
+
+Primary goal:
+
+```text
+Compile Triangle.slang to SPIR-V through XEngine ShaderSystem.
+```
+
+Do not create Vulkan pipeline yet in Stage 4A.
+
+Stage 4B will handle:
+
+```text
+VkShaderModule
+Graphics pipeline
+TrianglePass
+Draw triangle
+```
