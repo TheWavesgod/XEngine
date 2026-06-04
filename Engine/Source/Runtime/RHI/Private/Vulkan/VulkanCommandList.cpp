@@ -1,5 +1,328 @@
 #include "VulkanCommandList.h"
 
+#include "VulkanBuffer.h"
+#include "VulkanPipeline.h"
+#include "VulkanTexture.h"
+
+#include <XEngine/Logging/Log.h>
+
 namespace XEngine
 {
+    namespace
+    {
+        VkPipelineStageFlags GetSourceStage(VkImageLayout layout)
+        {
+            switch (layout)
+            {
+            case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+                return VK_PIPELINE_STAGE_TRANSFER_BIT;
+            case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+                return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            default:
+                return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            }
+        }
+
+        VkAccessFlags GetSourceAccess(VkImageLayout layout)
+        {
+            switch (layout)
+            {
+            case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+                return VK_ACCESS_TRANSFER_WRITE_BIT;
+            case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+                return VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            default:
+                return 0;
+            }
+        }
+    }
+
+    void VulkanCommandList::BeginFrame(
+        VkCommandBuffer commandBuffer,
+            VkImage swapchainImage,
+            VkImageView swapchainImageView,
+            VkExtent2D swapchainExtent,
+            VkImageLayout* swapchainImageLayout,
+            VulkanTexture* depthTexture)
+    {
+        m_CommandBuffer = commandBuffer;
+        m_SwapchainImage = swapchainImage;
+        m_SwapchainImageView = swapchainImageView;
+        m_SwapchainExtent = swapchainExtent;
+        m_SwapchainImageLayout = swapchainImageLayout;
+        m_DepthTexture = depthTexture;
+        m_BoundGraphicsPipeline = nullptr;
+        m_RenderingActive = false;
+    }
+
+    void VulkanCommandList::Reset()
+    {
+        m_CommandBuffer = VK_NULL_HANDLE;
+        m_SwapchainImage = VK_NULL_HANDLE;
+        m_SwapchainImageView = VK_NULL_HANDLE;
+        m_SwapchainExtent = {};
+        m_SwapchainImageLayout = nullptr;
+        m_DepthTexture = nullptr;
+        m_BoundGraphicsPipeline = nullptr;
+        m_RenderingActive = false;
+    }
+
+    void VulkanCommandList::EndRenderingIfActive()
+    {
+        if (!m_RenderingActive || m_CommandBuffer == VK_NULL_HANDLE)
+        {
+            return;
+        }
+
+        vkCmdEndRendering(m_CommandBuffer);
+        m_RenderingActive = false;
+    }
+
+    void VulkanCommandList::SetGraphicsPipeline(RHIPipeline* pipeline)
+    {
+        if (m_CommandBuffer == VK_NULL_HANDLE || pipeline == nullptr)
+        {
+            return;
+        }
+
+        auto* vulkanPipeline = dynamic_cast<VulkanPipeline*>(pipeline);
+        if (vulkanPipeline == nullptr || !vulkanPipeline->IsValid())
+        {
+            XENGINE_LOG_ERROR("Attempted to bind an invalid Vulkan graphics pipeline");
+            return;
+        }
+
+        BeginRenderingIfNeeded();
+        m_BoundGraphicsPipeline = vulkanPipeline;
+        vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->GetHandle());
+    }
+
+    void VulkanCommandList::SetVertexBuffer(RHIBuffer* buffer, u64 offset)
+    {
+        if (m_CommandBuffer == VK_NULL_HANDLE || buffer == nullptr)
+        {
+            return;
+        }
+
+        auto* vulkanBuffer = dynamic_cast<VulkanBuffer*>(buffer);
+        if (vulkanBuffer == nullptr || !vulkanBuffer->IsValid())
+        {
+            XENGINE_LOG_ERROR("Attempted to bind an invalid Vulkan vertex buffer");
+            return;
+        }
+
+        VkBuffer vkBuffer = vulkanBuffer->GetHandle();
+        VkDeviceSize vkOffset = offset;
+        vkCmdBindVertexBuffers(m_CommandBuffer, 0, 1, &vkBuffer, &vkOffset);
+    }
+
+    void VulkanCommandList::SetIndexBuffer(RHIBuffer* buffer, RHIIndexFormat format, u64 offset)
+    {
+        if (m_CommandBuffer == VK_NULL_HANDLE || buffer == nullptr)
+        {
+            return;
+        }
+
+        auto* vulkanBuffer = dynamic_cast<VulkanBuffer*>(buffer);
+        if (vulkanBuffer == nullptr || !vulkanBuffer->IsValid())
+        {
+            XENGINE_LOG_ERROR("Attempted to bind an invalid Vulkan index buffer");
+            return;
+        }
+
+        const VkIndexType indexType = format == RHIIndexFormat::UInt16 ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
+        vkCmdBindIndexBuffer(m_CommandBuffer, vulkanBuffer->GetHandle(), offset, indexType);
+    }
+
+    void VulkanCommandList::PushConstants(ShaderStage, const void* data, std::size_t size, std::size_t offset)
+    {
+        if (m_CommandBuffer == VK_NULL_HANDLE || m_BoundGraphicsPipeline == nullptr || data == nullptr || size == 0)
+        {
+            return;
+        }
+
+        vkCmdPushConstants(
+            m_CommandBuffer,
+            m_BoundGraphicsPipeline->GetLayout(),
+            m_BoundGraphicsPipeline->GetPushConstantStages(),
+            static_cast<u32>(offset),
+            static_cast<u32>(size),
+            data);
+    }
+
+    void VulkanCommandList::Draw(
+        u32 vertexCount,
+        u32 instanceCount,
+        u32 firstVertex,
+        u32 firstInstance)
+    {
+        if (m_CommandBuffer == VK_NULL_HANDLE || m_BoundGraphicsPipeline == nullptr)
+        {
+            return;
+        }
+
+        vkCmdDraw(m_CommandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+    }
+
+    void VulkanCommandList::DrawIndexed(
+        u32 indexCount,
+        u32 instanceCount,
+        u32 firstIndex,
+        i32 vertexOffset,
+        u32 firstInstance)
+    {
+        if (m_CommandBuffer == VK_NULL_HANDLE || m_BoundGraphicsPipeline == nullptr)
+        {
+            return;
+        }
+
+        vkCmdDrawIndexed(m_CommandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+    }
+
+    void VulkanCommandList::BeginRenderingIfNeeded()
+    {
+        if (m_RenderingActive)
+        {
+            return;
+        }
+
+        if (m_CommandBuffer == VK_NULL_HANDLE ||
+            m_SwapchainImage == VK_NULL_HANDLE ||
+            m_SwapchainImageView == VK_NULL_HANDLE ||
+            m_SwapchainImageLayout == nullptr)
+        {
+            return;
+        }
+
+        TransitionSwapchainImage(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        if (m_DepthTexture != nullptr)
+        {
+            TransitionDepthImage(*m_DepthTexture, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        }
+
+        VkRenderingAttachmentInfo colorAttachment {};
+        colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        colorAttachment.imageView = m_SwapchainImageView;
+        colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+        VkRenderingAttachmentInfo depthAttachment {};
+        if (m_DepthTexture != nullptr)
+        {
+            depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            depthAttachment.imageView = m_DepthTexture->GetImageView();
+            depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+            depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            depthAttachment.clearValue.depthStencil = { 1.0f, 0 };
+        }
+
+        VkRenderingInfo renderingInfo {};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        renderingInfo.renderArea.offset = { 0, 0 };
+        renderingInfo.renderArea.extent = m_SwapchainExtent;
+        renderingInfo.layerCount = 1;
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachments = &colorAttachment;
+        renderingInfo.pDepthAttachment = m_DepthTexture != nullptr ? &depthAttachment : nullptr;
+
+        vkCmdBeginRendering(m_CommandBuffer, &renderingInfo);
+        m_RenderingActive = true;
+
+        VkViewport viewport {};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(m_SwapchainExtent.width);
+        viewport.height = static_cast<float>(m_SwapchainExtent.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(m_CommandBuffer, 0, 1, &viewport);
+
+        VkRect2D scissor {};
+        scissor.offset = { 0, 0 };
+        scissor.extent = m_SwapchainExtent;
+        vkCmdSetScissor(m_CommandBuffer, 0, 1, &scissor);
+    }
+
+    void VulkanCommandList::TransitionSwapchainImage(VkImageLayout newLayout)
+    {
+        if (m_SwapchainImageLayout == nullptr || *m_SwapchainImageLayout == newLayout)
+        {
+            return;
+        }
+
+        VkImageSubresourceRange range {};
+        range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        range.baseMipLevel = 0;
+        range.levelCount = 1;
+        range.baseArrayLayer = 0;
+        range.layerCount = 1;
+
+        VkImageMemoryBarrier barrier {};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.srcAccessMask = GetSourceAccess(*m_SwapchainImageLayout);
+        barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        barrier.oldLayout = *m_SwapchainImageLayout;
+        barrier.newLayout = newLayout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = m_SwapchainImage;
+        barrier.subresourceRange = range;
+
+        vkCmdPipelineBarrier(
+            m_CommandBuffer,
+            GetSourceStage(*m_SwapchainImageLayout),
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            0,
+            0,
+            nullptr,
+            0,
+            nullptr,
+            1,
+            &barrier);
+
+        *m_SwapchainImageLayout = newLayout;
+    }
+
+    void VulkanCommandList::TransitionDepthImage(VulkanTexture& texture, VkImageLayout newLayout)
+    {
+        VkImageLayout* layout = texture.GetLayoutPtr();
+        if (layout == nullptr || *layout == newLayout)
+        {
+            return;
+        }
+
+        VkImageSubresourceRange range {};
+        range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        range.baseMipLevel = 0;
+        range.levelCount = 1;
+        range.baseArrayLayer = 0;
+        range.layerCount = 1;
+
+        VkImageMemoryBarrier barrier {};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        barrier.oldLayout = *layout;
+        barrier.newLayout = newLayout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = texture.GetImage();
+        barrier.subresourceRange = range;
+
+        vkCmdPipelineBarrier(
+            m_CommandBuffer,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+            0,
+            0,
+            nullptr,
+            0,
+            nullptr,
+            1,
+            &barrier);
+
+        *layout = newLayout;
+    }
 }

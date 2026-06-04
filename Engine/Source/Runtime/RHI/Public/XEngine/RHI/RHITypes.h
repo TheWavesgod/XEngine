@@ -25,7 +25,16 @@ namespace XEngine
         BGRA8Unorm,
         RGBA8Unorm,
         RGBA16Float,
-        D32Float
+        D32Float,
+        R32G32Float,
+        R32G32B32Float,
+        R32G32B32A32Float
+    };
+
+    enum class RHIIndexFormat
+    {
+        UInt16,
+        UInt32
     };
 
     struct RHIColor

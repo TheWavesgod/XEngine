@@ -4,13 +4,17 @@
 #include <XEngine/RHI/RHIDevice.h>
 
 #include "VulkanAllocator.h"
+#include "VulkanCommandList.h"
 #include "VulkanFrameResources.h"
 #include "VulkanInstance.h"
 #include "VulkanQueue.h"
 #include "VulkanSurface.h"
 #include "VulkanSwapchain.h"
+#include "VulkanTexture.h"
 
 #include <volk.h>
+
+#include <memory>
 
 namespace XEngine
 {
@@ -34,15 +38,24 @@ namespace XEngine
 
         RHIBackend GetBackend() const override;
         bool IsValid() const override;
-        void BeginFrame() override;
+        RHICommandList* BeginFrame() override;
         void ClearSwapchain(const RHIColor& color) override;
         void EndFrame() override;
         void RequestResize(u32 width, u32 height) override;
+        std::shared_ptr<RHIShader> CreateShader(const RHIShaderDesc& desc) override;
+        std::shared_ptr<RHIBuffer> CreateBuffer(
+            const RHIBufferDesc& desc,
+            const void* initialData,
+            std::size_t initialDataSize) override;
+        std::shared_ptr<RHIPipeline> CreateGraphicsPipeline(const RHIGraphicsPipelineDesc& desc) override;
+        RHIFormat GetSwapchainFormat() const override;
         void WaitIdle() override;
 
     private:
         bool PickPhysicalDevice();
         bool CreateLogicalDevice();
+        bool CreateDepthTexture();
+        void DestroyDepthTexture();
         void RecreateSwapchain(u32 width, u32 height);
 
         VulkanInstance m_Instance;
@@ -50,6 +63,8 @@ namespace XEngine
         VulkanAllocator m_Allocator;
         VulkanSwapchain m_Swapchain;
         VulkanFrameResources m_FrameResources;
+        VulkanCommandList m_CommandList;
+        std::unique_ptr<VulkanTexture> m_DepthTexture;
 
         VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
         VkDevice m_Device = VK_NULL_HANDLE;
@@ -61,6 +76,7 @@ namespace XEngine
         u32 m_CurrentImageIndex = 0;
         u32 m_PendingResizeWidth = 0;
         u32 m_PendingResizeHeight = 0;
+        VkImageLayout m_CurrentSwapchainImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         bool m_EnableVSync = true;
         bool m_FrameActive = false;
         bool m_ResizeRequested = false;

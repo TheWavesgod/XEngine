@@ -19,6 +19,22 @@ namespace XEngine
         constexpr const char* SlangcExecutable = "";
 #endif
 
+#if defined(XENGINE_SOURCE_DIR)
+        constexpr const char* SourceDirectory = XENGINE_SOURCE_DIR;
+#else
+        constexpr const char* SourceDirectory = "";
+#endif
+
+        std::filesystem::path GetSourceRoot()
+        {
+            if (std::string(SourceDirectory).empty())
+            {
+                return std::filesystem::current_path();
+            }
+
+            return std::filesystem::path(SourceDirectory);
+        }
+
         const char* GetStageName(ShaderStage stage)
         {
             switch (stage)
@@ -108,7 +124,7 @@ namespace XEngine
         std::filesystem::path inputPath(desc.Path);
         if (!inputPath.is_absolute())
         {
-            inputPath = std::filesystem::current_path() / inputPath;
+            inputPath = GetSourceRoot() / inputPath;
         }
         inputPath = std::filesystem::weakly_canonical(inputPath);
 
@@ -119,7 +135,7 @@ namespace XEngine
             return shader;
         }
 
-        std::filesystem::path outputDirectory = std::filesystem::current_path() / "Build/Generated/Shaders/Vulkan";
+        std::filesystem::path outputDirectory = GetSourceRoot() / "Build/Generated/Shaders/Vulkan";
         std::filesystem::create_directories(outputDirectory);
 
         std::filesystem::path outputPath = outputDirectory /

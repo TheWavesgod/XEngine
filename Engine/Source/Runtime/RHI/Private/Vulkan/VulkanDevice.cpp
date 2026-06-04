@@ -1,5 +1,8 @@
 #include "VulkanDevice.h"
 
+#include "VulkanBuffer.h"
+#include "VulkanPipeline.h"
+#include "VulkanShader.h"
 #include "VulkanUtils.h"
 
 #include <XEngine/Logging/Log.h>
@@ -169,6 +172,11 @@ namespace XEngine
             return false;
         }
 
+        if (!CreateDepthTexture())
+        {
+            return false;
+        }
+
         if (!m_FrameResources.Create(m_Device, m_GraphicsFamilyIndex, m_Swapchain.GetImageCount()))
         {
             return false;
@@ -187,6 +195,7 @@ namespace XEngine
 
         WaitIdle();
 
+        DestroyDepthTexture();
         m_FrameResources.Destroy();
         m_Swapchain.Destroy();
         m_Allocator.Destroy();
@@ -206,6 +215,7 @@ namespace XEngine
         m_PresentQueue = VulkanQueue {};
         m_CurrentImageIndex = 0;
         m_FrameActive = false;
+        m_CommandList.Reset();
         m_ResizeRequested = false;
         m_PendingResizeWidth = 0;
         m_PendingResizeHeight = 0;
@@ -222,33 +232,34 @@ namespace XEngine
         return m_Initialized && m_Device != VK_NULL_HANDLE;
     }
 
-    void VulkanDevice::BeginFrame()
+    RHICommandList* VulkanDevice::BeginFrame()
     {
         m_FrameActive = false;
+        m_CommandList.Reset();
 
         if (!IsValid())
         {
-            return;
+            return nullptr;
         }
 
         if (m_ResizeRequested)
         {
             if (m_PendingResizeWidth == 0 || m_PendingResizeHeight == 0)
             {
-                return;
+                return nullptr;
             }
 
             RecreateSwapchain(m_PendingResizeWidth, m_PendingResizeHeight);
             if (m_ResizeRequested)
             {
-                return;
+                return nullptr;
             }
         }
 
         const VkExtent2D extent = m_Swapchain.GetExtent();
         if (extent.width == 0 || extent.height == 0)
         {
-            return;
+            return nullptr;
         }
 
         VkFence inFlightFence = m_FrameResources.GetInFlightFence();
@@ -266,7 +277,7 @@ namespace XEngine
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
         {
             m_ResizeRequested = true;
-            return;
+            return nullptr;
         }
 
         if (result != VK_SUCCESS)
@@ -274,7 +285,7 @@ namespace XEngine
             std::string message = "Failed to acquire Vulkan swapchain image: ";
             message += VulkanResultToString(result);
             XENGINE_LOG_ERROR(message);
-            return;
+            return nullptr;
         }
 
         XENGINE_VK_CHECK(vkResetFences(m_Device, 1, &inFlightFence));
@@ -285,7 +296,18 @@ namespace XEngine
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
         XENGINE_VK_CHECK(vkBeginCommandBuffer(m_FrameResources.GetCommandBuffer(), &beginInfo));
+        m_CurrentSwapchainImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         m_FrameActive = true;
+
+        m_CommandList.BeginFrame(
+            m_FrameResources.GetCommandBuffer(),
+            m_Swapchain.GetImage(m_CurrentImageIndex),
+            m_Swapchain.GetImageView(m_CurrentImageIndex),
+            m_Swapchain.GetExtent(),
+            &m_CurrentSwapchainImageLayout,
+            m_DepthTexture.get());
+
+        return &m_CommandList;
     }
 
     void VulkanDevice::ClearSwapchain(const RHIColor& color)
@@ -309,7 +331,7 @@ namespace XEngine
         toTransferBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         toTransferBarrier.srcAccessMask = 0;
         toTransferBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        toTransferBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        toTransferBarrier.oldLayout = m_CurrentSwapchainImageLayout;
         toTransferBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         toTransferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         toTransferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -335,29 +357,7 @@ namespace XEngine
         clearValue.float32[3] = color.A;
 
         vkCmdClearColorImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearValue, 1, &range);
-
-        VkImageMemoryBarrier toPresentBarrier {};
-        toPresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        toPresentBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        toPresentBarrier.dstAccessMask = 0;
-        toPresentBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        toPresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        toPresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        toPresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        toPresentBarrier.image = image;
-        toPresentBarrier.subresourceRange = range;
-
-        vkCmdPipelineBarrier(
-            commandBuffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-            0,
-            0,
-            nullptr,
-            0,
-            nullptr,
-            1,
-            &toPresentBarrier);
+        m_CurrentSwapchainImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     }
 
     void VulkanDevice::EndFrame()
@@ -368,11 +368,61 @@ namespace XEngine
         }
 
         VkCommandBuffer commandBuffer = m_FrameResources.GetCommandBuffer();
+        m_CommandList.EndRenderingIfActive();
+
+        if (m_CurrentSwapchainImageLayout != VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+        {
+            VkImageSubresourceRange range {};
+            range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            range.baseMipLevel = 0;
+            range.levelCount = 1;
+            range.baseArrayLayer = 0;
+            range.layerCount = 1;
+
+            VkAccessFlags srcAccessMask = 0;
+            VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            if (m_CurrentSwapchainImageLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+            {
+                srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            }
+            else if (m_CurrentSwapchainImageLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+            {
+                srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            }
+
+            VkImageMemoryBarrier toPresentBarrier {};
+            toPresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            toPresentBarrier.srcAccessMask = srcAccessMask;
+            toPresentBarrier.dstAccessMask = 0;
+            toPresentBarrier.oldLayout = m_CurrentSwapchainImageLayout;
+            toPresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            toPresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            toPresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            toPresentBarrier.image = m_Swapchain.GetImage(m_CurrentImageIndex);
+            toPresentBarrier.subresourceRange = range;
+
+            vkCmdPipelineBarrier(
+                commandBuffer,
+                srcStage,
+                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                0,
+                0,
+                nullptr,
+                0,
+                nullptr,
+                1,
+                &toPresentBarrier);
+
+            m_CurrentSwapchainImageLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        }
+
         XENGINE_VK_CHECK(vkEndCommandBuffer(commandBuffer));
 
         VkSemaphore imageAvailableSemaphore = m_FrameResources.GetImageAvailableSemaphore();
         VkSemaphore renderFinishedSemaphore = m_FrameResources.GetRenderFinishedSemaphore(m_CurrentImageIndex);
-        VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 
         VkSubmitInfo submitInfo {};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -409,6 +459,7 @@ namespace XEngine
         }
 
         m_FrameActive = false;
+        m_CommandList.Reset();
     }
 
     void VulkanDevice::RequestResize(u32 width, u32 height)
@@ -424,6 +475,48 @@ namespace XEngine
         XENGINE_LOG_INFO(message);
     }
 
+    std::shared_ptr<RHIShader> VulkanDevice::CreateShader(const RHIShaderDesc& desc)
+    {
+        auto vulkanShader = std::make_shared<VulkanShader>(m_Device, desc);
+        if (!vulkanShader->IsValid())
+        {
+            return nullptr;
+        }
+
+        std::shared_ptr<RHIShader> shader = vulkanShader;
+        return shader;
+    }
+
+    std::shared_ptr<RHIBuffer> VulkanDevice::CreateBuffer(
+        const RHIBufferDesc& desc,
+        const void* initialData,
+        std::size_t initialDataSize)
+    {
+        auto buffer = std::make_shared<VulkanBuffer>(m_Allocator.GetHandle(), desc, initialData, initialDataSize);
+        if (!buffer->IsValid())
+        {
+            return nullptr;
+        }
+
+        return buffer;
+    }
+
+    std::shared_ptr<RHIPipeline> VulkanDevice::CreateGraphicsPipeline(const RHIGraphicsPipelineDesc& desc)
+    {
+        auto pipeline = std::make_shared<VulkanPipeline>(m_Device, desc);
+        if (!pipeline->IsValid())
+        {
+            return nullptr;
+        }
+
+        return pipeline;
+    }
+
+    RHIFormat VulkanDevice::GetSwapchainFormat() const
+    {
+        return VulkanFormatToRHIFormat(m_Swapchain.GetImageFormat());
+    }
+
     void VulkanDevice::WaitIdle()
     {
         if (m_Device == VK_NULL_HANDLE)
@@ -432,6 +525,36 @@ namespace XEngine
         }
 
         vkDeviceWaitIdle(m_Device);
+    }
+
+    bool VulkanDevice::CreateDepthTexture()
+    {
+        const VkExtent2D extent = m_Swapchain.GetExtent();
+        if (extent.width == 0 || extent.height == 0)
+        {
+            return false;
+        }
+
+        RHITextureDesc desc;
+        desc.Width = extent.width;
+        desc.Height = extent.height;
+        desc.Format = RHIFormat::D32Float;
+        desc.Usage = RHITextureUsage::DepthStencil;
+        desc.DebugName = "Swapchain depth";
+
+        auto depthTexture = std::make_unique<VulkanTexture>(m_Device, m_Allocator.GetHandle(), desc);
+        if (!depthTexture->IsValid())
+        {
+            return false;
+        }
+
+        m_DepthTexture = std::move(depthTexture);
+        return true;
+    }
+
+    void VulkanDevice::DestroyDepthTexture()
+    {
+        m_DepthTexture.reset();
     }
 
     void VulkanDevice::RecreateSwapchain(u32 width, u32 height)
@@ -448,6 +571,7 @@ namespace XEngine
         XENGINE_LOG_INFO(message);
 
         vkDeviceWaitIdle(m_Device);
+        DestroyDepthTexture();
 
         VulkanSwapchainCreateInfo swapchainCreateInfo;
         swapchainCreateInfo.PhysicalDevice = m_PhysicalDevice;
@@ -461,6 +585,12 @@ namespace XEngine
 
         if (m_Swapchain.Recreate(swapchainCreateInfo))
         {
+            if (!CreateDepthTexture())
+            {
+                m_ResizeRequested = true;
+                return;
+            }
+
             if (m_FrameResources.GetRenderFinishedSemaphoreCount() != m_Swapchain.GetImageCount())
             {
                 m_FrameResources.Destroy();
@@ -557,8 +687,18 @@ namespace XEngine
 
         VkPhysicalDeviceFeatures features {};
 
+        VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures {};
+        dynamicRenderingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+        dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
+
+        VkPhysicalDeviceShaderDrawParametersFeatures shaderDrawParametersFeatures {};
+        shaderDrawParametersFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES;
+        shaderDrawParametersFeatures.pNext = &dynamicRenderingFeatures;
+        shaderDrawParametersFeatures.shaderDrawParameters = VK_TRUE;
+
         VkDeviceCreateInfo createInfo {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        createInfo.pNext = &shaderDrawParametersFeatures;
         createInfo.queueCreateInfoCount = static_cast<u32>(queueCreateInfos.size());
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
         createInfo.enabledExtensionCount = 1;

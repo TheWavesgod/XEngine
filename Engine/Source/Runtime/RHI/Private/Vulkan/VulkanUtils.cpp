@@ -38,4 +38,50 @@ namespace XEngine
             return "VK_UNKNOWN";
         }
     }
+
+    VkFormat RHIFormatToVulkanFormat(RHIFormat format)
+    {
+        switch (format)
+        {
+        case RHIFormat::BGRA8Unorm:
+            return VK_FORMAT_B8G8R8A8_UNORM;
+        case RHIFormat::RGBA8Unorm:
+            return VK_FORMAT_R8G8B8A8_UNORM;
+        case RHIFormat::RGBA16Float:
+            return VK_FORMAT_R16G16B16A16_SFLOAT;
+        case RHIFormat::D32Float:
+            return VK_FORMAT_D32_SFLOAT;
+        case RHIFormat::R32G32Float:
+            return VK_FORMAT_R32G32_SFLOAT;
+        case RHIFormat::R32G32B32Float:
+            return VK_FORMAT_R32G32B32_SFLOAT;
+        case RHIFormat::R32G32B32A32Float:
+            return VK_FORMAT_R32G32B32A32_SFLOAT;
+        default:
+            return VK_FORMAT_UNDEFINED;
+        }
+    }
+
+    RHIFormat VulkanFormatToRHIFormat(VkFormat format)
+    {
+        switch (format)
+        {
+        case VK_FORMAT_B8G8R8A8_UNORM:
+            return RHIFormat::BGRA8Unorm;
+        case VK_FORMAT_R8G8B8A8_UNORM:
+            return RHIFormat::RGBA8Unorm;
+        case VK_FORMAT_R16G16B16A16_SFLOAT:
+            return RHIFormat::RGBA16Float;
+        case VK_FORMAT_D32_SFLOAT:
+            return RHIFormat::D32Float;
+        case VK_FORMAT_R32G32_SFLOAT:
+            return RHIFormat::R32G32Float;
+        case VK_FORMAT_R32G32B32_SFLOAT:
+            return RHIFormat::R32G32B32Float;
+        case VK_FORMAT_R32G32B32A32_SFLOAT:
+            return RHIFormat::R32G32B32A32Float;
+        default:
+            return RHIFormat::Undefined;
+        }
+    }
 }

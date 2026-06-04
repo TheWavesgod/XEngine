@@ -2,6 +2,7 @@
 
 #include <XEngine/Core/Assert.h>
 #include <XEngine/Logging/Log.h>
+#include <XEngine/RHI/RHITypes.h>
 
 #include <volk.h>
 
@@ -10,6 +11,8 @@
 namespace XEngine
 {
     const char* VulkanResultToString(VkResult result);
+    VkFormat RHIFormatToVulkanFormat(RHIFormat format);
+    RHIFormat VulkanFormatToRHIFormat(VkFormat format);
 }
 
 #define XENGINE_VK_CHECK(expression)                                                                      \

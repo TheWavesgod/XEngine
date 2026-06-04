@@ -5,8 +5,9 @@
 
 namespace XEngine
 {
-    RenderGraphContext::RenderGraphContext(RHIDevice& device)
+    RenderGraphContext::RenderGraphContext(RHIDevice& device, RHICommandList* commandList)
         : m_Device(&device)
+        , m_CommandList(commandList)
     {
     }
 
@@ -14,5 +15,10 @@ namespace XEngine
     {
         XENGINE_ASSERT(m_Device != nullptr, "RenderGraphContext requires a valid RHIDevice");
         return *m_Device;
+    }
+
+    RHICommandList* RenderGraphContext::GetCommandList()
+    {
+        return m_CommandList;
     }
 }

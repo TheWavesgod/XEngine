@@ -56,7 +56,7 @@ Stage 2B-1 does not render.
 Stage 2B-1 does not clear the screen.
 Swapchain and clear screen are planned for Stage 2B-2.
 
-Stage 4A adds:
+Stage 4 - ShaderSystem + Slang + Triangle adds:
 - ShaderSystem subsystem
 - Online shader compilation
 - XENGINE_ENABLE_SHADER_COMPILER option
@@ -66,13 +66,32 @@ Stage 4A adds:
 - ShaderReflection placeholder
 - Triangle.slang sample shader
 - SPIR-V compilation validation
+- RHIShader
+- RHIPipeline
+- VulkanShader
+- VulkanPipeline
+- RHICommandList minimal draw API
+- TrianglePass
+- First triangle rendering
 
-Stage 4A uses a private slangc fallback because the local Slang source snapshot does not provide a complete buildable CMake dependency set.
-Stage 4A does not create Vulkan shader modules.
-Stage 4A does not create graphics pipelines.
-Stage 4A does not draw a triangle yet.
-Stage 4B will create RHIShader / RHIPipeline and TrianglePass.
+Stage 4 uses a private slangc fallback because the local Slang source snapshot does not provide a complete buildable CMake dependency set.
 Future release/runtime builds may disable online shader compilation and load precompiled shader outputs instead.
+
+Stage 5 - Engine CMake Modularization + Basic Mesh Forward Renderer adds:
+- Modular Engine CMake targets
+- Foundation / Engine / Platform / Shader / RHI / Renderer module CMake files
+- RHI buffer abstraction for vertex and index data
+- Vulkan CPU-visible buffer allocation through VMA
+- Depth texture creation and dynamic rendering depth attachment
+- Vertex input layout support
+- Index buffer binding and indexed draw commands
+- Push constants for per-object MVP data
+- Hardcoded indexed cube mesh
+- MeshForward.slang
+- ForwardMeshPass
+- Default RenderGraph order: ClearPass -> ForwardMeshPass -> PresentPass
+
+Stage 5 does not implement glTF loading, material systems, texture sampling, PBR, ECS, ImGui, RenderFeature, GPU-driven rendering, or descriptor-based per-material resources.
 
 Stage 2B-2 adds:
 - Vulkan swapchain creation

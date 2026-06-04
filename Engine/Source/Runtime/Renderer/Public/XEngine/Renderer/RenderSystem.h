@@ -1,10 +1,16 @@
 #pragma once
 
 #include <XEngine/Engine/Subsystem.h>
+#include <XEngine/Math/Matrix.h>
+
+#include <memory>
 
 namespace XEngine
 {
+    class RHIPipeline;
+    class RHIShader;
     class RHISystem;
+    class StaticMesh;
 
     class RenderSystem final : public ISubsystem
     {
@@ -20,6 +26,15 @@ namespace XEngine
         void Render();
 
         RHISystem* m_RHISystem = nullptr;
+        std::unique_ptr<StaticMesh> m_CubeMesh;
+        std::shared_ptr<RHIShader> m_TriangleVertexShader;
+        std::shared_ptr<RHIShader> m_TriangleFragmentShader;
+        std::shared_ptr<RHIPipeline> m_TrianglePipeline;
+        std::shared_ptr<RHIShader> m_MeshVertexShader;
+        std::shared_ptr<RHIShader> m_MeshFragmentShader;
+        std::shared_ptr<RHIPipeline> m_MeshPipeline;
+        Matrix4 m_Model {};
+        Matrix4 m_ModelViewProjection {};
         bool m_Initialized = false;
     };
 }

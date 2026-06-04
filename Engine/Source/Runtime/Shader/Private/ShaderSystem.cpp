@@ -30,50 +30,6 @@ namespace XEngine
             XENGINE_LOG_ERROR("Shader compiler is unavailable");
             return;
         }
-
-        ShaderCompileDesc vertexDesc;
-        vertexDesc.Path = "Engine/Shaders/Passes/Triangle.slang";
-        vertexDesc.EntryPoint = "vertexMain";
-        vertexDesc.Stage = ShaderStage::Vertex;
-        vertexDesc.Target = ShaderTarget::VulkanSPIRV;
-        vertexDesc.GenerateDebugInfo = true;
-        vertexDesc.EnableOptimization = false;
-
-        CompiledShader vertexShader = m_Compiler->Compile(vertexDesc);
-        if (!vertexShader.IsValid())
-        {
-            XENGINE_LOG_ERROR(vertexShader.Diagnostics.empty() ? "Triangle vertex shader compilation failed" :
-                                                                  vertexShader.Diagnostics);
-            XENGINE_ASSERT(false, "Triangle vertex shader compilation failed");
-            return;
-        }
-
-        std::string vertexMessage = "Compiled Triangle vertex shader: ";
-        vertexMessage += std::to_string(vertexShader.Bytecode.size());
-        vertexMessage += " bytes";
-        XENGINE_LOG_INFO(vertexMessage);
-
-        ShaderCompileDesc fragmentDesc;
-        fragmentDesc.Path = "Engine/Shaders/Passes/Triangle.slang";
-        fragmentDesc.EntryPoint = "fragmentMain";
-        fragmentDesc.Stage = ShaderStage::Fragment;
-        fragmentDesc.Target = ShaderTarget::VulkanSPIRV;
-        fragmentDesc.GenerateDebugInfo = true;
-        fragmentDesc.EnableOptimization = false;
-
-        CompiledShader fragmentShader = m_Compiler->Compile(fragmentDesc);
-        if (!fragmentShader.IsValid())
-        {
-            XENGINE_LOG_ERROR(fragmentShader.Diagnostics.empty() ? "Triangle fragment shader compilation failed" :
-                                                                    fragmentShader.Diagnostics);
-            XENGINE_ASSERT(false, "Triangle fragment shader compilation failed");
-            return;
-        }
-
-        std::string fragmentMessage = "Compiled Triangle fragment shader: ";
-        fragmentMessage += std::to_string(fragmentShader.Bytecode.size());
-        fragmentMessage += " bytes";
-        XENGINE_LOG_INFO(fragmentMessage);
 #else
         XENGINE_LOG_WARN("Runtime shader compiler is disabled");
 #endif
