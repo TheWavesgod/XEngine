@@ -119,6 +119,35 @@ if(XENGINE_ENABLE_VULKAN)
     endif()
 endif()
 
+if(XENGINE_ENABLE_SHADER_COMPILER)
+    target_compile_definitions(XEngineRuntime
+        PRIVATE
+            XENGINE_ENABLE_SHADER_COMPILER
+    )
+
+    target_include_directories(XEngineRuntime
+        PRIVATE
+            ${CMAKE_SOURCE_DIR}/ThirdParty/slang/include
+    )
+
+    if(XENGINE_SLANGC_EXECUTABLE)
+        target_compile_definitions(XEngineRuntime
+            PRIVATE
+                XENGINE_SLANGC_EXECUTABLE="${XENGINE_SLANGC_EXECUTABLE}"
+        )
+    endif()
+
+    if(TARGET slang)
+        target_link_libraries(XEngineRuntime PRIVATE slang)
+    elseif(TARGET slang::slang)
+        target_link_libraries(XEngineRuntime PRIVATE slang::slang)
+    elseif(TARGET Slang::slang)
+        target_link_libraries(XEngineRuntime PRIVATE Slang::slang)
+    else()
+        message(STATUS "No Slang library target found. Using private slangc fallback for Stage 4A.")
+    endif()
+endif()
+
 if(XENGINE_ENABLE_EDITOR)
     file(GLOB_RECURSE XENGINE_EDITOR_SOURCES CONFIGURE_DEPENDS
         Source/Editor/*.h

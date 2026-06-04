@@ -6,6 +6,7 @@
 #include <XEngine/Platform/PlatformSystem.h>
 #include <XEngine/RHI/RHISystem.h>
 #include <XEngine/Renderer/RenderSystem.h>
+#include <XEngine/Shader/ShaderSystem.h>
 
 #include <string>
 
@@ -42,6 +43,11 @@ namespace XEngine
         if (m_Config.CreateMainWindow)
         {
             m_SubsystemManager.AddSubsystem<PlatformSystem>();
+        }
+
+        if (m_Config.EnableShaderCompiler)
+        {
+            m_SubsystemManager.AddSubsystem<ShaderSystem>();
         }
 
         if (m_Config.CreateGraphicsDevice)

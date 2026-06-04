@@ -1,4 +1,4 @@
-﻿# XEngine Stage 3 Prompt - RenderSystem + Linear RenderGraph V0
+﻿# XEngine Stage 4A Prompt - ShaderSystem + Slang Online Compilation
 
 ## Role
 
@@ -34,123 +34,246 @@ Stage 2A:
 - Vulkan backend skeleton
 
 Stage 2B-1:
-- volk loader initialization
-- VkInstance creation
+- Vulkan instance
 - Vulkan debug messenger
-- VkSurfaceKHR creation from SDL window
-- VkPhysicalDevice selection
-- VkDevice creation
+- SDL Vulkan surface
+- physical device selection
+- logical device
 - graphics / present queues
-- VmaAllocator creation
-- RHISystem observes WindowResize events
+- VMA allocator
 
 Stage 2B-2:
-- Vulkan swapchain creation
+- Vulkan swapchain
 - swapchain image views
-- one-frame command resources
-- vkCmdClearColorImage-based clear
-- queue submit
+- command buffer
+- sync objects
+- vkCmdClearColorImage
 - present
-- basic resize / out-of-date handling
+- basic resize handling
+
+Stage 3:
+- RenderSystem subsystem
+- Linear RenderGraph V0
+- ClearPass
+- PresentPass placeholder
+- RenderSettings initial version
 ```
 
-Your task is to implement **Stage 3: RenderSystem + Linear RenderGraph V0**.
+Your task is to implement **Stage 4A: ShaderSystem + Slang Online Compilation**.
 
-This stage moves clear-frame execution out of `RHISystem` and into `RenderSystem + RenderGraph`.
+This stage should integrate Slang as XEngine's primary shader compiler and compile `.slang` shader source files into SPIR-V at runtime during development.
 
-Do not implement Slang, shaders, graphics pipeline, triangle rendering, render pass, framebuffer, dynamic rendering, depth buffer, vertex/index buffers, descriptors, textures, ImGui, Scene, Asset loading, GPU-driven rendering, or a full event system.
+Do **not** implement Vulkan shader modules, graphics pipelines, TrianglePass, draw calls, render pass, framebuffer, dynamic rendering, descriptors, vertex buffers, textures, materials, Scene, Asset loading, ImGui, JobSystem, RenderFeature system, shader hot reload, or offline shader packaging yet.
 
 ---
 
-# Stage 3 Goal
+# Stage 4A Goal
 
 After this stage:
 
 ```text
-Engine registers:
-  PlatformSystem
-  RHISystem
-  RenderSystem
-
-RHISystem:
-  Owns RHI device lifecycle
-  Observes resize events
-  Forwards resize requests to RHIDevice
-  Does not directly clear/present every frame
-
-RenderSystem:
-  Owns frame rendering at a high level
-  Builds a linear RenderGraph every frame
-  Calls RHIDevice::BeginFrame()
-  Executes RenderGraph
-  Calls RHIDevice::EndFrame()
-
-RenderGraph V0:
-  Is a linear named pass list
-  Supports AddPass / Clear / Compile / Execute
-  Supports pass types:
-    Graphics
-    Compute
-    Transfer
-    Present
-    External
-
-ClearPass:
-  Calls RHIDevice::ClearSwapchain()
-
-PresentPass:
-  Exists as a placeholder pass
-  Actual present is still performed by RHIDevice::EndFrame()
+XEngine has a ShaderSystem subsystem.
+ShaderSystem performs online shader compilation when XENGINE_ENABLE_SHADER_COMPILER=ON.
+Slang is integrated as a private implementation detail.
+ShaderSystem can compile Engine/Shaders/Passes/Triangle.slang to SPIR-V.
+ShaderSystem public headers expose only XEngine-owned types.
+No Slang type appears in public XEngine headers.
+No RHI or Vulkan backend code includes Slang.
+No Vulkan shader module is created yet.
+No graphics pipeline is created yet.
+No triangle is drawn yet.
+The existing Stage 3 clear-frame behavior still works.
 ```
 
-The window should still clear to a fixed color every frame.
+The goal is to validate this chain:
 
-This stage is about **frame organization**, not visual features.
+```text
+ShaderSystem
+  -> SlangCompiler
+  -> Triangle.slang
+  -> SPIR-V bytecode
+  -> CompiledShader
+```
+
+Stage 4B will later consume the compiled SPIR-V to create:
+
+```text
+RHIShader
+VkShaderModule
+RHIPipeline
+TrianglePass
+```
 
 ---
 
 # Important Architecture Decisions
 
-Follow these decisions strictly:
+Follow these strictly:
 
 ```text
-1. Stage 3 is not a shader or triangle stage.
-2. Stage 3 is not a full renderer feature stage.
-3. RenderSystem becomes responsible for frame rendering.
-4. RHISystem stops doing per-frame clear/present work.
-5. RenderGraph V0 is linear, not a full DAG.
-6. RenderGraph V0 does not do resource dependency analysis.
-7. RenderGraph V0 does not do resource aliasing.
-8. RenderGraph V0 does not do automatic barriers.
-9. RenderGraph V0 does not do async compute.
-10. RenderGraph V0 execution is single-threaded.
-11. RenderGraphPassType should reserve future categories:
-    - Graphics
-    - Compute
-    - Transfer
-    - Present
-    - External
-12. Do not create a NeuralPass class.
-13. Future neural rendering features should later be represented as Compute or External passes.
-14. Do not implement JobSystem or RenderGraph task scheduling.
-15. Do not expose Vulkan types in Renderer public headers.
+1. ShaderSystem is a subsystem.
+2. ShaderSystem is CPU-side and initializes before RHISystem / RenderSystem.
+3. Slang is private to Runtime/Shader/Private/Slang.
+4. Public Shader headers must not expose Slang types.
+5. RHI must not know Slang.
+6. RenderSystem must not directly call Slang.
+7. Stage 4A performs online shader compilation only.
+8. Stage 4A does not create RHIShader.
+9. Stage 4A does not create VkShaderModule.
+10. Stage 4A does not create graphics pipelines.
+11. Stage 4A does not draw a triangle.
+12. ShaderStage must include Compute for future Forward+ / GPU-driven rendering.
+13. ShaderTarget must include VulkanSPIRV, D3D12DXIL, MetalMSL for future backends.
+14. CompiledShader must support both binary and text outputs.
+15. Reflection structures should exist, but reflection can be minimal or empty in Stage 4A.
+16. Do not introduce JobSystem yet.
+17. Shader compilation is synchronous in Stage 4A.
+18. Do not introduce shader hot reload yet.
+19. Do not introduce shader permutation system yet.
+20. Do not introduce persistent shader cache yet.
 ```
 
 ---
 
-# CMake Requirement Reminder
+# Online vs Offline Shader Compilation Policy
 
-Keep the dependency ownership clean.
+Stage 4A uses **online shader compilation**.
 
-`find_package(Vulkan REQUIRED)` must remain in:
+Online compilation means:
 
 ```text
-Engine/CMakeLists.txt
+.slang source
+  -> ShaderSystem
+  -> Slang compiler library
+  -> SPIR-V / DXIL / MSL
+  -> CompiledShader
 ```
 
-Do **not** move it to root `CMakeLists.txt`.
+Online shader compilation requires Slang as a runtime dependency.
 
-Root `CMakeLists.txt` should only contain:
+For Stage 4A:
+
+```text
+XENGINE_ENABLE_SHADER_COMPILER = ON
+XEngineRuntime privately links Slang
+ShaderSystem compiles Triangle.slang online
+```
+
+Future release/runtime direction:
+
+```text
+Development / Editor builds:
+  XENGINE_ENABLE_SHADER_COMPILER=ON
+  Runtime or Editor can compile shaders online through Slang.
+
+Release / packaged builds:
+  XENGINE_ENABLE_SHADER_COMPILER=OFF
+  Runtime should not link Slang.
+  Runtime should load precompiled shader outputs instead.
+```
+
+Offline shader compilation will be implemented later through:
+
+```text
+Tools/ShaderCompiler
+```
+
+Future offline outputs may look like:
+
+```text
+Build/Generated/Shaders/Vulkan/Triangle.vertex.spv
+Build/Generated/Shaders/Vulkan/Triangle.fragment.spv
+
+Build/Generated/Shaders/D3D12/Triangle.vertex.dxil
+Build/Generated/Shaders/D3D12/Triangle.fragment.dxil
+
+Build/Generated/Shaders/Metal/Triangle.vertex.msl
+Build/Generated/Shaders/Metal/Triangle.fragment.msl
+```
+
+Do not implement offline shader compiler in Stage 4A.
+
+Do not implement precompiled shader loading in Stage 4A.
+
+---
+
+# Slang Dependency Policy
+
+Use this expected layout:
+
+```text
+ThirdParty/
+  slang/
+```
+
+The Slang source code is manually copied/downloaded into `ThirdParty/slang`.
+
+Because dependency libraries are downloaded directly as source code, before integrating/building them, remove unnecessary files where safe, such as examples, tests, docs, CI files, and extra samples. Do **not** remove license files, CMake files, include folders, source folders, binaries/tools required by Slang, or files required for the dependency to build.
+
+Do not fetch Slang automatically.
+
+Do not use package managers.
+
+Do not use `find_package(Slang)`.
+
+Do not expose Slang as a public dependency.
+
+Preferred dependency flow:
+
+```text
+ThirdParty/slang
+  -> Slang compiler library / slangc tool
+  -> XEngineRuntime PRIVATE dependency when XENGINE_ENABLE_SHADER_COMPILER=ON
+  -> Runtime/Shader/Private/Slang
+```
+
+If the vendored Slang CMake exports usable library targets, link them privately to `XEngineRuntime`.
+
+If Slang target names differ locally, adapt cleanly and leave comments.
+
+If direct Slang C++ API integration is not immediately possible with the local source layout, implement a temporary `slangc` command-line fallback inside `SlangCompiler.cpp`, but keep the public ShaderSystem API unchanged.
+
+The fallback must be clearly marked with:
+
+```text
+TODO: Replace slangc fallback with Slang C++ API integration.
+```
+
+---
+
+# CMake Options
+
+Add this option in the root `CMakeLists.txt` if it does not already exist:
+
+```cmake
+option(XENGINE_ENABLE_SHADER_COMPILER "Enable runtime shader compilation" ON)
+```
+
+For Stage 4A:
+
+```text
+XENGINE_ENABLE_SHADER_COMPILER should default to ON.
+```
+
+Keep existing options:
+
+```cmake
+option(XENGINE_ENABLE_VULKAN "Enable Vulkan backend" ON)
+option(XENGINE_ENABLE_SDL "Enable SDL platform backend" ON)
+option(XENGINE_SDL_LINK_SHARED "Link SDL as a shared library" ON)
+option(XENGINE_ENABLE_EDITOR "Build XEngine editor" ON)
+option(XENGINE_ENABLE_TRACY "Enable Tracy profiler integration" OFF)
+```
+
+---
+
+# CMake Ownership Rules
+
+Keep dependency ownership clean.
+
+## Root CMakeLists.txt
+
+Root `CMakeLists.txt` should contain:
 
 ```text
 project setup
@@ -160,110 +283,171 @@ add_subdirectory(Engine)
 add_subdirectory(Apps)
 ```
 
-`ThirdParty/CMakeLists.txt` should only handle vendored dependencies:
+It should not contain Slang-specific target logic.
+
+It should not contain `find_package(Slang)`.
+
+It should not contain Vulkan target wiring either; Vulkan SDK lookup belongs in `Engine/CMakeLists.txt`.
+
+---
+
+## ThirdParty/CMakeLists.txt
+
+`ThirdParty/CMakeLists.txt` should handle vendored dependencies:
 
 ```text
 spdlog
 SDL
 volk
 VMA file existence check
+slang
 ```
 
-Do not change this ownership model.
+Add Slang integration only when shader compiler is enabled:
+
+```cmake
+if(XENGINE_ENABLE_SHADER_COMPILER)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/slang/CMakeLists.txt")
+        add_subdirectory(slang)
+    else()
+        message(FATAL_ERROR "Slang is required when XENGINE_ENABLE_SHADER_COMPILER=ON. Please place Slang source under ThirdParty/slang.")
+    endif()
+endif()
+```
+
+Do not fetch Slang.
+
+Do not use `find_package(Slang)`.
+
+Do not add unrelated third-party libraries in this stage.
+
+---
+
+## Engine/CMakeLists.txt
+
+`XEngineRuntime` should link Slang privately when online compilation is enabled.
+
+Use a defensive pattern:
+
+```cmake
+if(XENGINE_ENABLE_SHADER_COMPILER)
+    target_compile_definitions(XEngineRuntime
+        PRIVATE
+            XENGINE_ENABLE_SHADER_COMPILER
+    )
+
+    if(TARGET slang)
+        target_link_libraries(XEngineRuntime PRIVATE slang)
+    elseif(TARGET slang::slang)
+        target_link_libraries(XEngineRuntime PRIVATE slang::slang)
+    elseif(TARGET Slang::slang)
+        target_link_libraries(XEngineRuntime PRIVATE Slang::slang)
+    else()
+        message(WARNING "No Slang library target found. Stage 4A may need slangc fallback or local Slang target adaptation.")
+    endif()
+
+    target_include_directories(XEngineRuntime
+        PRIVATE
+            ${CMAKE_SOURCE_DIR}/ThirdParty/slang/include
+    )
+endif()
+```
+
+If the local Slang source layout uses a different include directory, adapt it cleanly.
+
+Do not expose Slang include directories publicly.
+
+Do not link Slang publicly.
+
+---
+
+# Slang Runtime Copy Policy
+
+If Slang builds as a shared library, app executables must be able to find the Slang runtime library.
+
+If the Slang target is shared and provides a valid target file, add a post-build copy helper similar to SDL.
+
+Example:
+
+```cmake
+function(xengine_copy_slang_runtime target)
+    if(XENGINE_ENABLE_SHADER_COMPILER)
+        if(TARGET slang)
+            add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:slang>
+                    $<TARGET_FILE_DIR:${target}>
+            )
+        elseif(TARGET slang::slang)
+            add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:slang::slang>
+                    $<TARGET_FILE_DIR:${target}>
+            )
+        elseif(TARGET Slang::slang)
+            add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:Slang::slang>
+                    $<TARGET_FILE_DIR:${target}>
+            )
+        endif()
+    endif()
+endfunction()
+```
+
+Only use this if the Slang target is actually a runtime library target.
+
+If the local Slang integration differs, add TODO comments and keep the build clean.
 
 ---
 
 # Strict Include Boundaries
 
-Public Renderer headers must not include:
+Public XEngine headers must not include:
 
 ```cpp
-#include <volk.h>
-#include <vulkan/vulkan.h>
-#include <vk_mem_alloc.h>
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_vulkan.h>
+#include <slang.h>
+#include <slang-com-ptr.h>
+#include <slang-com-helper.h>
 ```
 
-Forbidden locations for Vulkan / SDL / VMA includes:
+Forbidden locations for Slang includes:
 
 ```text
-Engine/Source/Runtime/Renderer/Public/
+Engine/Source/Runtime/Shader/Public/
 Engine/Source/Runtime/RHI/Public/
-Engine/Source/Runtime/Platform/Public/
+Engine/Source/Runtime/Renderer/Public/
 Engine/Source/Runtime/Engine/Public/
 Apps/
 ```
 
-Allowed locations remain:
+Allowed location:
 
 ```text
-Engine/Source/Runtime/RHI/Private/Vulkan/
-Engine/Source/Runtime/Platform/Private/SDL/
+Engine/Source/Runtime/Shader/Private/Slang/
 ```
 
-RenderSystem should depend on RHI public API only.
+Only Slang private implementation files may include Slang headers.
 
 ---
 
-# Files to Implement or Update
-
-Implement or update these files:
-
-```text
-Engine/Source/Runtime/Engine/Private/Engine.cpp
-
-Engine/Source/Runtime/RHI/Public/XEngine/RHI/RHIDevice.h
-Engine/Source/Runtime/RHI/Public/XEngine/RHI/RHISystem.h
-Engine/Source/Runtime/RHI/Private/RHISystem.cpp
-
-Engine/Source/Runtime/Renderer/Public/XEngine/Renderer/RenderSystem.h
-Engine/Source/Runtime/Renderer/Public/XEngine/Renderer/RenderTypes.h
-
-Engine/Source/Runtime/Renderer/Private/RenderSystem.cpp
-
-Engine/Source/Runtime/Renderer/Private/RenderGraph/RenderGraph.h
-Engine/Source/Runtime/Renderer/Private/RenderGraph/RenderGraph.cpp
-Engine/Source/Runtime/Renderer/Private/RenderGraph/RenderGraphPass.h
-Engine/Source/Runtime/Renderer/Private/RenderGraph/RenderGraphBuilder.h
-Engine/Source/Runtime/Renderer/Private/RenderGraph/RenderGraphBuilder.cpp
-Engine/Source/Runtime/Renderer/Private/RenderGraph/RenderGraphContext.h
-Engine/Source/Runtime/Renderer/Private/RenderGraph/RenderGraphContext.cpp
-Engine/Source/Runtime/Renderer/Private/RenderGraph/RenderGraphExecutor.h
-Engine/Source/Runtime/Renderer/Private/RenderGraph/RenderGraphExecutor.cpp
-
-Engine/Source/Runtime/Renderer/Private/Passes/ClearPass.h
-Engine/Source/Runtime/Renderer/Private/Passes/ClearPass.cpp
-Engine/Source/Runtime/Renderer/Private/Passes/PresentPass.h
-Engine/Source/Runtime/Renderer/Private/Passes/PresentPass.cpp
-
-Engine/CMakeLists.txt
-README.md
-```
-
-If these files already exist, update them cleanly.
-
-If old placeholder pass files exist, do not delete them unless they conflict. Leave TODOs for future stages.
-
-Do not modify Shader, Asset, Scene, UI, Editor, or Vulkan backend implementation unless absolutely required for build consistency.
-
----
-
-# Engine Registration Requirements
+# Engine Registration Order
 
 Update `Engine.cpp`.
 
-Stage 2B-2 registration order was likely:
+Current Stage 3 order is likely:
 
 ```text
 PlatformSystem
 RHISystem
+RenderSystem
 ```
 
-Stage 3 registration order must be:
+Stage 4A order should become:
 
 ```text
 PlatformSystem
+ShaderSystem
 RHISystem
 RenderSystem
 ```
@@ -276,6 +460,16 @@ if (m_Config.CreateMainWindow)
     m_SubsystemManager.AddSubsystem<PlatformSystem>();
 }
 
+if (m_Config.EnableShaderCompiler)
+{
+    m_SubsystemManager.AddSubsystem<ShaderSystem>();
+}
+else
+{
+    // Stage 4A can still register ShaderSystem, but it should report that online compilation is disabled.
+    // Choose one approach and keep it consistent.
+}
+
 if (m_Config.CreateGraphicsDevice)
 {
     m_SubsystemManager.AddSubsystem<RHISystem>();
@@ -283,536 +477,695 @@ if (m_Config.CreateGraphicsDevice)
 }
 ```
 
+If `EngineConfig` does not yet have a shader compiler flag, add:
+
+```cpp
+bool EnableShaderCompiler = true;
+```
+
+Do not register AssetSystem.
+
 Do not register SceneSystem.
 
 Do not register UISystem.
 
 Do not register EditorSystem.
 
+ShaderSystem should initialize before RenderSystem because RenderSystem will later request compiled shaders.
+
 ---
 
-# RHISystem Behavior Change
+# Files to Implement or Update
 
-Stage 2B-2 may have clear-frame code inside `RHISystem::OnUpdate`.
-
-Remove that responsibility.
-
-`RHISystem::OnUpdate` should only:
+Implement or update these files:
 
 ```text
-- Query PlatformSystem events.
-- If WindowResize event:
-  - Call RHIDevice::RequestResize(width, height).
-  - Log resize forwarding if useful.
-- Do not call BeginFrame.
-- Do not call ClearSwapchain.
-- Do not call EndFrame.
+Engine/Source/Runtime/Engine/Public/XEngine/Engine/EngineConfig.h
+Engine/Source/Runtime/Engine/Private/Engine.cpp
+
+Engine/Source/Runtime/Shader/Public/XEngine/Shader/ShaderTypes.h
+Engine/Source/Runtime/Shader/Public/XEngine/Shader/ShaderReflection.h
+Engine/Source/Runtime/Shader/Public/XEngine/Shader/ShaderModule.h
+Engine/Source/Runtime/Shader/Public/XEngine/Shader/ShaderCompiler.h
+Engine/Source/Runtime/Shader/Public/XEngine/Shader/ShaderSystem.h
+
+Engine/Source/Runtime/Shader/Private/ShaderCompiler.cpp
+Engine/Source/Runtime/Shader/Private/ShaderSystem.cpp
+Engine/Source/Runtime/Shader/Private/ShaderCache.cpp
+
+Engine/Source/Runtime/Shader/Private/Slang/SlangCompiler.h
+Engine/Source/Runtime/Shader/Private/Slang/SlangCompiler.cpp
+Engine/Source/Runtime/Shader/Private/Slang/SlangReflection.cpp
+
+Engine/Shaders/Passes/Triangle.slang
+
+ThirdParty/CMakeLists.txt
+Engine/CMakeLists.txt
+Apps/CMakeLists.txt
+README.md
 ```
 
-In short:
+If files already exist, update them cleanly.
 
-```text
-RHISystem = RHI lifecycle + resize forwarding
-RenderSystem = frame rendering
-```
+Do not modify Vulkan pipeline files for drawing yet.
+
+Do not implement TrianglePass yet.
+
+Do not modify RenderSystem pass order except if needed to keep Stage 3 clear working.
 
 ---
 
-# RHIDevice API
+# Public Shader API
 
-Keep the Stage 2B-2 temporary frame validation API for now:
-
-```cpp
-virtual void BeginFrame() = 0;
-virtual void ClearSwapchain(const RHIColor& color) = 0;
-virtual void EndFrame() = 0;
-virtual void RequestResize(u32 width, u32 height) = 0;
-```
-
-Do not refactor into full command list / render pass / resource barrier API yet.
-
-Do not add pipeline, shader, descriptor, buffer, or texture creation APIs yet.
-
----
-
-# RenderSystem Public API
+## ShaderTypes.h
 
 Create or update:
 
-```text
-Engine/Source/Runtime/Renderer/Public/XEngine/Renderer/RenderSystem.h
+```cpp
+#pragma once
+
+#include <XEngine/Core/Types.h>
+
+#include <string>
+#include <vector>
+
+namespace XEngine
+{
+    enum class ShaderStage
+    {
+        Unknown,
+        Vertex,
+        Fragment,
+        Compute
+    };
+
+    enum class ShaderTarget
+    {
+        Unknown,
+        VulkanSPIRV,
+        D3D12DXIL,
+        MetalMSL
+    };
+
+    enum class ShaderCodeFormat
+    {
+        Unknown,
+        Binary,
+        Text
+    };
+
+    enum class ShaderCompileResult
+    {
+        Success,
+        Failed,
+        UnsupportedTarget,
+        CompilerUnavailable
+    };
+
+    struct ShaderDefine
+    {
+        std::string Name;
+        std::string Value;
+    };
+
+    struct ShaderCompileDesc
+    {
+        std::string Path;
+        std::string EntryPoint;
+
+        ShaderStage Stage = ShaderStage::Unknown;
+        ShaderTarget Target = ShaderTarget::VulkanSPIRV;
+
+        std::string Profile;
+
+        std::vector<std::string> IncludeDirectories;
+        std::vector<ShaderDefine> Defines;
+
+        bool GenerateDebugInfo = true;
+        bool EnableOptimization = false;
+    };
+
+    ShaderTarget ShaderTargetFromRHIBackendName(const std::string& backendName);
+}
 ```
 
-Suggested content:
+Do not include Slang headers.
+
+The helper `ShaderTargetFromRHIBackendName` can be minimal or TODO.
+Do not include RHI headers in ShaderTypes unless absolutely necessary.
+
+---
+
+## ShaderReflection.h
+
+Create or update target-neutral reflection structures:
+
+```cpp
+#pragma once
+
+#include <XEngine/Core/Types.h>
+#include <XEngine/Shader/ShaderTypes.h>
+
+#include <string>
+#include <vector>
+
+namespace XEngine
+{
+    enum class ShaderResourceType
+    {
+        Unknown,
+        UniformBuffer,
+        StorageBuffer,
+        Texture,
+        Sampler,
+        CombinedImageSampler,
+        PushConstant
+    };
+
+    struct ShaderBindingLocation
+    {
+        // Vulkan descriptor set / logical bind group.
+        u32 Set = 0;
+
+        // Vulkan binding / logical binding.
+        u32 Binding = 0;
+
+        // D3D12 register space.
+        u32 Space = 0;
+
+        // D3D12 register index.
+        u32 Register = 0;
+
+        // Metal resource index / generic backend index.
+        u32 Index = 0;
+    };
+
+    struct ShaderResourceBinding
+    {
+        std::string Name;
+        ShaderResourceType Type = ShaderResourceType::Unknown;
+
+        ShaderBindingLocation Location;
+
+        u32 ArraySize = 1;
+
+        ShaderStage Visibility = ShaderStage::Unknown;
+    };
+
+    struct ShaderReflection
+    {
+        std::vector<ShaderResourceBinding> Resources;
+    };
+}
+```
+
+Reflection can remain empty in Stage 4A.
+
+Do not overbuild reflection yet.
+
+---
+
+## ShaderModule.h
+
+Create or update:
+
+```cpp
+#pragma once
+
+#include <XEngine/Core/Types.h>
+#include <XEngine/Shader/ShaderReflection.h>
+#include <XEngine/Shader/ShaderTypes.h>
+
+#include <string>
+#include <vector>
+
+namespace XEngine
+{
+    struct CompiledShader
+    {
+        ShaderStage Stage = ShaderStage::Unknown;
+        ShaderTarget Target = ShaderTarget::Unknown;
+        ShaderCodeFormat Format = ShaderCodeFormat::Unknown;
+
+        std::string EntryPoint;
+        std::string SourcePath;
+
+        // Used by binary targets such as SPIR-V and DXIL.
+        std::vector<u8> Bytecode;
+
+        // Used by textual targets such as MSL.
+        std::string SourceCode;
+
+        ShaderReflection Reflection;
+
+        ShaderCompileResult Result = ShaderCompileResult::Failed;
+        std::string Diagnostics;
+
+        bool IsValid() const
+        {
+            return Result == ShaderCompileResult::Success &&
+                   (!Bytecode.empty() || !SourceCode.empty());
+        }
+    };
+}
+```
+
+Target usage:
+
+```text
+VulkanSPIRV:
+  Format = Binary
+  Bytecode = SPIR-V
+
+D3D12DXIL:
+  Format = Binary
+  Bytecode = DXIL
+
+MetalMSL:
+  Format = Text
+  SourceCode = MSL
+```
+
+Stage 4A only needs to produce VulkanSPIRV.
+
+---
+
+## ShaderCompiler.h
+
+Create or update:
+
+```cpp
+#pragma once
+
+#include <XEngine/Shader/ShaderModule.h>
+#include <XEngine/Shader/ShaderTypes.h>
+
+namespace XEngine
+{
+    class ShaderCompiler
+    {
+    public:
+        virtual ~ShaderCompiler() = default;
+
+        virtual bool IsAvailable() const = 0;
+
+        virtual CompiledShader Compile(const ShaderCompileDesc& desc) = 0;
+    };
+}
+```
+
+---
+
+## ShaderSystem.h
+
+Create or update:
 
 ```cpp
 #pragma once
 
 #include <XEngine/Engine/Subsystem.h>
+#include <XEngine/Shader/ShaderModule.h>
+#include <XEngine/Shader/ShaderTypes.h>
+
+#include <memory>
 
 namespace XEngine
 {
-    class RHISystem;
+    class ShaderCompiler;
 
-    class RenderSystem final : public ISubsystem
+    class ShaderSystem final : public ISubsystem
     {
     public:
-        RenderSystem();
-        ~RenderSystem() override;
+        ShaderSystem();
+        ~ShaderSystem() override;
 
         void OnCreate(const SubsystemContext& context) override;
         void OnDestroy() override;
-        void OnUpdate(float deltaTime) override;
+
+        bool IsCompilerAvailable() const;
+
+        CompiledShader Compile(const ShaderCompileDesc& desc);
 
     private:
-        void Render();
-
-    private:
-        RHISystem* m_RHISystem = nullptr;
+        std::unique_ptr<ShaderCompiler> m_Compiler;
         bool m_Initialized = false;
     };
 }
 ```
 
-Public header must not include Vulkan headers.
+Public header must not expose Slang.
 
 ---
 
-# RenderSystem Behavior
-
-`RenderSystem::OnCreate`:
-
-```text
-- Store RHISystem pointer from Engine -> SubsystemManager.
-- Assert or log error if RHISystem is missing.
-- Log RenderSystem creation.
-```
-
-`RenderSystem::OnUpdate`:
-
-```text
-- Call Render().
-```
-
-`RenderSystem::OnDestroy`:
-
-```text
-- Log RenderSystem shutdown.
-- Clear internal state.
-```
-
-`RenderSystem::Render`:
-
-```text
-- If RHISystem is missing, return.
-- Get RHIDevice from RHISystem.
-- If device is missing or invalid, return.
-- Call device->BeginFrame().
-- Build RenderGraph:
-  - Clear()
-  - AddClearPass()
-  - AddPresentPass()
-  - Compile()
-  - Execute()
-- Call device->EndFrame().
-```
-
-Use a fixed clear color:
-
-```cpp
-RHIColor clearColor;
-clearColor.R = 0.1f;
-clearColor.G = 0.1f;
-clearColor.B = 0.15f;
-clearColor.A = 1.0f;
-```
-
----
-
-# RenderGraph V0 Design
-
-RenderGraph V0 should be a linear pass list.
-
-Do not implement a DAG.
-
-Do not sort passes.
-
-Do not implement resource analysis.
-
----
-
-## RenderGraphPassType
+# SlangCompiler Private API
 
 Create:
 
-```cpp
-enum class RenderGraphPassType
-{
-    Graphics,
-    Compute,
-    Transfer,
-    Present,
-    External
-};
-```
-
-Important:
-
 ```text
-Do not create NeuralPass.
-Future neural rendering features should be represented as Compute or External passes.
+Engine/Source/Runtime/Shader/Private/Slang/SlangCompiler.h
+Engine/Source/Runtime/Shader/Private/Slang/SlangCompiler.cpp
 ```
 
----
+`SlangCompiler.h` can include Slang headers because it is private.
 
-## RenderGraphPassDesc
-
-Create:
-
-```cpp
-struct RenderGraphPassDesc
-{
-    std::string Name;
-    RenderGraphPassType Type = RenderGraphPassType::Graphics;
-};
-```
-
----
-
-## RenderGraphBuilder
-
-Create a placeholder class.
-
-```cpp
-class RenderGraphBuilder
-{
-public:
-    // TODO Stage 4+:
-    // ReadTexture()
-    // WriteTexture()
-    // ReadBuffer()
-    // WriteBuffer()
-};
-```
-
-No resource declarations are required in Stage 3.
-
----
-
-## RenderGraphContext
-
-Create:
+Suggested design:
 
 ```cpp
 #pragma once
 
+#include <XEngine/Shader/ShaderCompiler.h>
+
 namespace XEngine
 {
-    class RHIDevice;
-
-    class RenderGraphContext
+    class SlangCompiler final : public ShaderCompiler
     {
     public:
-        explicit RenderGraphContext(RHIDevice& device);
+        SlangCompiler();
+        ~SlangCompiler() override;
 
-        RHIDevice& GetDevice();
+        bool IsAvailable() const override;
+
+        CompiledShader Compile(const ShaderCompileDesc& desc) override;
 
     private:
-        RHIDevice* m_Device = nullptr;
+        bool Initialize();
+        void Shutdown();
+
+    private:
+        bool m_Initialized = false;
     };
 }
 ```
 
-Implementation should assert `m_Device` is not null when accessed.
+All Slang-specific objects must stay private to `SlangCompiler.cpp`.
 
 ---
 
-## RenderGraphPass
+# Slang Compilation Requirements
+
+Stage 4A should support:
+
+```text
+Target:
+  VulkanSPIRV
+
+Stages:
+  Vertex
+  Fragment
+  Compute reserved for future
+```
+
+For `ShaderTarget::VulkanSPIRV`, output should be SPIR-V bytecode:
+
+```text
+CompiledShader.Format = ShaderCodeFormat::Binary
+CompiledShader.Bytecode = SPIR-V bytes
+CompiledShader.Result = ShaderCompileResult::Success
+```
+
+For unsupported targets in Stage 4A:
+
+```text
+D3D12DXIL:
+  Return invalid CompiledShader with Result = UnsupportedTarget.
+
+MetalMSL:
+  Return invalid CompiledShader with Result = UnsupportedTarget.
+```
+
+Do not implement DXIL or MSL yet.
+
+However, keep the API compatible with future DXIL/MSL support.
+
+---
+
+# Slang C++ API Preferred Behavior
+
+If using the Slang C++ API, implement these conceptual steps:
+
+```text
+1. Create Slang global session.
+2. Create a compile session targeting SPIR-V.
+3. Load or compile the module from file.
+4. Find entry point by name.
+5. Compose module + entry point.
+6. Request target code as SPIR-V.
+7. Copy SPIR-V bytes into CompiledShader.Bytecode.
+8. Fill CompiledShader metadata.
+9. Fill Diagnostics if compilation fails.
+```
+
+Use RAII where practical.
+
+Do not expose Slang COM pointers or Slang types in public headers.
+
+---
+
+# Command-line slangc Fallback
+
+If Slang C++ API target/library integration is not ready, implement a temporary fallback using `slangc`.
+
+Rules:
+
+```text
+- Fallback lives only inside SlangCompiler.cpp.
+- Public ShaderSystem API must not change.
+- Use a temporary output path under Build/Generated/Shaders or another clearly named intermediate directory.
+- Invoke slangc to compile one entry point at a time to SPIR-V.
+- Read compiled SPIR-V binary into CompiledShader.Bytecode.
+- Log the exact command used.
+- Mark fallback with TODO:
+  "Replace slangc fallback with Slang C++ API integration."
+```
+
+Do not rely on slangc permanently.
+
+Do not put slangc command logic into public headers.
+
+---
+
+# Shader Path Policy
+
+For Stage 4A, the shader path may be a normal filesystem path.
+
+Do not implement a full FileSystem subsystem yet unless already present.
+
+Recommended behavior:
+
+```text
+ShaderCompileDesc.Path can be:
+  Engine/Shaders/Passes/Triangle.slang
+  or an absolute/relative path from the working directory.
+
+SlangCompiler should log the path being compiled.
+```
+
+Keep the code structured so it can later be replaced by FileSystem.
+
+Do not implement file watching.
+
+Do not implement hot reload.
+
+Do not implement virtual shader paths yet unless already available.
+
+---
+
+# Triangle.slang
 
 Create:
 
-```cpp
-#pragma once
-
-#include <functional>
-#include <string>
-
-namespace XEngine
-{
-    class RenderGraphBuilder;
-    class RenderGraphContext;
-
-    enum class RenderGraphPassType
-    {
-        Graphics,
-        Compute,
-        Transfer,
-        Present,
-        External
-    };
-
-    struct RenderGraphPassDesc
-    {
-        std::string Name;
-        RenderGraphPassType Type = RenderGraphPassType::Graphics;
-    };
-
-    struct RenderGraphPass
-    {
-        RenderGraphPassDesc Desc;
-
-        std::function<void(RenderGraphBuilder&)> Setup;
-        std::function<void(RenderGraphContext&)> Execute;
-    };
-}
-```
-
----
-
-## RenderGraph
-
-Create:
-
-```cpp
-#pragma once
-
-#include "RenderGraphPass.h"
-
-#include <vector>
-
-namespace XEngine
-{
-    class RenderGraph
-    {
-    public:
-        using SetupFunc = std::function<void(RenderGraphBuilder&)>;
-        using ExecuteFunc = std::function<void(RenderGraphContext&)>;
-
-        void AddPass(const RenderGraphPassDesc& desc, SetupFunc setup, ExecuteFunc execute);
-
-        void Clear();
-        void Compile();
-        void Execute(RenderGraphContext& context);
-
-        bool IsCompiled() const;
-        std::size_t GetPassCount() const;
-
-    private:
-        std::vector<RenderGraphPass> m_Passes;
-        bool m_Compiled = false;
-    };
-}
-```
-
-`Compile()` behavior:
-
 ```text
-- Create a RenderGraphBuilder.
-- Call setup function for each pass in order.
-- Mark graph as compiled.
-- No sorting.
-- No dependency analysis.
+Engine/Shaders/Passes/Triangle.slang
 ```
 
-`Execute()` behavior:
+The shader should not require vertex buffers, descriptor sets, uniform buffers, textures, or push constants.
 
-```text
-- If not compiled, compile or assert.
-- Execute pass callbacks in insertion order.
-- Log pass names if useful.
-```
+Use vertex ID to generate triangle vertices.
 
-Keep execution single-threaded.
+Example content:
 
----
-
-## RenderGraphExecutor
-
-Create a simple placeholder class.
-
-It may be used by `RenderGraph::Execute`, or it may remain a TODO wrapper.
-
-Do not overbuild.
-
-Example:
-
-```cpp
-class RenderGraphExecutor
+```hlsl
+struct VSOutput
 {
-public:
-    void Execute(RenderGraph& graph, RenderGraphContext& context);
+    float4 position : SV_Position;
+    float3 color : COLOR0;
 };
-```
 
-If this creates unnecessary complexity, keep it minimal with TODOs.
-
----
-
-# ClearPass
-
-Create:
-
-```text
-Engine/Source/Runtime/Renderer/Private/Passes/ClearPass.h
-Engine/Source/Runtime/Renderer/Private/Passes/ClearPass.cpp
-```
-
-`ClearPass.h`:
-
-```cpp
-#pragma once
-
-#include <XEngine/RHI/RHITypes.h>
-
-namespace XEngine
+[shader("vertex")]
+VSOutput vertexMain(uint vertexId : SV_VertexID)
 {
-    class RenderGraph;
+    float2 positions[3] =
+    {
+        float2(0.0, -0.5),
+        float2(0.5, 0.5),
+        float2(-0.5, 0.5)
+    };
 
-    void AddClearPass(RenderGraph& graph, const RHIColor& clearColor);
+    float3 colors[3] =
+    {
+        float3(1.0, 0.0, 0.0),
+        float3(0.0, 1.0, 0.0),
+        float3(0.0, 0.0, 1.0)
+    };
+
+    VSOutput output;
+    output.position = float4(positions[vertexId], 0.0, 1.0);
+    output.color = colors[vertexId];
+    return output;
+}
+
+[shader("fragment")]
+float4 fragmentMain(VSOutput input) : SV_Target0
+{
+    return float4(input.color, 1.0);
 }
 ```
 
-`ClearPass.cpp` behavior:
-
-```text
-- Add pass named "ClearPass".
-- Type = RenderGraphPassType::Graphics.
-- Setup function is currently empty / TODO.
-- Execute function calls context.GetDevice().ClearSwapchain(clearColor).
-```
+If local Slang syntax requires slight adjustments, adapt it.
 
 ---
 
-# PresentPass
+# ShaderSystem Startup Validation
 
-Create:
+In Stage 4A, `ShaderSystem::OnCreate` should validate compiler integration by compiling the test shader.
+
+Behavior:
 
 ```text
-Engine/Source/Runtime/Renderer/Private/Passes/PresentPass.h
-Engine/Source/Runtime/Renderer/Private/Passes/PresentPass.cpp
+- Create SlangCompiler when XENGINE_ENABLE_SHADER_COMPILER is defined.
+- Initialize compiler.
+- Compile Triangle.slang vertex entry point.
+- Compile Triangle.slang fragment entry point.
+- Log bytecode sizes.
+- If compilation fails, log diagnostics clearly.
+- Do not create RHIShader.
+- Do not create Vulkan shader module.
+- Do not create pipeline.
 ```
 
-`PresentPass.h`:
+Suggested compile descriptors:
 
 ```cpp
-#pragma once
+ShaderCompileDesc vertexDesc;
+vertexDesc.Path = "Engine/Shaders/Passes/Triangle.slang";
+vertexDesc.EntryPoint = "vertexMain";
+vertexDesc.Stage = ShaderStage::Vertex;
+vertexDesc.Target = ShaderTarget::VulkanSPIRV;
+vertexDesc.GenerateDebugInfo = true;
+vertexDesc.EnableOptimization = false;
 
-namespace XEngine
-{
-    class RenderGraph;
-
-    void AddPresentPass(RenderGraph& graph);
-}
+ShaderCompileDesc fragmentDesc;
+fragmentDesc.Path = "Engine/Shaders/Passes/Triangle.slang";
+fragmentDesc.EntryPoint = "fragmentMain";
+fragmentDesc.Stage = ShaderStage::Fragment;
+fragmentDesc.Target = ShaderTarget::VulkanSPIRV;
+fragmentDesc.GenerateDebugInfo = true;
+fragmentDesc.EnableOptimization = false;
 ```
 
-`PresentPass.cpp` behavior:
-
-```text
-- Add pass named "PresentPass".
-- Type = RenderGraphPassType::Present.
-- Setup function is currently empty.
-- Execute function is currently a placeholder.
-- Add TODO comment:
-  "Present is currently handled by RHIDevice::EndFrame().
-   Future RHI will expose explicit present command."
-```
-
-Do not call present directly from PresentPass in Stage 3.
+For Stage 4A, it is acceptable to assert on compilation failure.
 
 ---
 
-# RenderGraph Single-threading
+# ShaderCache
 
-Stage 3 RenderGraph must be single-threaded.
+`ShaderCache.cpp` can remain minimal.
+
+For Stage 4A, it may contain TODO comments only.
 
 Do not implement:
 
 ```text
-JobSystem
-parallel graph compile
-parallel graph execute
-task graph
-parallel command recording
-async compute scheduling
+Persistent shader cache
+Hash-based cache
+Shader dependency tracking
+Shader hot reload
+Permutation system
 ```
 
-But the API should not prevent these later.
-
-Add comments where appropriate:
+Future cache key should include:
 
 ```text
-TODO: future stages may compile/execute passes through JobSystem.
+Path
+Entry point
+Stage
+Target
+Defines
+Profile
+Debug/optimization flags
 ```
+
+But do not implement full cache in Stage 4A.
 
 ---
 
-# GPU-driven / Compute / External Future-proofing
+# RenderSystem Integration
 
-Stage 3 should not implement GPU-driven rendering.
+Do not make RenderSystem draw a triangle in Stage 4A.
 
-However:
+RenderSystem should continue using Stage 3:
 
 ```text
-RenderGraphPassType::Compute must exist for future:
-- GPU culling
-- Forward+ light culling
-- Hi-Z generation
-- Compute post-process
-
-RenderGraphPassType::External must exist for future:
-- DLSS
-- XeSS
-- FSR
-- neural denoiser
-- external vendor SDK passes
+ClearPass
+PresentPass
 ```
 
-Do not create a `NeuralPass` class.
+Do not add TrianglePass yet.
 
-Do not create neural rendering systems.
+Do not create pipelines in RenderSystem yet.
+
+Stage 4B will connect RenderSystem to compiled shader objects.
 
 ---
 
-# Runtime Behavior
+# RHI / Vulkan Restrictions
 
-Expected logs may include:
-
-```text
-[XEngine] Creating RenderSystem
-[XEngine] RenderGraph compile: 2 passes
-[XEngine] Executing RenderGraph pass: ClearPass
-[XEngine] Executing RenderGraph pass: PresentPass
-```
-
-Exact formatting is flexible.
-
-The visible result should remain:
+Do not implement:
 
 ```text
-SDL window clears to fixed Vulkan clear color every frame.
+RHIShader creation
+RHIPipeline creation
+VulkanShader
+VulkanPipeline
+TrianglePass
+Draw commands
+Dynamic rendering
+Pipeline layout
+Descriptor set layout
 ```
+
+These belong to Stage 4B.
+
+Existing Stage 2B-2 and Stage 3 clear-screen behavior must keep working.
 
 ---
 
 # README Update
 
-Update `README.md` to mention Stage 3:
+Update `README.md` to mention Stage 4A:
 
 ```text
-Stage 3 adds:
-- RenderSystem subsystem
-- Linear RenderGraph V0
-- ClearPass
-- PresentPass placeholder
-- Pass type categories: Graphics / Compute / Transfer / Present / External
-- RHISystem no longer directly clears every frame
+Stage 4A adds:
+- ShaderSystem subsystem
+- Online shader compilation
+- XENGINE_ENABLE_SHADER_COMPILER option
+- Slang integration
+- ShaderStage / ShaderTarget / ShaderCodeFormat public types
+- CompiledShader public structure
+- ShaderReflection placeholder
+- Triangle.slang sample shader
+- SPIR-V compilation validation
 ```
 
 Also mention:
 
 ```text
-Stage 3 does not implement shaders, triangle rendering, RenderGraph resource dependencies, async compute, neural rendering, or GPU-driven rendering.
-Future neural rendering features should be represented as Compute or External passes.
+Stage 4A links Slang privately when XENGINE_ENABLE_SHADER_COMPILER=ON.
+Stage 4A does not create Vulkan shader modules.
+Stage 4A does not create graphics pipelines.
+Stage 4A does not draw a triangle yet.
+Stage 4B will create RHIShader / RHIPipeline and TrianglePass.
+Future release/runtime builds may disable online shader compilation and load precompiled shader outputs instead.
 ```
 
 ---
@@ -822,83 +1175,78 @@ Future neural rendering features should be represented as Compute or External pa
 Do not implement:
 
 ```text
-Slang
-ShaderSystem
-Shader modules
+RHIShader
+RHIPipeline
+VkShaderModule
+VulkanPipeline
 Graphics pipeline
-Triangle
+Pipeline layout
+Descriptor set layout
+TrianglePass
+Draw calls
+Vertex buffer
+Index buffer
 Render pass
 Framebuffer
 Dynamic rendering
-Depth buffer
-Vertex buffer
-Index buffer
-Descriptor sets
 Textures
-Asset loading
-Scene ECS
+Materials
+Scene
+Asset system
 ImGui
-Tracy GPU profiling
 JobSystem
-Parallel RenderGraph execution
-Full EventBus
-NeuralPass
-GPU-driven rendering
-Forward+
+Shader hot reload
+Shader permutation system
+Persistent shader cache
+Offline shader compiler tool
+Precompiled shader package loader
+RenderFeature system
 ```
 
-Do not enable advanced Vulkan features yet:
-
-```text
-VK_KHR_dynamic_rendering
-VK_KHR_synchronization2
-VK_EXT_descriptor_indexing
-VK_EXT_descriptor_buffer
-Ray tracing extensions
-Mesh shader extensions
-```
+Do not modify RenderGraph into a full resource graph yet.
 
 ---
 
 # Acceptance Criteria
 
-Stage 3 is complete when:
+Stage 4A is complete when:
 
 ```text
 1. Project configures successfully.
-2. Project builds successfully with XENGINE_ENABLE_VULKAN=ON.
-3. Engine registers PlatformSystem -> RHISystem -> RenderSystem.
-4. RHISystem no longer calls BeginFrame / ClearSwapchain / EndFrame in OnUpdate.
-5. RenderSystem is an ISubsystem.
-6. RenderSystem obtains RHISystem through SubsystemManager.
-7. RenderSystem performs frame rendering.
-8. RenderGraph V0 exists.
-9. RenderGraph supports AddPass / Clear / Compile / Execute.
-10. RenderGraph execution is single-threaded and insertion-order based.
-11. RenderGraphPassType includes Graphics / Compute / Transfer / Present / External.
-12. RenderGraphBuilder exists as a placeholder.
-13. RenderGraphContext provides access to RHIDevice.
-14. ClearPass calls RHIDevice::ClearSwapchain.
-15. PresentPass exists as a placeholder.
-16. Window still clears to fixed color.
-17. Window close exits cleanly.
-18. Window resize does not crash.
-19. RenderDoc can still capture a clear frame.
-20. No shaders or triangle rendering are implemented.
-21. No graphics pipeline is implemented.
-22. No RenderGraph resource dependency system is implemented.
-23. No NeuralPass class is created.
-24. Public Renderer headers do not expose Vulkan / SDL / VMA / volk.
+2. Project builds successfully.
+3. XENGINE_ENABLE_SHADER_COMPILER option exists and defaults to ON.
+4. Slang source under ThirdParty/slang is integrated or a clearly marked slangc fallback is implemented.
+5. Slang is linked privately to XEngineRuntime when online shader compilation is enabled.
+6. ShaderSystem is registered before RHISystem and RenderSystem.
+7. ShaderSystem is an ISubsystem.
+8. ShaderSystem public API exposes only XEngine-owned types.
+9. Public headers do not include Slang headers.
+10. Slang headers appear only under Runtime/Shader/Private/Slang.
+11. Triangle.slang exists under Engine/Shaders/Passes/.
+12. ShaderSystem compiles vertexMain to Vulkan SPIR-V.
+13. ShaderSystem compiles fragmentMain to Vulkan SPIR-V.
+14. CompiledShader supports Binary and Text formats.
+15. VulkanSPIRV output uses Binary bytecode.
+16. MetalMSL is represented as a future Text output target but is not implemented yet.
+17. D3D12DXIL is represented as a future Binary output target but is not implemented yet.
+18. Logs show successful compilation and bytecode sizes.
+19. Unsupported targets fail cleanly or return invalid shaders.
+20. Existing Stage 3 clear-screen frame still works.
+21. No Vulkan shader modules are created.
+22. No graphics pipeline is created.
+23. No triangle is drawn yet.
+24. No RenderFeature system is implemented.
+25. Runtime/offline shader compilation separation is documented in README.
 ```
 
 ---
 
 # Final Task
 
-Implement Stage 3 now.
+Implement Stage 4A now.
 
 Do not ask for confirmation.
 
 Keep the implementation minimal, clean, and architecture-focused.
 
-Where later stages are expected, leave clear TODO comments.
+Where Stage 4B functionality or future offline shader compilation is expected, leave clear TODO comments.

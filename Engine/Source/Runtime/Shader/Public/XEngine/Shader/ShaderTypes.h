@@ -1,13 +1,15 @@
-﻿#pragma once
+#pragma once
 
 #include <XEngine/Core/Types.h>
 
+#include <string>
 #include <vector>
 
 namespace XEngine
 {
     enum class ShaderStage
     {
+        Unknown,
         Vertex,
         Fragment,
         Compute
@@ -15,29 +17,49 @@ namespace XEngine
 
     enum class ShaderTarget
     {
-        SpirV,
-        Dxil,
-        MetalLib
+        Unknown,
+        VulkanSPIRV,
+        D3D12DXIL,
+        MetalMSL
     };
 
-    enum class ShaderResourceType
+    enum class ShaderCodeFormat
     {
-        UniformBuffer,
-        StorageBuffer,
-        Texture,
-        Sampler
+        Unknown,
+        Binary,
+        Text
     };
 
-    struct ShaderResourceBinding
+    enum class ShaderCompileResult
     {
-        ShaderResourceType Type = ShaderResourceType::UniformBuffer;
-        u32 Set = 0;
-        u32 Binding = 0;
+        Success,
+        Failed,
+        UnsupportedTarget,
+        CompilerUnavailable
     };
 
-    struct CompiledShader
+    struct ShaderDefine
     {
-        ShaderStage Stage = ShaderStage::Vertex;
-        std::vector<u8> Bytecode;
+        std::string Name;
+        std::string Value;
     };
+
+    struct ShaderCompileDesc
+    {
+        std::string Path;
+        std::string EntryPoint;
+
+        ShaderStage Stage = ShaderStage::Unknown;
+        ShaderTarget Target = ShaderTarget::VulkanSPIRV;
+
+        std::string Profile;
+
+        std::vector<std::string> IncludeDirectories;
+        std::vector<ShaderDefine> Defines;
+
+        bool GenerateDebugInfo = true;
+        bool EnableOptimization = false;
+    };
+
+    ShaderTarget ShaderTargetFromRHIBackendName(const std::string& backendName);
 }

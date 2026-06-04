@@ -30,6 +30,7 @@ namespace XEngine
         bool CreateMainWindow = true;
 
         bool CreateGraphicsDevice = true;
+        bool EnableShaderCompiler = true;
         bool EnableVSync = true;
         GraphicsBackend Backend = GraphicsBackend::Vulkan;
     };

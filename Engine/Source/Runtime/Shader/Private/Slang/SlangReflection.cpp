@@ -1,5 +1,4 @@
-﻿namespace XEngine
+namespace XEngine
 {
-    // TODO: Add Slang reflection integration.
+    // TODO(Stage 4B+): Translate Slang reflection into ShaderReflection.
 }
-
