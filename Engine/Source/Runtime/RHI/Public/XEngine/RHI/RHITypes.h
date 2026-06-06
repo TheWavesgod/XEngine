@@ -86,6 +86,41 @@ namespace XEngine
         return (static_cast<u32>(value) & static_cast<u32>(flag)) != 0;
     }
 
+    enum class RHIBindingType
+    {
+        Unknown,
+        UniformBuffer,
+        StorageBuffer,
+        SampledTexture,
+        Sampler,
+        CombinedImageSampler
+    };
+
+    enum class RHIShaderStageFlags : u32
+    {
+        None = 0,
+        Vertex = 1 << 0,
+        Fragment = 1 << 1,
+        Compute = 1 << 2,
+        AllGraphics = Vertex | Fragment,
+        All = Vertex | Fragment | Compute
+    };
+
+    inline RHIShaderStageFlags operator|(RHIShaderStageFlags lhs, RHIShaderStageFlags rhs)
+    {
+        return static_cast<RHIShaderStageFlags>(static_cast<u32>(lhs) | static_cast<u32>(rhs));
+    }
+
+    inline RHIShaderStageFlags operator&(RHIShaderStageFlags lhs, RHIShaderStageFlags rhs)
+    {
+        return static_cast<RHIShaderStageFlags>(static_cast<u32>(lhs) & static_cast<u32>(rhs));
+    }
+
+    inline bool HasFlag(RHIShaderStageFlags value, RHIShaderStageFlags flag)
+    {
+        return (static_cast<u32>(value) & static_cast<u32>(flag)) != 0;
+    }
+
     struct RHIColor
     {
         f32 R = 0.0f;

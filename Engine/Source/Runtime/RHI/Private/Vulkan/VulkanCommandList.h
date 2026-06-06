@@ -6,6 +6,7 @@
 
 namespace XEngine
 {
+    class VulkanBindGroup;
     class VulkanPipeline;
     class VulkanTexture;
 
@@ -27,6 +28,7 @@ namespace XEngine
         void EndRenderingIfActive();
 
         void SetGraphicsPipeline(RHIPipeline* pipeline) override;
+        void SetBindGroup(u32 setIndex, RHIBindGroup* bindGroup) override;
         void SetVertexBuffer(RHIBuffer* buffer, u64 offset = 0) override;
         void SetIndexBuffer(RHIBuffer* buffer, RHIIndexFormat format, u64 offset = 0) override;
         void PushConstants(

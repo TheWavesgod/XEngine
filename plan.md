@@ -769,6 +769,35 @@ No BindGroup / descriptor V0 yet.
 Future production texture pipeline should support KTX2 / Basis Universal / DDS / GPU compressed formats.
 ```
 
+## Stage 6C - MaterialSystem + Material Data
+
+```text
+MaterialSystem is a lightweight renderer-side manager, not AssetSystem.
+MaterialHandle is introduced.
+MaterialDesc stores base color, metallic, roughness, alpha mode, and texture handles.
+GPUMaterialData is introduced as a GPU-friendly / bindless-ready data structure.
+MaterialSystem owns default lit, default unlit, and missing materials.
+MaterialSystem resolves invalid texture handles to TextureManager fallback textures.
+No BindGroup / descriptor set yet.
+No texture sampling shader yet.
+No PBR shader yet.
+RenderFeature system remains planned for Stage 9.
+```
+
+## Stage 6D - BindGroup V0 + Unlit Textured Mesh
+
+```text
+Introduces RHIBindGroupLayout and RHIBindGroup.
+Introduces Vulkan descriptor set layout / descriptor pool / descriptor set update.
+Stage 6D only supports combined image sampler for base color texture.
+MaterialSystem creates per-material base color bind groups.
+UnlitTextured.slang samples base color texture.
+ForwardOpaquePass / ForwardMeshPass binds pipeline and material bind group.
+No PBR yet.
+No bindless descriptors yet.
+No RenderFeature system yet.
+```
+
 ---
 
 # Stage 7 - glTF Asset + Scene Integration

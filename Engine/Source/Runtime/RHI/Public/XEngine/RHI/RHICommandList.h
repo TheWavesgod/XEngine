@@ -10,6 +10,7 @@ namespace XEngine
 {
     class RHIPipeline;
     class RHIBuffer;
+    class RHIBindGroup;
 
     class RHICommandList
     {
@@ -17,6 +18,7 @@ namespace XEngine
         virtual ~RHICommandList() = default;
 
         virtual void SetGraphicsPipeline(RHIPipeline* pipeline) = 0;
+        virtual void SetBindGroup(u32 setIndex, RHIBindGroup* bindGroup) = 0;
         virtual void SetVertexBuffer(RHIBuffer* buffer, u64 offset = 0) = 0;
         virtual void SetIndexBuffer(RHIBuffer* buffer, RHIIndexFormat format, u64 offset = 0) = 0;
         virtual void PushConstants(

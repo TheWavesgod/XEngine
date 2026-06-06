@@ -5,6 +5,7 @@
 
 #include "VulkanAllocator.h"
 #include "VulkanCommandList.h"
+#include "VulkanDescriptor.h"
 #include "VulkanFrameResources.h"
 #include "VulkanInstance.h"
 #include "VulkanQueue.h"
@@ -55,6 +56,10 @@ namespace XEngine
             std::size_t initialDataSize) override;
         std::shared_ptr<RHISampler> CreateSampler(
             const RHISamplerDesc& desc) override;
+        std::shared_ptr<RHIBindGroupLayout> CreateBindGroupLayout(
+            const RHIBindGroupLayoutDesc& desc) override;
+        std::shared_ptr<RHIBindGroup> CreateBindGroup(
+            const RHIBindGroupDesc& desc) override;
         std::shared_ptr<RHIPipeline> CreateGraphicsPipeline(const RHIGraphicsPipelineDesc& desc) override;
         RHIFormat GetSwapchainFormat() const override;
         void WaitIdle() override;
@@ -62,6 +67,8 @@ namespace XEngine
     private:
         bool PickPhysicalDevice();
         bool CreateLogicalDevice();
+        bool CreateDescriptorPool();
+        void DestroyDescriptorPool();
         bool CreateDepthTexture();
         void DestroyDepthTexture();
         void RecreateSwapchain(u32 width, u32 height);
@@ -77,6 +84,7 @@ namespace XEngine
 
         VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
         VkDevice m_Device = VK_NULL_HANDLE;
+        VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
         VulkanQueue m_GraphicsQueue;
         VulkanQueue m_PresentQueue;
 

@@ -134,4 +134,32 @@ namespace XEngine
             return VK_SAMPLER_ADDRESS_MODE_REPEAT;
         }
     }
+
+    VkDescriptorType ToVulkanDescriptorType(RHIBindingType type)
+    {
+        switch (type)
+        {
+        case RHIBindingType::CombinedImageSampler:
+            return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        case RHIBindingType::UniformBuffer:
+            return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        case RHIBindingType::StorageBuffer:
+            return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        case RHIBindingType::SampledTexture:
+            return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        case RHIBindingType::Sampler:
+            return VK_DESCRIPTOR_TYPE_SAMPLER;
+        default:
+            return VK_DESCRIPTOR_TYPE_MAX_ENUM;
+        }
+    }
+
+    VkShaderStageFlags ToVulkanShaderStageFlags(RHIShaderStageFlags flags)
+    {
+        VkShaderStageFlags result = 0;
+        if (HasFlag(flags, RHIShaderStageFlags::Vertex)) { result |= VK_SHADER_STAGE_VERTEX_BIT; }
+        if (HasFlag(flags, RHIShaderStageFlags::Fragment)) { result |= VK_SHADER_STAGE_FRAGMENT_BIT; }
+        if (HasFlag(flags, RHIShaderStageFlags::Compute)) { result |= VK_SHADER_STAGE_COMPUTE_BIT; }
+        return result;
+    }
 }

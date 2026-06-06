@@ -1,6 +1,7 @@
 #include "VulkanCommandList.h"
 
 #include "VulkanBuffer.h"
+#include "VulkanDescriptor.h"
 #include "VulkanPipeline.h"
 #include "VulkanTexture.h"
 
@@ -95,6 +96,32 @@ namespace XEngine
         BeginRenderingIfNeeded();
         m_BoundGraphicsPipeline = vulkanPipeline;
         vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanPipeline->GetHandle());
+    }
+
+    void VulkanCommandList::SetBindGroup(u32 setIndex, RHIBindGroup* bindGroup)
+    {
+        if (m_CommandBuffer == VK_NULL_HANDLE || m_BoundGraphicsPipeline == nullptr || bindGroup == nullptr)
+        {
+            return;
+        }
+
+        auto* vulkanBindGroup = dynamic_cast<VulkanBindGroup*>(bindGroup);
+        if (vulkanBindGroup == nullptr || vulkanBindGroup->GetHandle() == VK_NULL_HANDLE)
+        {
+            XENGINE_LOG_ERROR("Attempted to bind an invalid Vulkan bind group");
+            return;
+        }
+
+        VkDescriptorSet descriptorSet = vulkanBindGroup->GetHandle();
+        vkCmdBindDescriptorSets(
+            m_CommandBuffer,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            m_BoundGraphicsPipeline->GetLayout(),
+            setIndex,
+            1,
+            &descriptorSet,
+            0,
+            nullptr);
     }
 
     void VulkanCommandList::SetVertexBuffer(RHIBuffer* buffer, u64 offset)

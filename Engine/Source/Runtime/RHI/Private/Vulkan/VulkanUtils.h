@@ -16,6 +16,8 @@ namespace XEngine
     VkImageUsageFlags ToVulkanImageUsageFlags(RHITextureUsageFlags usage);
     VkFilter ToVulkanFilter(RHIFilter filter);
     VkSamplerAddressMode ToVulkanAddressMode(RHIAddressMode mode);
+    VkDescriptorType ToVulkanDescriptorType(RHIBindingType type);
+    VkShaderStageFlags ToVulkanShaderStageFlags(RHIShaderStageFlags flags);
 }
 
 #define XENGINE_VK_CHECK(expression)                                                                      \

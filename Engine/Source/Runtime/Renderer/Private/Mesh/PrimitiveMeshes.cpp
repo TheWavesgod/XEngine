@@ -9,14 +9,14 @@ namespace XEngine
     StaticMesh CreateHardcodedCubeMesh(RHIDevice& device)
     {
         const std::array<MeshVertex, 8> vertices = {
-            MeshVertex { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f } },
-            MeshVertex { {  0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f } },
-            MeshVertex { {  0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f } },
-            MeshVertex { { -0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f } },
-            MeshVertex { { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 1.0f } },
-            MeshVertex { {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 1.0f } },
-            MeshVertex { {  0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 1.0f } },
-            MeshVertex { { -0.5f,  0.5f,  0.5f }, { 0.2f, 0.6f, 1.0f } }
+            MeshVertex { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
+            MeshVertex { {  0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f } },
+            MeshVertex { {  0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } },
+            MeshVertex { { -0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
+            MeshVertex { { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 1.0f }, { 0.0f, 0.0f } },
+            MeshVertex { {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } },
+            MeshVertex { {  0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f } },
+            MeshVertex { { -0.5f,  0.5f,  0.5f }, { 0.2f, 0.6f, 1.0f }, { 0.0f, 1.0f } }
         };
 
         const std::array<u32, 36> indices = {

@@ -7,6 +7,7 @@
 
 namespace XEngine
 {
+    class RHIBindGroupLayout;
     class RHIShader;
 
     struct RHIVertexAttributeDesc
@@ -34,6 +35,8 @@ namespace XEngine
         bool EnableDepthWrite = true;
 
         RHIVertexBufferLayoutDesc VertexLayout;
+
+        std::vector<RHIBindGroupLayout*> BindGroupLayouts;
 
         u32 PushConstantSize = 0;
         ShaderStage PushConstantStages = ShaderStage::Vertex;

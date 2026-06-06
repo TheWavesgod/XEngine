@@ -1,6 +1,7 @@
 #include "VulkanDevice.h"
 
 #include "VulkanBuffer.h"
+#include "VulkanDescriptor.h"
 #include "VulkanPipeline.h"
 #include "VulkanSampler.h"
 #include "VulkanShader.h"
@@ -160,6 +161,11 @@ namespace XEngine
             return false;
         }
 
+        if (!CreateDescriptorPool())
+        {
+            return false;
+        }
+
         m_EnableVSync = createInfo.EnableVSync;
         m_PendingResizeWidth = createInfo.Width;
         m_PendingResizeHeight = createInfo.Height;
@@ -205,6 +211,7 @@ namespace XEngine
         DestroyDepthTexture();
         m_FrameResources.Destroy();
         m_Swapchain.Destroy();
+        DestroyDescriptorPool();
         m_Allocator.Destroy();
 
         if (m_Device != VK_NULL_HANDLE)
@@ -628,6 +635,28 @@ namespace XEngine
         return sampler;
     }
 
+    std::shared_ptr<RHIBindGroupLayout> VulkanDevice::CreateBindGroupLayout(const RHIBindGroupLayoutDesc& desc)
+    {
+        auto layout = std::make_shared<VulkanBindGroupLayout>();
+        if (!layout->Create(m_Device, desc))
+        {
+            return nullptr;
+        }
+
+        return layout;
+    }
+
+    std::shared_ptr<RHIBindGroup> VulkanDevice::CreateBindGroup(const RHIBindGroupDesc& desc)
+    {
+        auto bindGroup = std::make_shared<VulkanBindGroup>();
+        if (!bindGroup->Create(m_Device, m_DescriptorPool, desc))
+        {
+            return nullptr;
+        }
+
+        return bindGroup;
+    }
+
     std::shared_ptr<RHIPipeline> VulkanDevice::CreateGraphicsPipeline(const RHIGraphicsPipelineDesc& desc)
     {
         auto pipeline = std::make_shared<VulkanPipeline>(m_Device, desc);
@@ -677,6 +706,44 @@ namespace XEngine
 
         m_DepthTexture = std::move(depthTexture);
         return true;
+    }
+
+    bool VulkanDevice::CreateDescriptorPool()
+    {
+        // TODO Stage 8/10: replace this global pool with a descriptor allocator / arena.
+        // TODO Stage 11: replace per-material descriptors with BindlessResourceManager.
+        VkDescriptorPoolSize poolSize {};
+        poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSize.descriptorCount = 1024;
+
+        VkDescriptorPoolCreateInfo createInfo {};
+        createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        createInfo.maxSets = 1024;
+        createInfo.poolSizeCount = 1;
+        createInfo.pPoolSizes = &poolSize;
+
+        VkResult result = vkCreateDescriptorPool(m_Device, &createInfo, nullptr, &m_DescriptorPool);
+        if (result != VK_SUCCESS)
+        {
+            std::string message = "Failed to create Vulkan descriptor pool: ";
+            message += VulkanResultToString(result);
+            XENGINE_LOG_ERROR(message);
+            return false;
+        }
+
+        XENGINE_LOG_INFO("Vulkan descriptor pool created");
+        return true;
+    }
+
+    void VulkanDevice::DestroyDescriptorPool()
+    {
+        if (m_Device != VK_NULL_HANDLE && m_DescriptorPool != VK_NULL_HANDLE)
+        {
+            XENGINE_LOG_INFO("Destroying Vulkan descriptor pool");
+            vkDestroyDescriptorPool(m_Device, m_DescriptorPool, nullptr);
+            m_DescriptorPool = VK_NULL_HANDLE;
+        }
     }
 
     void VulkanDevice::DestroyDepthTexture()

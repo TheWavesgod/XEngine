@@ -13,6 +13,7 @@ namespace XEngine
     {
         Vector3 Position;
         Vector3 Color;
+        Vector2 UV;
     };
 
     class StaticMesh

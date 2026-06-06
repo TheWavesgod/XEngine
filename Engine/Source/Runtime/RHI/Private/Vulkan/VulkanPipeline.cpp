@@ -1,5 +1,6 @@
 #include "VulkanPipeline.h"
 
+#include "VulkanDescriptor.h"
 #include "VulkanShader.h"
 #include "VulkanUtils.h"
 
@@ -52,6 +53,20 @@ namespace XEngine
 
         XENGINE_LOG_INFO("Creating Vulkan pipeline layout");
 
+        std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+        descriptorSetLayouts.reserve(desc.BindGroupLayouts.size());
+        for (RHIBindGroupLayout* layout : desc.BindGroupLayouts)
+        {
+            auto* vulkanLayout = dynamic_cast<VulkanBindGroupLayout*>(layout);
+            if (vulkanLayout == nullptr || vulkanLayout->GetHandle() == VK_NULL_HANDLE)
+            {
+                XENGINE_LOG_ERROR("Vulkan pipeline received an invalid bind group layout");
+                return;
+            }
+
+            descriptorSetLayouts.push_back(vulkanLayout->GetHandle());
+        }
+
         VkPushConstantRange pushConstantRange {};
         pushConstantRange.stageFlags = m_PushConstantStages;
         pushConstantRange.offset = 0;
@@ -59,6 +74,8 @@ namespace XEngine
 
         VkPipelineLayoutCreateInfo layoutCreateInfo {};
         layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        layoutCreateInfo.setLayoutCount = static_cast<u32>(descriptorSetLayouts.size());
+        layoutCreateInfo.pSetLayouts = descriptorSetLayouts.data();
         if (desc.PushConstantSize > 0)
         {
             layoutCreateInfo.pushConstantRangeCount = 1;

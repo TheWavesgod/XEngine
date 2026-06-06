@@ -125,6 +125,38 @@ Stage 6B does not implement PBR.
 Stage 6B does not implement AssetSystem.
 Stage 6B does not implement texture streaming.
 
+Stage 6C adds:
+- MaterialHandle
+- MaterialDesc
+- GPUMaterialData placeholder
+- MaterialSystem
+- Default lit material
+- Default unlit material
+- Missing material
+- Texture fallback resolution through TextureManager
+
+Stage 6C does not implement descriptor sets.
+Stage 6C does not bind material textures to shaders.
+Stage 6C does not implement PBR.
+Stage 6C does not implement AssetSystem.
+Stage 6C does not implement RenderFeature system.
+
+Stage 6D adds:
+- RHIBindGroupLayout
+- RHIBindGroup
+- Vulkan descriptor set layout
+- Vulkan descriptor pool
+- Vulkan descriptor set update
+- Combined image sampler binding
+- UnlitTextured shader
+- Material base color bind group
+- Textured mesh rendering
+
+Stage 6D does not implement PBR.
+Stage 6D does not implement bindless descriptors.
+Stage 6D does not implement AssetSystem.
+Stage 6D does not implement RenderFeature system.
+
 Stage 2B-2 adds:
 - Vulkan swapchain creation
 - Swapchain image views

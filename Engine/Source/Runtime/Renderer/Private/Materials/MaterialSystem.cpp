@@ -1,7 +1,311 @@
-﻿#include "MaterialSystem.h"
+#include "MaterialSystem.h"
+
+#include "../Resources/TextureManager.h"
+
+#include <XEngine/Core/Assert.h>
+#include <XEngine/Logging/Log.h>
+#include <XEngine/RHI/RHIDevice.h>
+
+#include <utility>
 
 namespace XEngine
 {
-    void MaterialSystem::Execute() {}
-}
+    namespace
+    {
+        constexpr u32 MaterialFlagUnlit = 1u << 0u;
+        constexpr u32 MaterialFlagMasked = 1u << 1u;
+        constexpr u32 MaterialFlagBlend = 1u << 2u;
+        constexpr u32 MaterialFlagDoubleSided = 1u << 3u;
+    }
 
+    void MaterialSystem::Initialize(TextureManager* textureManager, RHIDevice* device)
+    {
+        if (m_Initialized)
+        {
+            return;
+        }
+
+        XENGINE_ASSERT(textureManager != nullptr, "MaterialSystem requires TextureManager");
+        XENGINE_ASSERT(device != nullptr, "MaterialSystem requires RHIDevice");
+        if (textureManager == nullptr || device == nullptr || !device->IsValid())
+        {
+            XENGINE_LOG_ERROR("MaterialSystem requires TextureManager and a valid RHIDevice");
+            return;
+        }
+
+        m_TextureManager = textureManager;
+        m_Device = device;
+
+        RHIBindGroupLayoutDesc layoutDesc;
+        layoutDesc.DebugName = "Material base color bind group layout";
+        // Stage 6D manual convention:
+        // set 0, binding 0 = combined image sampler for base color in fragment shader.
+        layoutDesc.Entries.push_back(RHIBindGroupLayoutEntry {
+            0,
+            RHIBindingType::CombinedImageSampler,
+            RHIShaderStageFlags::Fragment,
+            1
+        });
+        m_BaseColorBindGroupLayout = m_Device->CreateBindGroupLayout(layoutDesc);
+        if (!m_BaseColorBindGroupLayout)
+        {
+            XENGINE_LOG_ERROR("Failed to create material base color bind group layout");
+            return;
+        }
+
+        RHISamplerDesc samplerDesc;
+        samplerDesc.MinFilter = RHIFilter::Linear;
+        samplerDesc.MagFilter = RHIFilter::Linear;
+        samplerDesc.AddressU = RHIAddressMode::Repeat;
+        samplerDesc.AddressV = RHIAddressMode::Repeat;
+        samplerDesc.AddressW = RHIAddressMode::Repeat;
+        samplerDesc.DebugName = "Material default linear repeat sampler";
+        m_DefaultSampler = m_Device->CreateSampler(samplerDesc);
+        if (!m_DefaultSampler)
+        {
+            XENGINE_LOG_ERROR("Failed to create material default sampler");
+            return;
+        }
+
+        MaterialDesc defaultLit;
+        defaultLit.ShadingModel = MaterialShadingModel::Lit;
+        defaultLit.BaseColorTexture = m_TextureManager->GetDefaultWhiteTexture();
+        defaultLit.NormalTexture = m_TextureManager->GetDefaultNormalTexture();
+        defaultLit.MetallicRoughnessTexture = m_TextureManager->GetDefaultWhiteTexture();
+        defaultLit.AOTexture = m_TextureManager->GetDefaultWhiteTexture();
+        m_DefaultLitMaterial = AddMaterialRecord("DefaultLit", defaultLit);
+
+        MaterialDesc defaultUnlit;
+        defaultUnlit.ShadingModel = MaterialShadingModel::Unlit;
+        defaultUnlit.BaseColorTexture = m_TextureManager->GetDefaultWhiteTexture();
+        defaultUnlit.NormalTexture = m_TextureManager->GetDefaultNormalTexture();
+        defaultUnlit.MetallicRoughnessTexture = m_TextureManager->GetDefaultWhiteTexture();
+        defaultUnlit.AOTexture = m_TextureManager->GetDefaultWhiteTexture();
+        m_DefaultUnlitMaterial = AddMaterialRecord("DefaultUnlit", defaultUnlit);
+
+        MaterialDesc missing;
+        missing.ShadingModel = MaterialShadingModel::Unlit;
+        missing.BaseColorFactor = Vec4 { 1.0f, 0.0f, 1.0f, 1.0f };
+        missing.BaseColorTexture = m_TextureManager->GetMissingTexture();
+        missing.NormalTexture = m_TextureManager->GetDefaultNormalTexture();
+        missing.MetallicRoughnessTexture = m_TextureManager->GetDefaultWhiteTexture();
+        missing.AOTexture = m_TextureManager->GetDefaultWhiteTexture();
+        m_MissingMaterial = AddMaterialRecord("MissingMaterial", missing);
+
+        m_Initialized = true;
+        XENGINE_LOG_INFO("MaterialSystem initialized");
+    }
+
+    void MaterialSystem::Shutdown()
+    {
+        if (!m_Initialized && m_Materials.empty())
+        {
+            return;
+        }
+
+        XENGINE_LOG_INFO("MaterialSystem shutdown");
+        m_Materials.clear();
+        m_DefaultSampler.reset();
+        m_BaseColorBindGroupLayout.reset();
+        m_DefaultLitMaterial = {};
+        m_DefaultUnlitMaterial = {};
+        m_MissingMaterial = {};
+        m_TextureManager = nullptr;
+        m_Device = nullptr;
+        m_Initialized = false;
+    }
+
+    MaterialHandle MaterialSystem::CreateMaterial(const std::string& name, const MaterialDesc& desc)
+    {
+        if (!m_Initialized)
+        {
+            XENGINE_LOG_ERROR("Cannot create material before MaterialSystem is initialized");
+            return {};
+        }
+
+        return AddMaterialRecord(name, desc);
+    }
+
+    const MaterialDesc* MaterialSystem::GetMaterialDesc(MaterialHandle handle) const
+    {
+        if (!IsValid(handle))
+        {
+            return nullptr;
+        }
+
+        return &m_Materials[handle.Index].Desc;
+    }
+
+    MaterialDesc* MaterialSystem::GetMaterialDesc(MaterialHandle handle)
+    {
+        return const_cast<MaterialDesc*>(static_cast<const MaterialSystem*>(this)->GetMaterialDesc(handle));
+    }
+
+    const GPUMaterialData* MaterialSystem::GetGPUMaterialData(MaterialHandle handle) const
+    {
+        if (!IsValid(handle))
+        {
+            return nullptr;
+        }
+
+        return &m_Materials[handle.Index].GPUData;
+    }
+
+    RHIBindGroup* MaterialSystem::GetBaseColorBindGroup(MaterialHandle handle) const
+    {
+        if (!IsValid(handle))
+        {
+            return nullptr;
+        }
+
+        return m_Materials[handle.Index].BaseColorBindGroup.get();
+    }
+
+    RHIBindGroupLayout* MaterialSystem::GetBaseColorBindGroupLayout() const
+    {
+        return m_BaseColorBindGroupLayout.get();
+    }
+
+    MaterialHandle MaterialSystem::GetDefaultLitMaterial() const
+    {
+        return m_DefaultLitMaterial;
+    }
+
+    MaterialHandle MaterialSystem::GetDefaultUnlitMaterial() const
+    {
+        return m_DefaultUnlitMaterial;
+    }
+
+    MaterialHandle MaterialSystem::GetMissingMaterial() const
+    {
+        return m_MissingMaterial;
+    }
+
+    bool MaterialSystem::IsValid(MaterialHandle handle) const
+    {
+        if (!handle.IsValid() || handle.Index >= m_Materials.size())
+        {
+            return false;
+        }
+
+        return m_Materials[handle.Index].Generation == handle.Generation;
+    }
+
+    MaterialHandle MaterialSystem::AddMaterialRecord(std::string name, const MaterialDesc& desc)
+    {
+        MaterialDesc resolvedDesc = ResolveFallbackTextures(desc);
+
+        MaterialRecord record;
+        record.Name = std::move(name);
+        record.Desc = resolvedDesc;
+        record.GPUData = BuildGPUMaterialData(resolvedDesc);
+        record.BaseColorBindGroup = CreateBaseColorBindGroup(resolvedDesc);
+        record.Generation = 1;
+
+        MaterialHandle handle;
+        handle.Index = static_cast<u32>(m_Materials.size());
+        handle.Generation = record.Generation;
+
+        m_Materials.push_back(std::move(record));
+        return handle;
+    }
+
+    MaterialDesc MaterialSystem::ResolveFallbackTextures(const MaterialDesc& desc) const
+    {
+        MaterialDesc resolved = desc;
+        if (m_TextureManager == nullptr)
+        {
+            return resolved;
+        }
+
+        resolved.BaseColorTexture = ResolveTexture(resolved.BaseColorTexture, m_TextureManager->GetDefaultWhiteTexture());
+        resolved.NormalTexture = ResolveTexture(resolved.NormalTexture, m_TextureManager->GetDefaultNormalTexture());
+        resolved.MetallicRoughnessTexture = ResolveTexture(
+            resolved.MetallicRoughnessTexture,
+            m_TextureManager->GetDefaultWhiteTexture());
+        resolved.AOTexture = ResolveTexture(resolved.AOTexture, m_TextureManager->GetDefaultWhiteTexture());
+        return resolved;
+    }
+
+    GPUMaterialData MaterialSystem::BuildGPUMaterialData(const MaterialDesc& desc) const
+    {
+        GPUMaterialData gpu;
+        gpu.BaseColorFactor = desc.BaseColorFactor;
+        gpu.MetallicFactor = desc.MetallicFactor;
+        gpu.RoughnessFactor = desc.RoughnessFactor;
+        gpu.AlphaCutoff = desc.AlphaCutoff;
+
+        // TODO Stage 10/11: replace TextureHandle.Index placeholders with
+        // BindlessResourceManager texture indices.
+        gpu.BaseColorTextureIndex = desc.BaseColorTexture.Index;
+        gpu.NormalTextureIndex = desc.NormalTexture.Index;
+        gpu.MetallicRoughnessTextureIndex = desc.MetallicRoughnessTexture.Index;
+        gpu.AOTextureIndex = desc.AOTexture.Index;
+
+        if (desc.ShadingModel == MaterialShadingModel::Unlit)
+        {
+            gpu.Flags |= MaterialFlagUnlit;
+        }
+
+        if (desc.AlphaMode == MaterialAlphaMode::Masked)
+        {
+            gpu.Flags |= MaterialFlagMasked;
+        }
+        else if (desc.AlphaMode == MaterialAlphaMode::Blend)
+        {
+            gpu.Flags |= MaterialFlagBlend;
+        }
+
+        if (desc.DoubleSided)
+        {
+            gpu.Flags |= MaterialFlagDoubleSided;
+        }
+
+        return gpu;
+    }
+
+    std::shared_ptr<RHIBindGroup> MaterialSystem::CreateBaseColorBindGroup(const MaterialDesc& desc) const
+    {
+        if (m_Device == nullptr || m_TextureManager == nullptr ||
+            !m_BaseColorBindGroupLayout || !m_DefaultSampler)
+        {
+            return nullptr;
+        }
+
+        RHITexture* baseColorTexture = m_TextureManager->GetTexture(desc.BaseColorTexture);
+        if (baseColorTexture == nullptr)
+        {
+            baseColorTexture = m_TextureManager->GetTexture(m_TextureManager->GetMissingTexture());
+        }
+
+        if (baseColorTexture == nullptr)
+        {
+            XENGINE_LOG_ERROR("Failed to resolve base color texture for material bind group");
+            return nullptr;
+        }
+
+        RHIBindGroupDesc bindGroupDesc;
+        bindGroupDesc.Layout = m_BaseColorBindGroupLayout.get();
+        bindGroupDesc.DebugName = "Material base color bind group";
+        bindGroupDesc.Resources.push_back(RHIBindingResource {
+            0,
+            RHIBindingType::CombinedImageSampler,
+            baseColorTexture,
+            m_DefaultSampler.get(),
+            nullptr
+        });
+
+        // TODO Stage 6E/10/11: move toward reflection-driven layouts and bindless texture indices.
+        return m_Device->CreateBindGroup(bindGroupDesc);
+    }
+
+    TextureHandle MaterialSystem::ResolveTexture(TextureHandle texture, TextureHandle fallback) const
+    {
+        if (m_TextureManager == nullptr || m_TextureManager->GetTexture(texture) == nullptr)
+        {
+            return fallback;
+        }
+
+        return texture;
+    }
+}

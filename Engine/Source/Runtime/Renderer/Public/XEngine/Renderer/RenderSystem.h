@@ -2,6 +2,7 @@
 
 #include <XEngine/Engine/Subsystem.h>
 #include <XEngine/Math/Matrix.h>
+#include <XEngine/Renderer/Material.h>
 
 #include <memory>
 
@@ -10,6 +11,7 @@ namespace XEngine
     class RHIPipeline;
     class RHIShader;
     class RHISystem;
+    class MaterialSystem;
     class StaticMesh;
     class TextureManager;
 
@@ -28,10 +30,12 @@ namespace XEngine
 
         RHISystem* m_RHISystem = nullptr;
         std::unique_ptr<TextureManager> m_TextureManager;
+        std::unique_ptr<MaterialSystem> m_MaterialSystem;
         std::unique_ptr<StaticMesh> m_CubeMesh;
         std::shared_ptr<RHIShader> m_MeshVertexShader;
         std::shared_ptr<RHIShader> m_MeshFragmentShader;
         std::shared_ptr<RHIPipeline> m_MeshPipeline;
+        MaterialHandle m_TestMaterial;
         Matrix4 m_Model {};
         Matrix4 m_ModelViewProjection {};
         bool m_Initialized = false;
