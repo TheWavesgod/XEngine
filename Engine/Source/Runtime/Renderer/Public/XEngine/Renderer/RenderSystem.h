@@ -11,6 +11,7 @@ namespace XEngine
     class RHIShader;
     class RHISystem;
     class StaticMesh;
+    class TextureManager;
 
     class RenderSystem final : public ISubsystem
     {
@@ -26,10 +27,8 @@ namespace XEngine
         void Render();
 
         RHISystem* m_RHISystem = nullptr;
+        std::unique_ptr<TextureManager> m_TextureManager;
         std::unique_ptr<StaticMesh> m_CubeMesh;
-        std::shared_ptr<RHIShader> m_TriangleVertexShader;
-        std::shared_ptr<RHIShader> m_TriangleFragmentShader;
-        std::shared_ptr<RHIPipeline> m_TrianglePipeline;
         std::shared_ptr<RHIShader> m_MeshVertexShader;
         std::shared_ptr<RHIShader> m_MeshFragmentShader;
         std::shared_ptr<RHIPipeline> m_MeshPipeline;

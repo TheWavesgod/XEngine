@@ -18,9 +18,7 @@ namespace XEngine
         VulkanTexture& operator=(const VulkanTexture&) = delete;
 
         bool IsValid() const;
-        u32 GetWidth() const override;
-        u32 GetHeight() const override;
-        RHIFormat GetFormat() const override;
+        const RHITextureDesc& GetDesc() const override;
 
         VkImage GetImage() const;
         VkImageView GetImageView() const;
@@ -34,8 +32,6 @@ namespace XEngine
         VmaAllocation m_Allocation = VK_NULL_HANDLE;
         VmaAllocationInfo m_AllocationInfo {};
         VkImageLayout m_Layout = VK_IMAGE_LAYOUT_UNDEFINED;
-        u32 m_Width = 0;
-        u32 m_Height = 0;
-        RHIFormat m_Format = RHIFormat::Undefined;
+        RHITextureDesc m_Desc {};
     };
 }

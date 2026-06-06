@@ -10,37 +10,49 @@ namespace XEngine
 {
     namespace
     {
-        VkImageUsageFlags ToVulkanTextureUsage(RHITextureUsage usage)
-        {
-            VkImageUsageFlags flags = 0;
-            if (HasFlag(usage, RHITextureUsage::ColorAttachment)) { flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; }
-            if (HasFlag(usage, RHITextureUsage::DepthStencil)) { flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT; }
-            if (HasFlag(usage, RHITextureUsage::Sampled)) { flags |= VK_IMAGE_USAGE_SAMPLED_BIT; }
-            if (HasFlag(usage, RHITextureUsage::TransferSrc)) { flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT; }
-            if (HasFlag(usage, RHITextureUsage::TransferDst)) { flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT; }
-            return flags;
-        }
-
         VkImageAspectFlags GetAspectMask(RHIFormat format)
         {
             return format == RHIFormat::D32Float ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+        }
+
+        VkImageViewType GetImageViewType(RHITextureDimension dimension)
+        {
+            switch (dimension)
+            {
+            case RHITextureDimension::TextureCube:
+                return VK_IMAGE_VIEW_TYPE_CUBE;
+            case RHITextureDimension::Texture2D:
+            default:
+                return VK_IMAGE_VIEW_TYPE_2D;
+            }
         }
     }
 
     VulkanTexture::VulkanTexture(VkDevice device, VmaAllocator allocator, const RHITextureDesc& desc)
         : m_Device(device)
         , m_Allocator(allocator)
-        , m_Width(desc.Width)
-        , m_Height(desc.Height)
-        , m_Format(desc.Format)
+        , m_Desc(desc)
     {
-        if (m_Device == VK_NULL_HANDLE || m_Allocator == VK_NULL_HANDLE || desc.Width == 0 || desc.Height == 0)
+        if (m_Desc.GenerateMips)
+        {
+            XENGINE_LOG_WARN("Texture mip generation is not implemented in Stage 6A. Creating the base mip only.");
+            m_Desc.MipLevels = 1;
+            m_Desc.GenerateMips = false;
+        }
+
+        if (m_Device == VK_NULL_HANDLE || m_Allocator == VK_NULL_HANDLE || m_Desc.Width == 0 || m_Desc.Height == 0)
         {
             XENGINE_LOG_ERROR("Cannot create Vulkan texture with invalid device, allocator, or extent");
             return;
         }
 
-        const VkFormat format = RHIFormatToVulkanFormat(desc.Format);
+        if (m_Desc.Dimension == RHITextureDimension::TextureCube && m_Desc.ArrayLayers != 6)
+        {
+            XENGINE_LOG_ERROR("TextureCube requires exactly 6 array layers");
+            return;
+        }
+
+        const VkFormat format = RHIFormatToVulkanFormat(m_Desc.Format);
         if (format == VK_FORMAT_UNDEFINED)
         {
             XENGINE_LOG_ERROR("Cannot create Vulkan texture with unsupported format");
@@ -49,14 +61,15 @@ namespace XEngine
 
         VkImageCreateInfo imageCreateInfo {};
         imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageCreateInfo.flags = m_Desc.Dimension == RHITextureDimension::TextureCube ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
         imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageCreateInfo.extent = { desc.Width, desc.Height, 1 };
-        imageCreateInfo.mipLevels = 1;
-        imageCreateInfo.arrayLayers = 1;
+        imageCreateInfo.extent = { m_Desc.Width, m_Desc.Height, 1 };
+        imageCreateInfo.mipLevels = m_Desc.MipLevels;
+        imageCreateInfo.arrayLayers = m_Desc.ArrayLayers;
         imageCreateInfo.format = format;
         imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageCreateInfo.usage = ToVulkanTextureUsage(desc.Usage);
+        imageCreateInfo.usage = ToVulkanImageUsageFlags(m_Desc.Usage);
         imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -81,13 +94,13 @@ namespace XEngine
         VkImageViewCreateInfo viewCreateInfo {};
         viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewCreateInfo.image = m_Image;
-        viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewCreateInfo.viewType = GetImageViewType(m_Desc.Dimension);
         viewCreateInfo.format = format;
-        viewCreateInfo.subresourceRange.aspectMask = GetAspectMask(desc.Format);
+        viewCreateInfo.subresourceRange.aspectMask = GetAspectMask(m_Desc.Format);
         viewCreateInfo.subresourceRange.baseMipLevel = 0;
-        viewCreateInfo.subresourceRange.levelCount = 1;
+        viewCreateInfo.subresourceRange.levelCount = m_Desc.MipLevels;
         viewCreateInfo.subresourceRange.baseArrayLayer = 0;
-        viewCreateInfo.subresourceRange.layerCount = 1;
+        viewCreateInfo.subresourceRange.layerCount = m_Desc.ArrayLayers;
 
         result = vkCreateImageView(m_Device, &viewCreateInfo, nullptr, &m_ImageView);
         if (result != VK_SUCCESS)
@@ -114,11 +127,28 @@ namespace XEngine
         }
     }
 
-    bool VulkanTexture::IsValid() const { return m_Image != VK_NULL_HANDLE && m_ImageView != VK_NULL_HANDLE; }
-    u32 VulkanTexture::GetWidth() const { return m_Width; }
-    u32 VulkanTexture::GetHeight() const { return m_Height; }
-    RHIFormat VulkanTexture::GetFormat() const { return m_Format; }
-    VkImage VulkanTexture::GetImage() const { return m_Image; }
-    VkImageView VulkanTexture::GetImageView() const { return m_ImageView; }
-    VkImageLayout* VulkanTexture::GetLayoutPtr() { return &m_Layout; }
+    bool VulkanTexture::IsValid() const
+    {
+        return m_Image != VK_NULL_HANDLE && m_ImageView != VK_NULL_HANDLE;
+    }
+
+    const RHITextureDesc& VulkanTexture::GetDesc() const
+    {
+        return m_Desc;
+    }
+
+    VkImage VulkanTexture::GetImage() const
+    {
+        return m_Image;
+    }
+
+    VkImageView VulkanTexture::GetImageView() const
+    {
+        return m_ImageView;
+    }
+
+    VkImageLayout* VulkanTexture::GetLayoutPtr()
+    {
+        return &m_Layout;
+    }
 }

@@ -25,4 +25,9 @@ target_include_directories(XEngineFoundation
 )
 
 target_compile_features(XEngineFoundation PUBLIC cxx_std_20)
-target_link_libraries(XEngineFoundation PRIVATE spdlog::spdlog)
+target_link_libraries(XEngineFoundation
+    PUBLIC
+        glm::glm
+    PRIVATE
+        spdlog::spdlog
+)

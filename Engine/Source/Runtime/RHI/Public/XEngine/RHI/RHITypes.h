@@ -22,9 +22,12 @@ namespace XEngine
     enum class RHIFormat
     {
         Undefined,
-        BGRA8Unorm,
         RGBA8Unorm,
+        RGBA8Srgb,
+        BGRA8Unorm,
+        BGRA8Srgb,
         RGBA16Float,
+        RGBA32Float,
         D32Float,
         R32G32Float,
         R32G32B32Float,
@@ -36,6 +39,52 @@ namespace XEngine
         UInt16,
         UInt32
     };
+
+    enum class RHIFilter
+    {
+        Nearest,
+        Linear
+    };
+
+    enum class RHIAddressMode
+    {
+        Repeat,
+        MirroredRepeat,
+        ClampToEdge,
+        ClampToBorder
+    };
+
+    enum class RHITextureDimension
+    {
+        Texture2D,
+        TextureCube
+    };
+
+    enum class RHITextureUsageFlags : u32
+    {
+        None = 0,
+        Sampled = 1 << 0,
+        ColorAttachment = 1 << 1,
+        DepthStencilAttachment = 1 << 2,
+        Storage = 1 << 3,
+        TransferSrc = 1 << 4,
+        TransferDst = 1 << 5
+    };
+
+    inline RHITextureUsageFlags operator|(RHITextureUsageFlags lhs, RHITextureUsageFlags rhs)
+    {
+        return static_cast<RHITextureUsageFlags>(static_cast<u32>(lhs) | static_cast<u32>(rhs));
+    }
+
+    inline RHITextureUsageFlags operator&(RHITextureUsageFlags lhs, RHITextureUsageFlags rhs)
+    {
+        return static_cast<RHITextureUsageFlags>(static_cast<u32>(lhs) & static_cast<u32>(rhs));
+    }
+
+    inline bool HasFlag(RHITextureUsageFlags value, RHITextureUsageFlags flag)
+    {
+        return (static_cast<u32>(value) & static_cast<u32>(flag)) != 0;
+    }
 
     struct RHIColor
     {

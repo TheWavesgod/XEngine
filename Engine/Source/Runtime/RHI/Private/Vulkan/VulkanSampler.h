@@ -1,13 +1,28 @@
 #pragma once
 
+#include <XEngine/RHI/Resources/RHISampler.h>
+
+#include <volk.h>
+
 namespace XEngine
 {
-    class VulkanSampler
+    class VulkanSampler final : public RHISampler
     {
     public:
         VulkanSampler() = default;
-        ~VulkanSampler() = default;
+        VulkanSampler(VkDevice device, const RHISamplerDesc& desc);
+        ~VulkanSampler() override;
 
-        // TODO(Stage 2B): Own VkSampler handles.
+        VulkanSampler(const VulkanSampler&) = delete;
+        VulkanSampler& operator=(const VulkanSampler&) = delete;
+
+        bool IsValid() const;
+        const RHISamplerDesc& GetDesc() const override;
+        VkSampler GetHandle() const;
+
+    private:
+        VkDevice m_Device = VK_NULL_HANDLE;
+        VkSampler m_Sampler = VK_NULL_HANDLE;
+        RHISamplerDesc m_Desc {};
     };
 }

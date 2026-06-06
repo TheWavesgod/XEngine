@@ -13,6 +13,9 @@ namespace XEngine
     const char* VulkanResultToString(VkResult result);
     VkFormat RHIFormatToVulkanFormat(RHIFormat format);
     RHIFormat VulkanFormatToRHIFormat(VkFormat format);
+    VkImageUsageFlags ToVulkanImageUsageFlags(RHITextureUsageFlags usage);
+    VkFilter ToVulkanFilter(RHIFilter filter);
+    VkSamplerAddressMode ToVulkanAddressMode(RHIAddressMode mode);
 }
 
 #define XENGINE_VK_CHECK(expression)                                                                      \

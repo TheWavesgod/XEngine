@@ -43,12 +43,18 @@ namespace XEngine
     {
         switch (format)
         {
-        case RHIFormat::BGRA8Unorm:
-            return VK_FORMAT_B8G8R8A8_UNORM;
         case RHIFormat::RGBA8Unorm:
             return VK_FORMAT_R8G8B8A8_UNORM;
+        case RHIFormat::RGBA8Srgb:
+            return VK_FORMAT_R8G8B8A8_SRGB;
+        case RHIFormat::BGRA8Unorm:
+            return VK_FORMAT_B8G8R8A8_UNORM;
+        case RHIFormat::BGRA8Srgb:
+            return VK_FORMAT_B8G8R8A8_SRGB;
         case RHIFormat::RGBA16Float:
             return VK_FORMAT_R16G16B16A16_SFLOAT;
+        case RHIFormat::RGBA32Float:
+            return VK_FORMAT_R32G32B32A32_SFLOAT;
         case RHIFormat::D32Float:
             return VK_FORMAT_D32_SFLOAT;
         case RHIFormat::R32G32Float:
@@ -66,10 +72,14 @@ namespace XEngine
     {
         switch (format)
         {
-        case VK_FORMAT_B8G8R8A8_UNORM:
-            return RHIFormat::BGRA8Unorm;
         case VK_FORMAT_R8G8B8A8_UNORM:
             return RHIFormat::RGBA8Unorm;
+        case VK_FORMAT_R8G8B8A8_SRGB:
+            return RHIFormat::RGBA8Srgb;
+        case VK_FORMAT_B8G8R8A8_UNORM:
+            return RHIFormat::BGRA8Unorm;
+        case VK_FORMAT_B8G8R8A8_SRGB:
+            return RHIFormat::BGRA8Srgb;
         case VK_FORMAT_R16G16B16A16_SFLOAT:
             return RHIFormat::RGBA16Float;
         case VK_FORMAT_D32_SFLOAT:
@@ -82,6 +92,46 @@ namespace XEngine
             return RHIFormat::R32G32B32A32Float;
         default:
             return RHIFormat::Undefined;
+        }
+    }
+
+    VkImageUsageFlags ToVulkanImageUsageFlags(RHITextureUsageFlags usage)
+    {
+        VkImageUsageFlags flags = 0;
+        if (HasFlag(usage, RHITextureUsageFlags::Sampled)) { flags |= VK_IMAGE_USAGE_SAMPLED_BIT; }
+        if (HasFlag(usage, RHITextureUsageFlags::ColorAttachment)) { flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; }
+        if (HasFlag(usage, RHITextureUsageFlags::DepthStencilAttachment)) { flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT; }
+        if (HasFlag(usage, RHITextureUsageFlags::Storage)) { flags |= VK_IMAGE_USAGE_STORAGE_BIT; }
+        if (HasFlag(usage, RHITextureUsageFlags::TransferSrc)) { flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT; }
+        if (HasFlag(usage, RHITextureUsageFlags::TransferDst)) { flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT; }
+        return flags;
+    }
+
+    VkFilter ToVulkanFilter(RHIFilter filter)
+    {
+        switch (filter)
+        {
+        case RHIFilter::Nearest:
+            return VK_FILTER_NEAREST;
+        case RHIFilter::Linear:
+        default:
+            return VK_FILTER_LINEAR;
+        }
+    }
+
+    VkSamplerAddressMode ToVulkanAddressMode(RHIAddressMode mode)
+    {
+        switch (mode)
+        {
+        case RHIAddressMode::MirroredRepeat:
+            return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+        case RHIAddressMode::ClampToEdge:
+            return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        case RHIAddressMode::ClampToBorder:
+            return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        case RHIAddressMode::Repeat:
+        default:
+            return VK_SAMPLER_ADDRESS_MODE_REPEAT;
         }
     }
 }

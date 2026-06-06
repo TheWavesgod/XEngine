@@ -8,12 +8,14 @@
 #include "VulkanFrameResources.h"
 #include "VulkanInstance.h"
 #include "VulkanQueue.h"
+#include "VulkanSampler.h"
 #include "VulkanSurface.h"
 #include "VulkanSwapchain.h"
 #include "VulkanTexture.h"
 
 #include <volk.h>
 
+#include <functional>
 #include <memory>
 
 namespace XEngine
@@ -47,6 +49,12 @@ namespace XEngine
             const RHIBufferDesc& desc,
             const void* initialData,
             std::size_t initialDataSize) override;
+        std::shared_ptr<RHITexture> CreateTexture(
+            const RHITextureDesc& desc,
+            const void* initialData,
+            std::size_t initialDataSize) override;
+        std::shared_ptr<RHISampler> CreateSampler(
+            const RHISamplerDesc& desc) override;
         std::shared_ptr<RHIPipeline> CreateGraphicsPipeline(const RHIGraphicsPipelineDesc& desc) override;
         RHIFormat GetSwapchainFormat() const override;
         void WaitIdle() override;
@@ -57,6 +65,7 @@ namespace XEngine
         bool CreateDepthTexture();
         void DestroyDepthTexture();
         void RecreateSwapchain(u32 width, u32 height);
+        void ImmediateSubmit(const std::function<void(VkCommandBuffer)>& function);
 
         VulkanInstance m_Instance;
         VulkanSurface m_Surface;

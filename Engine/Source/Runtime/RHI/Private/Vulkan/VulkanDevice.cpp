@@ -2,6 +2,7 @@
 
 #include "VulkanBuffer.h"
 #include "VulkanPipeline.h"
+#include "VulkanSampler.h"
 #include "VulkanShader.h"
 #include "VulkanUtils.h"
 
@@ -9,6 +10,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <functional>
 #include <set>
 #include <string>
 #include <vector>
@@ -99,6 +101,11 @@ namespace XEngine
             }
 
             return 100;
+        }
+
+        VkImageAspectFlags GetTextureAspectMask(RHIFormat format)
+        {
+            return format == RHIFormat::D32Float ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
         }
     }
 
@@ -501,6 +508,126 @@ namespace XEngine
         return buffer;
     }
 
+    std::shared_ptr<RHITexture> VulkanDevice::CreateTexture(
+        const RHITextureDesc& desc,
+        const void* initialData,
+        std::size_t initialDataSize)
+    {
+        auto texture = std::make_shared<VulkanTexture>(m_Device, m_Allocator.GetHandle(), desc);
+        if (!texture->IsValid())
+        {
+            return nullptr;
+        }
+
+        if (initialData != nullptr && initialDataSize > 0)
+        {
+            RHIBufferDesc stagingDesc;
+            stagingDesc.Size = initialDataSize;
+            stagingDesc.Usage = RHIBufferUsage::TransferSrc;
+            stagingDesc.MemoryUsage = RHIMemoryUsage::CPUToGPU;
+            stagingDesc.DebugName = "Texture upload staging buffer";
+
+            VulkanBuffer stagingBuffer(m_Allocator.GetHandle(), stagingDesc, initialData, initialDataSize);
+            if (!stagingBuffer.IsValid())
+            {
+                XENGINE_LOG_ERROR("Failed to create texture upload staging buffer");
+                return nullptr;
+            }
+
+            // TODO Stage 8/10:
+            // Replace immediate submit upload path with RHIUploadManager / transfer queue / async upload.
+            ImmediateSubmit([&](VkCommandBuffer commandBuffer)
+            {
+                VkImageSubresourceRange range {};
+                range.aspectMask = GetTextureAspectMask(desc.Format);
+                range.baseMipLevel = 0;
+                range.levelCount = 1;
+                range.baseArrayLayer = 0;
+                range.layerCount = desc.ArrayLayers;
+
+                VkImageMemoryBarrier toTransfer {};
+                toTransfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                toTransfer.srcAccessMask = 0;
+                toTransfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                toTransfer.oldLayout = *texture->GetLayoutPtr();
+                toTransfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                toTransfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                toTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                toTransfer.image = texture->GetImage();
+                toTransfer.subresourceRange = range;
+
+                vkCmdPipelineBarrier(
+                    commandBuffer,
+                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    0,
+                    0,
+                    nullptr,
+                    0,
+                    nullptr,
+                    1,
+                    &toTransfer);
+
+                VkBufferImageCopy copyRegion {};
+                copyRegion.bufferOffset = 0;
+                copyRegion.bufferRowLength = 0;
+                copyRegion.bufferImageHeight = 0;
+                copyRegion.imageSubresource.aspectMask = range.aspectMask;
+                copyRegion.imageSubresource.mipLevel = 0;
+                copyRegion.imageSubresource.baseArrayLayer = 0;
+                copyRegion.imageSubresource.layerCount = desc.ArrayLayers;
+                copyRegion.imageOffset = { 0, 0, 0 };
+                copyRegion.imageExtent = { desc.Width, desc.Height, 1 };
+
+                vkCmdCopyBufferToImage(
+                    commandBuffer,
+                    stagingBuffer.GetHandle(),
+                    texture->GetImage(),
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    1,
+                    &copyRegion);
+
+                VkImageMemoryBarrier toShaderRead {};
+                toShaderRead.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                toShaderRead.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                toShaderRead.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                toShaderRead.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                toShaderRead.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                toShaderRead.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                toShaderRead.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                toShaderRead.image = texture->GetImage();
+                toShaderRead.subresourceRange = range;
+
+                vkCmdPipelineBarrier(
+                    commandBuffer,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                    0,
+                    0,
+                    nullptr,
+                    0,
+                    nullptr,
+                    1,
+                    &toShaderRead);
+            });
+
+            *texture->GetLayoutPtr() = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        }
+
+        return texture;
+    }
+
+    std::shared_ptr<RHISampler> VulkanDevice::CreateSampler(const RHISamplerDesc& desc)
+    {
+        auto sampler = std::make_shared<VulkanSampler>(m_Device, desc);
+        if (!sampler->IsValid())
+        {
+            return nullptr;
+        }
+
+        return sampler;
+    }
+
     std::shared_ptr<RHIPipeline> VulkanDevice::CreateGraphicsPipeline(const RHIGraphicsPipelineDesc& desc)
     {
         auto pipeline = std::make_shared<VulkanPipeline>(m_Device, desc);
@@ -539,7 +666,7 @@ namespace XEngine
         desc.Width = extent.width;
         desc.Height = extent.height;
         desc.Format = RHIFormat::D32Float;
-        desc.Usage = RHITextureUsage::DepthStencil;
+        desc.Usage = RHITextureUsageFlags::DepthStencilAttachment;
         desc.DebugName = "Swapchain depth";
 
         auto depthTexture = std::make_unique<VulkanTexture>(m_Device, m_Allocator.GetHandle(), desc);
@@ -555,6 +682,51 @@ namespace XEngine
     void VulkanDevice::DestroyDepthTexture()
     {
         m_DepthTexture.reset();
+    }
+
+    void VulkanDevice::ImmediateSubmit(const std::function<void(VkCommandBuffer)>& function)
+    {
+        if (m_Device == VK_NULL_HANDLE || m_GraphicsQueue.GetHandle() == VK_NULL_HANDLE)
+        {
+            return;
+        }
+
+        VkCommandPoolCreateInfo poolInfo {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        poolInfo.queueFamilyIndex = m_GraphicsFamilyIndex;
+
+        VkCommandPool commandPool = VK_NULL_HANDLE;
+        XENGINE_VK_CHECK(vkCreateCommandPool(m_Device, &poolInfo, nullptr, &commandPool));
+
+        VkCommandBufferAllocateInfo allocateInfo {};
+        allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocateInfo.commandPool = commandPool;
+        allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocateInfo.commandBufferCount = 1;
+
+        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+        XENGINE_VK_CHECK(vkAllocateCommandBuffers(m_Device, &allocateInfo, &commandBuffer));
+
+        VkCommandBufferBeginInfo beginInfo {};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        XENGINE_VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
+
+        function(commandBuffer);
+
+        XENGINE_VK_CHECK(vkEndCommandBuffer(commandBuffer));
+
+        VkSubmitInfo submitInfo {};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        XENGINE_VK_CHECK(vkQueueSubmit(m_GraphicsQueue.GetHandle(), 1, &submitInfo, VK_NULL_HANDLE));
+        XENGINE_VK_CHECK(vkQueueWaitIdle(m_GraphicsQueue.GetHandle()));
+
+        vkFreeCommandBuffers(m_Device, commandPool, 1, &commandBuffer);
+        vkDestroyCommandPool(m_Device, commandPool, nullptr);
     }
 
     void VulkanDevice::RecreateSwapchain(u32 width, u32 height)

@@ -712,6 +712,65 @@ MaterialAsset does not hold Vulkan handles.
 
 ---
 
+# Stage 6 Split
+
+Stage 6 is split into:
+
+```text
+Stage 6A - Math V0 + RHI Texture / Sampler / Image Upload Foundation
+Stage 6B - TextureManager + stb_image File Loading
+Stage 6C - MaterialSystem + Material Data
+Stage 6D - Unlit Textured Mesh
+Stage 6E - Basic PBR Material
+```
+
+## Stage 6A Decisions
+
+```text
+Stage 6A introduces Math V0.
+Math V0 uses glm as the backend.
+XEngine code should use XEngine Math types such as Vec2 / Vec3 / Vec4 / Mat4 / Quat.
+Direct glm usage should be avoided outside the Math module where practical.
+Future stages may replace aliases with fully owned XEngine math structs if needed.
+```
+
+```text
+stb_image is used as the Stage 6 simple development image loader.
+It is lightweight and easy to integrate.
+It is not the final production texture pipeline.
+Future production texture support should include KTX2 / Basis Universal / DDS / GPU compressed formats.
+```
+
+```text
+RHIDevice currently acts as a resource creation facade.
+This is acceptable in early stages.
+Renderer controls what resources are created.
+RHI backend controls how native GPU resources are created.
+Resource usage should happen through RHICommandList.
+Future stages should split RHIDevice into ResourceFactory / UploadManager / Swapchain / Queue responsibilities.
+```
+
+Do not introduce RenderFeature system in Stage 6.
+RenderFeature V0 is planned for Stage 9 when HDR / Tonemap / Bloom / FXAA become configurable.
+
+---
+
+## Stage 6B - TextureManager + stb_image File Loading
+
+```text
+TextureManager is a lightweight renderer-side manager, not the full AssetSystem.
+stb_image is used for simple development-time loading of PNG/JPG/TGA/HDR-style files where supported.
+TextureManager loads RGBA8 CPU pixels and creates RHITexture through RHIDevice.
+TextureManager owns default fallback textures.
+Missing files return a missing texture fallback.
+No MaterialSystem yet.
+No texture sampling shader yet.
+No BindGroup / descriptor V0 yet.
+Future production texture pipeline should support KTX2 / Basis Universal / DDS / GPU compressed formats.
+```
+
+---
+
 # Stage 7 - glTF Asset + Scene Integration
 
 ## Status

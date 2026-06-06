@@ -74,6 +74,7 @@ namespace XEngine
             }
 
             m_Device = std::move(vulkanDevice);
+            CreateDefaultTextureValidationResources();
             m_Initialized = true;
 #else
             XENGINE_LOG_ERROR("Vulkan backend requested but XENGINE_ENABLE_VULKAN is disabled.");
@@ -96,6 +97,9 @@ namespace XEngine
         if (m_Device)
         {
             m_Device->WaitIdle();
+            m_DefaultLinearRepeatSampler.reset();
+            m_DefaultNormalTexture.reset();
+            m_DefaultWhiteTexture.reset();
             m_Device.reset();
         }
 
@@ -150,5 +154,57 @@ namespace XEngine
     const RHIDevice* RHISystem::GetDevice() const
     {
         return m_Device.get();
+    }
+
+    void RHISystem::CreateDefaultTextureValidationResources()
+    {
+        if (!m_Device || !m_Device->IsValid())
+        {
+            return;
+        }
+
+        RHITextureDesc textureDesc;
+        textureDesc.Width = 1;
+        textureDesc.Height = 1;
+        textureDesc.MipLevels = 1;
+        textureDesc.ArrayLayers = 1;
+        textureDesc.Format = RHIFormat::RGBA8Unorm;
+        textureDesc.Dimension = RHITextureDimension::Texture2D;
+        textureDesc.Usage = RHITextureUsageFlags::Sampled | RHITextureUsageFlags::TransferDst;
+        textureDesc.DebugName = "DefaultWhiteTexture";
+
+        const u8 whitePixel[] = { 255, 255, 255, 255 };
+        m_DefaultWhiteTexture = m_Device->CreateTexture(textureDesc, whitePixel, sizeof(whitePixel));
+        if (!m_DefaultWhiteTexture)
+        {
+            XENGINE_LOG_ERROR("Failed to create DefaultWhiteTexture validation resource");
+            return;
+        }
+
+        textureDesc.DebugName = "DefaultNormalTexture";
+        const u8 normalPixel[] = { 128, 128, 255, 255 };
+        m_DefaultNormalTexture = m_Device->CreateTexture(textureDesc, normalPixel, sizeof(normalPixel));
+        if (!m_DefaultNormalTexture)
+        {
+            XENGINE_LOG_ERROR("Failed to create DefaultNormalTexture validation resource");
+            return;
+        }
+
+        RHISamplerDesc samplerDesc;
+        samplerDesc.MinFilter = RHIFilter::Linear;
+        samplerDesc.MagFilter = RHIFilter::Linear;
+        samplerDesc.AddressU = RHIAddressMode::Repeat;
+        samplerDesc.AddressV = RHIAddressMode::Repeat;
+        samplerDesc.AddressW = RHIAddressMode::Repeat;
+        samplerDesc.DebugName = "DefaultLinearRepeatSampler";
+
+        m_DefaultLinearRepeatSampler = m_Device->CreateSampler(samplerDesc);
+        if (!m_DefaultLinearRepeatSampler)
+        {
+            XENGINE_LOG_ERROR("Failed to create DefaultLinearRepeatSampler validation resource");
+            return;
+        }
+
+        XENGINE_LOG_INFO("Created Stage 6A default white/normal textures and linear repeat sampler");
     }
 }

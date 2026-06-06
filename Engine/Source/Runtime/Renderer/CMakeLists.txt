@@ -6,6 +6,8 @@ file(GLOB_RECURSE XENGINE_RENDERER_SOURCES CONFIGURE_DEPENDS
     Private/RenderGraph/*.cpp
     Private/Mesh/*.h
     Private/Mesh/*.cpp
+    Private/Resources/*.h
+    Private/Resources/*.cpp
     Private/RenderSystem.cpp
 )
 
@@ -16,6 +18,7 @@ target_include_directories(XEngineRenderer
         Public
     PRIVATE
         Private
+        ${XENGINE_STB_INCLUDE_DIR}
 )
 
 target_compile_features(XEngineRenderer PUBLIC cxx_std_20)

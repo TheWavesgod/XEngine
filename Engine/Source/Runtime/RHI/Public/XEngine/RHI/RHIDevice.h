@@ -4,8 +4,11 @@
 #include <XEngine/RHI/RHITypes.h>
 #include <XEngine/RHI/Resources/RHIBuffer.h>
 #include <XEngine/RHI/Resources/RHIPipeline.h>
+#include <XEngine/RHI/Resources/RHISampler.h>
 #include <XEngine/RHI/Resources/RHIShader.h>
+#include <XEngine/RHI/Resources/RHITexture.h>
 
+#include <cstddef>
 #include <memory>
 
 namespace XEngine
@@ -32,6 +35,16 @@ namespace XEngine
             const RHIBufferDesc& desc,
             const void* initialData,
             std::size_t initialDataSize) = 0;
+
+        // TODO Stage 8/10:
+        // Split RHIDevice resource creation into RHIResourceFactory and texture uploads into RHIUploadManager.
+        virtual std::shared_ptr<RHITexture> CreateTexture(
+            const RHITextureDesc& desc,
+            const void* initialData,
+            std::size_t initialDataSize) = 0;
+
+        virtual std::shared_ptr<RHISampler> CreateSampler(
+            const RHISamplerDesc& desc) = 0;
 
         virtual std::shared_ptr<RHIPipeline> CreateGraphicsPipeline(
             const RHIGraphicsPipelineDesc& desc) = 0;

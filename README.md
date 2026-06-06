@@ -93,6 +93,38 @@ Stage 5 - Engine CMake Modularization + Basic Mesh Forward Renderer adds:
 
 Stage 5 does not implement glTF loading, material systems, texture sampling, PBR, ECS, ImGui, RenderFeature, GPU-driven rendering, or descriptor-based per-material resources.
 
+Stage 6A adds:
+- Math V0 using glm backend
+- RHITexture abstraction
+- RHISampler abstraction
+- VulkanTexture
+- VulkanSampler
+- Initial CPU pixel data upload to GPU texture
+- Default white texture validation
+- Default normal texture validation
+- stb_image dependency prepared for Stage 6B
+
+Stage 6A does not implement full TextureManager.
+Stage 6A does not implement MaterialSystem.
+Stage 6A does not sample textures in shaders yet.
+Stage 6A does not implement PBR.
+Stage 6A does not implement bindless descriptors.
+
+Stage 6B adds:
+- TextureManager
+- TextureHandle
+- stb_image-based private image loading
+- RGBA8 image loading
+- RHITexture creation from loaded image data
+- Default fallback textures
+- Optional checker texture load from Assets/Textures/checker.png
+
+Stage 6B does not implement MaterialSystem.
+Stage 6B does not bind textures to shaders.
+Stage 6B does not implement PBR.
+Stage 6B does not implement AssetSystem.
+Stage 6B does not implement texture streaming.
+
 Stage 2B-2 adds:
 - Vulkan swapchain creation
 - Swapchain image views

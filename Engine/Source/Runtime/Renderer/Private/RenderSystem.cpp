@@ -8,6 +8,7 @@
 #include "Passes/TrianglePass.h"
 #include "RenderGraph/RenderGraph.h"
 #include "RenderGraph/RenderGraphContext.h"
+#include "Resources/TextureManager.h"
 
 #include <XEngine/Core/Assert.h>
 #include <XEngine/Engine/Engine.h>
@@ -24,6 +25,8 @@
 
 #include <cmath>
 #include <cstddef>
+#include <filesystem>
+#include <string>
 #include <vector>
 
 namespace XEngine
@@ -178,6 +181,19 @@ namespace XEngine
             return;
         }
 
+        m_TextureManager = std::make_unique<TextureManager>();
+        m_TextureManager->Initialize(device);
+
+        const std::string checkerPath = "Assets/Textures/checker.png";
+        if (std::filesystem::exists(checkerPath))
+        {
+            m_TextureManager->LoadTexture2D(checkerPath, true);
+        }
+        else
+        {
+            XENGINE_LOG_WARN("Assets/Textures/checker.png not found; using default texture validation only.");
+        }
+
         m_CubeMesh = std::make_unique<StaticMesh>(CreateHardcodedCubeMesh(*device));
         if (!m_CubeMesh->VertexBuffer || !m_CubeMesh->IndexBuffer)
         {
@@ -284,9 +300,11 @@ namespace XEngine
         m_MeshFragmentShader.reset();
         m_MeshVertexShader.reset();
         m_CubeMesh.reset();
-        m_TrianglePipeline.reset();
-        m_TriangleFragmentShader.reset();
-        m_TriangleVertexShader.reset();
+        if (m_TextureManager)
+        {
+            m_TextureManager->Shutdown();
+            m_TextureManager.reset();
+        }
         m_RHISystem = nullptr;
         m_Initialized = false;
     }
