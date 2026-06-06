@@ -39,7 +39,6 @@ if(XENGINE_ENABLE_VULKAN)
         PRIVATE
             ${Vulkan_INCLUDE_DIRS}
             ${CMAKE_SOURCE_DIR}/ThirdParty/VulkanMemoryAllocator/include
-            ${XENGINE_STB_INCLUDE_DIR}
     )
 
     if(TARGET volk::volk)

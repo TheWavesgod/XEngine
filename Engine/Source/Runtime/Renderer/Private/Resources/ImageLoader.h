@@ -31,6 +31,8 @@ namespace XEngine
     class ImageLoader
     {
     public:
+        // TODO Stage 7C:
+        // Deprecated. Renderer should use AssetSystem + TextureAsset for image decoding.
         static ImageData LoadRGBA8(const std::string& path, bool flipVertically = true);
     };
 }

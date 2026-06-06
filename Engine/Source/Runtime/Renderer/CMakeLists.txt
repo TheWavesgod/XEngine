@@ -20,7 +20,6 @@ target_include_directories(XEngineRenderer
         Public
     PRIVATE
         Private
-        ${XENGINE_STB_INCLUDE_DIR}
 )
 
 target_compile_features(XEngineRenderer PUBLIC cxx_std_20)
@@ -30,4 +29,6 @@ target_link_libraries(XEngineRenderer
         XEngineCoreRuntime
         XEngineShader
         XEngineRHI
+    PRIVATE
+        XEngineAsset
 )

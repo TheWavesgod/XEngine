@@ -19,6 +19,7 @@ namespace XEngine
         MaterialDesc Desc;
         GPUMaterialData GPUData;
         std::shared_ptr<RHIBindGroup> BaseColorBindGroup;
+        std::shared_ptr<RHIBindGroup> PBRBindGroup;
         u32 Generation = 0;
     };
 
@@ -36,6 +37,8 @@ namespace XEngine
         const GPUMaterialData* GetGPUMaterialData(MaterialHandle handle) const;
         RHIBindGroup* GetBaseColorBindGroup(MaterialHandle handle) const;
         RHIBindGroupLayout* GetBaseColorBindGroupLayout() const;
+        RHIBindGroup* GetPBRMaterialBindGroup(MaterialHandle handle) const;
+        RHIBindGroupLayout* GetPBRMaterialBindGroupLayout() const;
 
         MaterialHandle GetDefaultLitMaterial() const;
         MaterialHandle GetDefaultUnlitMaterial() const;
@@ -48,11 +51,14 @@ namespace XEngine
         MaterialDesc ResolveFallbackTextures(const MaterialDesc& desc) const;
         GPUMaterialData BuildGPUMaterialData(const MaterialDesc& desc) const;
         std::shared_ptr<RHIBindGroup> CreateBaseColorBindGroup(const MaterialDesc& desc) const;
+        std::shared_ptr<RHIBindGroup> CreatePBRBindGroup(const MaterialDesc& desc) const;
+        RHITexture* ResolveRHITexture(TextureHandle texture, TextureHandle fallback) const;
         TextureHandle ResolveTexture(TextureHandle texture, TextureHandle fallback) const;
 
         RHIDevice* m_Device = nullptr;
         TextureManager* m_TextureManager = nullptr;
         std::shared_ptr<RHIBindGroupLayout> m_BaseColorBindGroupLayout;
+        std::shared_ptr<RHIBindGroupLayout> m_PBRMaterialBindGroupLayout;
         std::shared_ptr<RHISampler> m_DefaultSampler;
         std::vector<MaterialRecord> m_Materials;
         MaterialHandle m_DefaultLitMaterial;

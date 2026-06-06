@@ -11,6 +11,7 @@ target_include_directories(XEngineCoreRuntime
         Public
     PRIVATE
         Private
+        ../Asset/Public
         ../Platform/Public
         ../Shader/Public
         ../RHI/Public

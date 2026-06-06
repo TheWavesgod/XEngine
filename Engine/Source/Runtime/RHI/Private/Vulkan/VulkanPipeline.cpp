@@ -12,24 +12,6 @@
 
 namespace XEngine
 {
-    namespace
-    {
-        VkShaderStageFlags ToVulkanShaderStageFlags(ShaderStage stage)
-        {
-            switch (stage)
-            {
-            case ShaderStage::Vertex:
-                return VK_SHADER_STAGE_VERTEX_BIT;
-            case ShaderStage::Fragment:
-                return VK_SHADER_STAGE_FRAGMENT_BIT;
-            case ShaderStage::Compute:
-                return VK_SHADER_STAGE_COMPUTE_BIT;
-            default:
-                return 0;
-            }
-        }
-    }
-
     VulkanPipeline::VulkanPipeline(VkDevice device, const RHIGraphicsPipelineDesc& desc)
         : m_Device(device)
         , m_PushConstantStages(ToVulkanShaderStageFlags(desc.PushConstantStages))

@@ -59,7 +59,7 @@ namespace XEngine
 
                     MeshPushConstants constants;
                     constants.ModelViewProjection = object.ModelViewProjection;
-                    commandList->PushConstants(ShaderStage::Vertex, &constants, sizeof(constants));
+                    commandList->PushConstants(RHIShaderStageFlags::Vertex, &constants, sizeof(constants));
 
                     commandList->DrawIndexed(object.Mesh->IndexCount, 1, 0, 0, 0);
                 }

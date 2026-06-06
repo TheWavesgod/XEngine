@@ -135,7 +135,7 @@ namespace XEngine
         {
             if (resource.Type != RHIBindingType::CombinedImageSampler)
             {
-                XENGINE_LOG_ERROR("Stage 6D VulkanBindGroup only supports combined image sampler resources");
+                XENGINE_LOG_ERROR("VulkanBindGroup currently supports combined image sampler resources only");
                 return false;
             }
 

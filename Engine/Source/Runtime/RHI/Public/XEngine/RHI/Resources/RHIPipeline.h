@@ -39,7 +39,7 @@ namespace XEngine
         std::vector<RHIBindGroupLayout*> BindGroupLayouts;
 
         u32 PushConstantSize = 0;
-        ShaderStage PushConstantStages = ShaderStage::Vertex;
+        RHIShaderStageFlags PushConstantStages = RHIShaderStageFlags::Vertex;
 
         const char* DebugName = nullptr;
     };

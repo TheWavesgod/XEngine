@@ -32,7 +32,7 @@ namespace XEngine
         void SetVertexBuffer(RHIBuffer* buffer, u64 offset = 0) override;
         void SetIndexBuffer(RHIBuffer* buffer, RHIIndexFormat format, u64 offset = 0) override;
         void PushConstants(
-            ShaderStage stages,
+            RHIShaderStageFlags stages,
             const void* data,
             std::size_t size,
             std::size_t offset = 0) override;

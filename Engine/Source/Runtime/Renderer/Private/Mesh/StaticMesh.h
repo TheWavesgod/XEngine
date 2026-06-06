@@ -13,6 +13,7 @@ namespace XEngine
     {
         Vector3 Position;
         Vector3 Color;
+        Vector3 Normal;
         Vector2 UV;
     };
 

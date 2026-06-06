@@ -13,6 +13,7 @@ namespace XEngine
 {
     class RHIDevice;
     class RHITexture;
+    struct TextureAsset;
 
     struct TextureRecord
     {
@@ -28,6 +29,7 @@ namespace XEngine
         void Shutdown();
 
         TextureHandle LoadTexture2D(const std::string& path, bool srgb = true);
+        TextureHandle CreateTextureFromAsset(const TextureAsset& asset, bool srgb = true);
 
         TextureHandle CreateSolidColorTexture(
             const char* name,

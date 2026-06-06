@@ -1,5 +1,6 @@
 #include <XEngine/Engine/Engine.h>
 
+#include <XEngine/Asset/AssetSystem.h>
 #include <XEngine/Core/Assert.h>
 #include <XEngine/Engine/SubsystemContext.h>
 #include <XEngine/Logging/Log.h>
@@ -49,6 +50,8 @@ namespace XEngine
         {
             m_SubsystemManager.AddSubsystem<ShaderSystem>();
         }
+
+        m_SubsystemManager.AddSubsystem<AssetSystem>();
 
         if (m_Config.CreateGraphicsDevice)
         {

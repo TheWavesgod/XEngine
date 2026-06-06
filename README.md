@@ -157,6 +157,62 @@ Stage 6D does not implement bindless descriptors.
 Stage 6D does not implement AssetSystem.
 Stage 6D does not implement RenderFeature system.
 
+Stage 6E adds:
+- ForwardPBR.slang
+- Basic metallic-roughness PBR shader
+- PBR material bind group
+- Base color texture support
+- Normal texture slot with safe fallback
+- Metallic-roughness texture slot with safe fallback
+- AO texture slot with safe fallback
+- Base color factor, metallic factor, and roughness factor
+- Simple directional light
+- Lit material rendering through ForwardOpaquePass
+
+Stage 6E does not implement IBL.
+Stage 6E does not implement shadows.
+Stage 6E does not implement glTF import.
+Stage 6E does not implement bindless descriptors.
+Stage 6E does not implement RenderFeature system.
+
+Stage 7A adds:
+- Runtime Asset module
+- AssetSystem subsystem
+- AssetHandle
+- AssetType / AssetLoadState
+- AssetMetadata
+- AssetRegistry
+- AssetImportContext / AssetImportResult
+- Source asset metadata registration
+- Path lookup and basic extension-based type guessing
+- fastgltf 0.9 source validation for future glTF importer work
+- glTF validation asset documentation under Assets/Models/gltf
+
+Stage 7A does not parse glTF yet.
+Stage 7A does not create GPU resources.
+Stage 7A does not implement AssetDatabase persistence.
+Stage 7A does not implement async loading.
+
+Stage 7B adds:
+- TextureAsset CPU-side RGBA8 texture data
+- Public AssetImportTypes without exposing importer implementations
+- Private IAssetImporter under Runtime/Asset
+- Private ImporterRegistry with extension-based importer dispatch
+- Private ImageImporter using stb_image inside Asset implementation
+- AssetSystem image import into TextureAsset
+- AssetSystem TextureAsset lookup by AssetHandle
+- Renderer TextureManager bridge from TextureAsset to RHITexture
+- Optional checker texture import through AssetSystem
+
+IAssetImporter is private to the Asset module.
+stb_image is private to Asset importer implementation.
+Renderer no longer owns image decoding long-term; old renderer image loading files are deprecated compatibility shells.
+
+Stage 7B does not parse glTF yet.
+Stage 7B does not implement MeshAsset import.
+Stage 7B does not implement MaterialAsset import.
+Stage 7B does not create GPU resources inside AssetSystem.
+
 Stage 2B-2 adds:
 - Vulkan swapchain creation
 - Swapchain image views

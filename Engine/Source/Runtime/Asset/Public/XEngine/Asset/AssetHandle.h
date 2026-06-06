@@ -1,18 +1,35 @@
-﻿#pragma once
+#pragma once
 
-#include <XEngine/Asset/AssetId.h>
+#include <XEngine/Core/Types.h>
 
 namespace XEngine
 {
-    template<typename T>
-    class AssetHandle
-    {
-    public:
-        AssetId GetId() const { return m_Id; }
-        bool IsValid() const { return m_Id != 0; }
+    constexpr u32 InvalidAssetHandleIndex = 0xffffffffu;
 
-    private:
-        AssetId m_Id = 0;
+    // Runtime handle into AssetSystem metadata. It is not a persistent asset id.
+    struct AssetHandle
+    {
+        u32 Index = InvalidAssetHandleIndex;
+        u32 Generation = 0;
+
+        bool IsValid() const
+        {
+            return Index != InvalidAssetHandleIndex;
+        }
+
+        explicit operator bool() const
+        {
+            return IsValid();
+        }
+
+        friend bool operator==(const AssetHandle& lhs, const AssetHandle& rhs)
+        {
+            return lhs.Index == rhs.Index && lhs.Generation == rhs.Generation;
+        }
+
+        friend bool operator!=(const AssetHandle& lhs, const AssetHandle& rhs)
+        {
+            return !(lhs == rhs);
+        }
     };
 }
-

@@ -53,6 +53,39 @@ namespace XEngine
             return;
         }
 
+        RHIBindGroupLayoutDesc pbrLayoutDesc;
+        pbrLayoutDesc.DebugName = "PBR material bind group layout";
+        pbrLayoutDesc.Entries.push_back(RHIBindGroupLayoutEntry {
+            0,
+            RHIBindingType::CombinedImageSampler,
+            RHIShaderStageFlags::Fragment,
+            1
+        });
+        pbrLayoutDesc.Entries.push_back(RHIBindGroupLayoutEntry {
+            1,
+            RHIBindingType::CombinedImageSampler,
+            RHIShaderStageFlags::Fragment,
+            1
+        });
+        pbrLayoutDesc.Entries.push_back(RHIBindGroupLayoutEntry {
+            2,
+            RHIBindingType::CombinedImageSampler,
+            RHIShaderStageFlags::Fragment,
+            1
+        });
+        pbrLayoutDesc.Entries.push_back(RHIBindGroupLayoutEntry {
+            3,
+            RHIBindingType::CombinedImageSampler,
+            RHIShaderStageFlags::Fragment,
+            1
+        });
+        m_PBRMaterialBindGroupLayout = m_Device->CreateBindGroupLayout(pbrLayoutDesc);
+        if (!m_PBRMaterialBindGroupLayout)
+        {
+            XENGINE_LOG_ERROR("Failed to create PBR material bind group layout");
+            return;
+        }
+
         RHISamplerDesc samplerDesc;
         samplerDesc.MinFilter = RHIFilter::Linear;
         samplerDesc.MagFilter = RHIFilter::Linear;
@@ -106,6 +139,7 @@ namespace XEngine
         XENGINE_LOG_INFO("MaterialSystem shutdown");
         m_Materials.clear();
         m_DefaultSampler.reset();
+        m_PBRMaterialBindGroupLayout.reset();
         m_BaseColorBindGroupLayout.reset();
         m_DefaultLitMaterial = {};
         m_DefaultUnlitMaterial = {};
@@ -166,6 +200,21 @@ namespace XEngine
         return m_BaseColorBindGroupLayout.get();
     }
 
+    RHIBindGroup* MaterialSystem::GetPBRMaterialBindGroup(MaterialHandle handle) const
+    {
+        if (!IsValid(handle))
+        {
+            return nullptr;
+        }
+
+        return m_Materials[handle.Index].PBRBindGroup.get();
+    }
+
+    RHIBindGroupLayout* MaterialSystem::GetPBRMaterialBindGroupLayout() const
+    {
+        return m_PBRMaterialBindGroupLayout.get();
+    }
+
     MaterialHandle MaterialSystem::GetDefaultLitMaterial() const
     {
         return m_DefaultLitMaterial;
@@ -200,6 +249,7 @@ namespace XEngine
         record.Desc = resolvedDesc;
         record.GPUData = BuildGPUMaterialData(resolvedDesc);
         record.BaseColorBindGroup = CreateBaseColorBindGroup(resolvedDesc);
+        record.PBRBindGroup = CreatePBRBindGroup(resolvedDesc);
         record.Generation = 1;
 
         MaterialHandle handle;
@@ -235,7 +285,7 @@ namespace XEngine
         gpu.RoughnessFactor = desc.RoughnessFactor;
         gpu.AlphaCutoff = desc.AlphaCutoff;
 
-        // TODO Stage 10/11: replace TextureHandle.Index placeholders with
+        // TODO Stage 11: replace TextureHandle.Index placeholders with
         // BindlessResourceManager texture indices.
         gpu.BaseColorTextureIndex = desc.BaseColorTexture.Index;
         gpu.NormalTextureIndex = desc.NormalTexture.Index;
@@ -295,8 +345,84 @@ namespace XEngine
             nullptr
         });
 
-        // TODO Stage 6E/10/11: move toward reflection-driven layouts and bindless texture indices.
+        // TODO Stage 10/11: move toward reflection-driven layouts and bindless texture indices.
         return m_Device->CreateBindGroup(bindGroupDesc);
+    }
+
+    std::shared_ptr<RHIBindGroup> MaterialSystem::CreatePBRBindGroup(const MaterialDesc& desc) const
+    {
+        if (m_Device == nullptr || m_TextureManager == nullptr ||
+            !m_PBRMaterialBindGroupLayout || !m_DefaultSampler)
+        {
+            return nullptr;
+        }
+
+        RHITexture* baseColorTexture = ResolveRHITexture(desc.BaseColorTexture, m_TextureManager->GetDefaultWhiteTexture());
+        RHITexture* normalTexture = ResolveRHITexture(desc.NormalTexture, m_TextureManager->GetDefaultNormalTexture());
+        RHITexture* metallicRoughnessTexture = ResolveRHITexture(
+            desc.MetallicRoughnessTexture,
+            m_TextureManager->GetDefaultWhiteTexture());
+        RHITexture* aoTexture = ResolveRHITexture(desc.AOTexture, m_TextureManager->GetDefaultWhiteTexture());
+
+        if (baseColorTexture == nullptr || normalTexture == nullptr ||
+            metallicRoughnessTexture == nullptr || aoTexture == nullptr)
+        {
+            XENGINE_LOG_ERROR("Failed to resolve one or more textures for PBR material bind group");
+            return nullptr;
+        }
+
+        RHIBindGroupDesc bindGroupDesc;
+        bindGroupDesc.Layout = m_PBRMaterialBindGroupLayout.get();
+        bindGroupDesc.DebugName = "PBR material bind group";
+        bindGroupDesc.Resources.push_back(RHIBindingResource {
+            0,
+            RHIBindingType::CombinedImageSampler,
+            baseColorTexture,
+            m_DefaultSampler.get(),
+            nullptr
+        });
+        bindGroupDesc.Resources.push_back(RHIBindingResource {
+            1,
+            RHIBindingType::CombinedImageSampler,
+            normalTexture,
+            m_DefaultSampler.get(),
+            nullptr
+        });
+        bindGroupDesc.Resources.push_back(RHIBindingResource {
+            2,
+            RHIBindingType::CombinedImageSampler,
+            metallicRoughnessTexture,
+            m_DefaultSampler.get(),
+            nullptr
+        });
+        bindGroupDesc.Resources.push_back(RHIBindingResource {
+            3,
+            RHIBindingType::CombinedImageSampler,
+            aoTexture,
+            m_DefaultSampler.get(),
+            nullptr
+        });
+
+        // TODO Stage 7:
+        // glTF metallic-roughness channel convention should be handled carefully.
+        // TODO Stage 11: replace per-material descriptors with bindless texture indices.
+        return m_Device->CreateBindGroup(bindGroupDesc);
+    }
+
+    RHITexture* MaterialSystem::ResolveRHITexture(TextureHandle texture, TextureHandle fallback) const
+    {
+        if (m_TextureManager == nullptr)
+        {
+            return nullptr;
+        }
+
+        RHITexture* resolvedTexture = m_TextureManager->GetTexture(texture);
+        if (resolvedTexture != nullptr)
+        {
+            return resolvedTexture;
+        }
+
+        return m_TextureManager->GetTexture(fallback);
     }
 
     TextureHandle MaterialSystem::ResolveTexture(TextureHandle texture, TextureHandle fallback) const

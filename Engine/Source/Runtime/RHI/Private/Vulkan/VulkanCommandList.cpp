@@ -161,7 +161,7 @@ namespace XEngine
         vkCmdBindIndexBuffer(m_CommandBuffer, vulkanBuffer->GetHandle(), offset, indexType);
     }
 
-    void VulkanCommandList::PushConstants(ShaderStage, const void* data, std::size_t size, std::size_t offset)
+    void VulkanCommandList::PushConstants(RHIShaderStageFlags, const void* data, std::size_t size, std::size_t offset)
     {
         if (m_CommandBuffer == VK_NULL_HANDLE || m_BoundGraphicsPipeline == nullptr || data == nullptr || size == 0)
         {

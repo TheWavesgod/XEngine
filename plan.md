@@ -720,7 +720,7 @@ Stage 6 is split into:
 Stage 6A - Math V0 + RHI Texture / Sampler / Image Upload Foundation
 Stage 6B - TextureManager + stb_image File Loading
 Stage 6C - MaterialSystem + Material Data
-Stage 6D - Unlit Textured Mesh
+Stage 6D - BindGroup V0 + Unlit Textured Mesh
 Stage 6E - Basic PBR Material
 ```
 
@@ -798,9 +798,27 @@ No bindless descriptors yet.
 No RenderFeature system yet.
 ```
 
+## Stage 6E - Basic PBR Material
+
+```text
+Adds ForwardPBR.slang.
+Extends MaterialSystem with PBR material bind groups.
+Supports base color / normal / metallic-roughness / AO texture slots.
+Supports base color factor, metallic factor, and roughness factor.
+Implements a basic direct-lighting metallic-roughness BRDF.
+Uses a simple hardcoded directional light.
+Uses push constants for Stage 6E material scalar factors.
+Uses safe fallback textures for missing material slots.
+Does not implement IBL.
+Does not implement shadows.
+Does not implement glTF import.
+Does not implement RenderFeature system.
+Does not implement bindless descriptors.
+```
+
 ---
 
-# Stage 7 - glTF Asset + Scene Integration
+# Stage 7 - Asset System Foundation
 
 ## Status
 
@@ -810,65 +828,101 @@ PLANNED
 
 ## Goal
 
-Load real assets and connect them to the scene system.
+Build the asset metadata/import pipeline in small steps, then connect real assets to renderer and scene systems.
 
-## Systems
+## Stage 7 Split
 
 ```text
-AssetSystem
-MeshAsset
-TextureAsset
-MaterialAsset
-SceneSystem
-Entity
-Components
-RenderExtractionSystem
+Stage 7A - Asset Core
+Stage 7B - TextureAsset + Private ImageImporter
+Stage 7C - MeshAsset + RenderMeshManager Bridge
+Stage 7D - MaterialAsset + RenderMaterial Bridge
+Stage 7E - glTF Importer V0
+Stage 7F - Scene Integration V0
 ```
 
-## Third-party Libraries
+## Stage 7A - Asset Core
 
 ```text
-fastgltf
-stb_image
-EnTT
-nlohmann/json
-meshoptimizer optional
+AssetHandle
+AssetType
+AssetMetadata
+AssetRegistry
+AssetSystem subsystem
+Public AssetImportTypes
+Path-based metadata registration
+Basic type guessing from source extensions
+No real importers yet
+No GPU resources
 ```
 
-## Features
+## Stage 7B - TextureAsset + Private ImageImporter
 
 ```text
-Load glTF mesh
-Load glTF material
-Load texture references
-Create scene entity
-TransformComponent
-MeshRendererComponent
-CameraComponent
-LightComponent
-Extract RenderScene from Scene
+TextureAsset CPU-side RGBA8 data
+IAssetImporter private to Runtime/Asset
+Public AssetSystem exposes ImportAsset(), not importer registration
+Private ImporterRegistry
+Extension-based importer dispatch
+Private ImageImporter backed by stb_image
+AssetSystem image import into TextureAsset
+AssetSystem TextureAsset lookup by AssetHandle
+Renderer TextureManager bridge from TextureAsset to RHITexture
+Renderer image decoding deprecated
+No glTF parsing yet
+No MeshAsset import yet
+No MaterialAsset import yet
+No GPU resources inside AssetSystem
 ```
 
-## Important Architecture Rule
-
-Scene must not directly call renderer draw functions.
-
-Correct direction:
+## Asset / Renderer / RHI Boundary
 
 ```text
-Scene
-  -> RenderExtractionSystem
-  -> RenderScene
-  -> RenderSystem
+AssetSystem:
+  Owns source paths, asset handles, metadata, private importer registry, and CPU-side asset data.
+
+Renderer:
+  Owns render resource managers, material systems, and GPU-facing render representations.
+  Converts TextureAsset data into RHITexture objects.
+
+RHI:
+  Owns backend GPU objects such as buffers, images, samplers, descriptor sets, and pipelines.
+```
+
+Correct future data flow:
+
+```text
+.gltf / .glb / .png / .jpg
+  -> AssetSystem
+  -> private importer
+  -> TextureAsset / MeshAsset / MaterialAsset
+  -> Renderer managers
+  -> RHI resources
+```
+
+## fastgltf Decision
+
+```text
+fastgltf 0.9 is the selected glTF importer library.
+It is placed under ThirdParty/fastgltf.
+It should be used only inside Asset/Private/Importers/GltfImporter in Stage 7E.
+Public Asset headers must not expose fastgltf types.
+Renderer and RHI must not include fastgltf.
+```
+
+## Validation Assets
+
+```text
+Validation assets are placed under Assets/models/gltf:
+- Cube with texture
+- DamagedHelmet
 ```
 
 ## Completion Criteria
 
 ```text
-Scene entity renders a glTF mesh.
-Scene does not depend on RHI.
-Asset system does not expose Vulkan resources.
-Renderer receives RenderScene as input.
+Stage 7A creates AssetSystem and metadata registration without parsing glTF or creating GPU resources.
+Later Stage 7 sub-stages add texture, mesh, material, glTF, and scene integration.
 ```
 
 ---
@@ -1538,7 +1592,7 @@ Stage 15:
 3. Stage 4.5 - JobSystem V0
 4. Stage 5 - Basic Mesh Forward Renderer
 5. Stage 6 - Material + Texture + Basic PBR
-6. Stage 7 - glTF Asset + Scene Integration
+6. Stage 7 - Asset System Foundation
 7. Stage 7.5 - Async Asset Loading V0
 8. Stage 8 - Lighting + Shadow
 9. Stage 9 - HDR + Post-processing + RenderFeature V0

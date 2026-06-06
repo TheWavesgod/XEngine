@@ -22,7 +22,7 @@ namespace XEngine
         virtual void SetVertexBuffer(RHIBuffer* buffer, u64 offset = 0) = 0;
         virtual void SetIndexBuffer(RHIBuffer* buffer, RHIIndexFormat format, u64 offset = 0) = 0;
         virtual void PushConstants(
-            ShaderStage stages,
+            RHIShaderStageFlags stages,
             const void* data,
             std::size_t size,
             std::size_t offset = 0) = 0;

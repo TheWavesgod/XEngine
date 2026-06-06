@@ -1,13 +1,13 @@
 #include "TextureManager.h"
 
-#include "ImageLoader.h"
-
+#include <XEngine/Asset/Assets/TextureAsset.h>
 #include <XEngine/Core/Assert.h>
 #include <XEngine/Logging/Log.h>
 #include <XEngine/RHI/RHIDevice.h>
 
 #include <filesystem>
 #include <string>
+#include <utility>
 
 namespace XEngine
 {
@@ -71,6 +71,7 @@ namespace XEngine
 
     TextureHandle TextureManager::LoadTexture2D(const std::string& path, bool srgb)
     {
+        (void)srgb;
         if (m_Device == nullptr || !m_Device->IsValid())
         {
             XENGINE_LOG_ERROR("Texture load failed because TextureManager has no valid RHIDevice");
@@ -78,32 +79,46 @@ namespace XEngine
         }
 
         const std::string normalizedPath = NormalizeTexturePath(path);
+        // TODO Stage 7C:
+        // Deprecated. Renderer should not decode image files directly.
+        // Use AssetSystem::ImportAsset and CreateTextureFromAsset instead.
+        XENGINE_LOG_WARN(std::string("Deprecated renderer texture path requested: ") + normalizedPath);
+        return m_MissingTexture;
+    }
+
+    TextureHandle TextureManager::CreateTextureFromAsset(const TextureAsset& asset, bool srgb)
+    {
+        if (m_Device == nullptr || !m_Device->IsValid())
+        {
+            XENGINE_LOG_ERROR("Texture creation failed because TextureManager has no valid RHIDevice");
+            return m_MissingTexture;
+        }
+
+        if (!asset.IsValid() || asset.Format != TextureAssetFormat::RGBA8)
+        {
+            XENGINE_LOG_WARN("TextureAsset is invalid or has an unsupported format");
+            return m_MissingTexture;
+        }
+
+        const std::string normalizedPath = NormalizeTexturePath(asset.SourcePath);
         const auto cached = m_PathCache.find(normalizedPath);
         if (cached != m_PathCache.end())
         {
             return cached->second;
         }
 
-        XENGINE_LOG_INFO(std::string("Loading texture: ") + normalizedPath);
-        ImageData image = ImageLoader::LoadRGBA8(normalizedPath);
-        if (!image.IsValid())
-        {
-            XENGINE_LOG_WARN(std::string("Texture load failed: ") + normalizedPath);
-            return m_MissingTexture;
-        }
-
         RHITextureDesc desc;
-        desc.Width = image.Width;
-        desc.Height = image.Height;
+        desc.Width = asset.Width;
+        desc.Height = asset.Height;
         desc.MipLevels = 1;
         desc.ArrayLayers = 1;
-        desc.Format = srgb ? RHIFormat::RGBA8Srgb : RHIFormat::RGBA8Unorm;
+        desc.Format = (srgb && asset.IsSRGB) ? RHIFormat::RGBA8Srgb : RHIFormat::RGBA8Unorm;
         desc.Dimension = RHITextureDimension::Texture2D;
         desc.Usage = RHITextureUsageFlags::Sampled | RHITextureUsageFlags::TransferDst;
         desc.GenerateMips = false;
-        desc.DebugName = nullptr;
+        desc.DebugName = normalizedPath.c_str();
 
-        std::shared_ptr<RHITexture> texture = m_Device->CreateTexture(desc, image.Pixels.data(), image.Pixels.size());
+        std::shared_ptr<RHITexture> texture = m_Device->CreateTexture(desc, asset.Pixels.data(), asset.Pixels.size());
         if (!texture)
         {
             XENGINE_LOG_ERROR(std::string("Failed to create RHI texture: ") + normalizedPath);

@@ -4,13 +4,15 @@
 #include "Mesh/StaticMesh.h"
 #include "Materials/MaterialSystem.h"
 #include "Passes/ClearPass.h"
-#include "Passes/ForwardMeshPass.h"
+#include "Passes/ForwardOpaquePass.h"
 #include "Passes/PresentPass.h"
 #include "Passes/TrianglePass.h"
 #include "RenderGraph/RenderGraph.h"
 #include "RenderGraph/RenderGraphContext.h"
 #include "Resources/TextureManager.h"
 
+#include <XEngine/Asset/AssetSystem.h>
+#include <XEngine/Asset/Assets/TextureAsset.h>
 #include <XEngine/Core/Assert.h>
 #include <XEngine/Engine/Engine.h>
 #include <XEngine/Engine/SubsystemManager.h>
@@ -138,6 +140,13 @@ namespace XEngine
             desc.DebugName = debugName;
             return desc;
         }
+
+        struct PBRPipelinePushConstants
+        {
+            Matrix4 ModelViewProjection;
+            Vec4 BaseColorFactor;
+            Vec4 MaterialFactors;
+        };
     }
 
     RenderSystem::RenderSystem() = default;
@@ -186,29 +195,51 @@ namespace XEngine
         m_TextureManager->Initialize(device);
 
         TextureHandle baseColorTexture = m_TextureManager->GetDefaultWhiteTexture();
-        const std::string checkerPath = "Assets/Textures/checker.png";
+        AssetSystem* assetSystem = context.Engine->GetSubsystemManager().GetSubsystem<AssetSystem>();
+        const std::string checkerPath = "Assets/Textures/checker.jpg";
         if (std::filesystem::exists(checkerPath))
         {
-            baseColorTexture = m_TextureManager->LoadTexture2D(checkerPath, true);
+            if (assetSystem != nullptr)
+            {
+                AssetImportResult importResult = assetSystem->ImportAsset(checkerPath);
+                const TextureAsset* textureAsset = importResult.Succeeded() ?
+                    assetSystem->GetTextureAsset(importResult.MainAsset) :
+                    nullptr;
+                if (textureAsset != nullptr)
+                {
+                    baseColorTexture = m_TextureManager->CreateTextureFromAsset(*textureAsset, true);
+                }
+                else
+                {
+                    XENGINE_LOG_WARN("AssetSystem could not import checker texture; using default texture.");
+                }
+            }
+            else
+            {
+                XENGINE_LOG_WARN("AssetSystem is unavailable; using default texture validation only.");
+            }
         }
         else
         {
-            XENGINE_LOG_WARN("Assets/Textures/checker.png not found; using default texture validation only.");
+            XENGINE_LOG_WARN("Assets/Textures/checker.jpg not found; using default texture validation only.");
         }
 
         m_MaterialSystem = std::make_unique<MaterialSystem>();
         m_MaterialSystem->Initialize(m_TextureManager.get(), device);
 
         MaterialDesc testMaterialDesc;
-        testMaterialDesc.ShadingModel = MaterialShadingModel::Unlit;
+        testMaterialDesc.ShadingModel = MaterialShadingModel::Lit;
         testMaterialDesc.BaseColorFactor = Vec4 { 1.0f, 0.8f, 0.6f, 1.0f };
         testMaterialDesc.MetallicFactor = 0.0f;
         testMaterialDesc.RoughnessFactor = 0.5f;
         testMaterialDesc.BaseColorTexture = baseColorTexture;
-        m_TestMaterial = m_MaterialSystem->CreateMaterial("Stage6D_UnlitTexturedMaterial", testMaterialDesc);
+        testMaterialDesc.NormalTexture = m_TextureManager->GetDefaultNormalTexture();
+        testMaterialDesc.MetallicRoughnessTexture = m_TextureManager->GetDefaultWhiteTexture();
+        testMaterialDesc.AOTexture = m_TextureManager->GetDefaultWhiteTexture();
+        m_TestMaterial = m_MaterialSystem->CreateMaterial("Stage6E_PBRMaterial", testMaterialDesc);
         if (m_MaterialSystem->IsValid(m_TestMaterial))
         {
-            XENGINE_LOG_INFO("Stage 6D unlit textured material created.");
+            XENGINE_LOG_INFO("Stage 6E PBR material created.");
         }
 
         m_CubeMesh = std::make_unique<StaticMesh>(CreateHardcodedCubeMesh(*device));
@@ -219,50 +250,50 @@ namespace XEngine
         }
 
         ShaderCompileDesc vertexDesc;
-        vertexDesc.Path = "Engine/Shaders/Passes/UnlitTextured.slang";
+        vertexDesc.Path = "Engine/Shaders/Passes/ForwardPBR.slang";
         vertexDesc.EntryPoint = "vertexMain";
         vertexDesc.Stage = ShaderStage::Vertex;
         vertexDesc.Target = ShaderTarget::VulkanSPIRV;
         vertexDesc.GenerateDebugInfo = true;
         vertexDesc.EnableOptimization = false;
 
-        XENGINE_LOG_INFO("Compiling UnlitTextured.slang vertexMain");
+        XENGINE_LOG_INFO("Compiling ForwardPBR.slang vertexMain");
         CompiledShader vertexShader = shaderSystem->Compile(vertexDesc);
         if (!vertexShader.IsValid())
         {
-            XENGINE_LOG_ERROR(vertexShader.Diagnostics.empty() ? "UnlitTextured vertex shader compilation failed" :
+            XENGINE_LOG_ERROR(vertexShader.Diagnostics.empty() ? "ForwardPBR vertex shader compilation failed" :
                                                                   vertexShader.Diagnostics);
             return;
         }
 
         ShaderCompileDesc fragmentDesc;
-        fragmentDesc.Path = "Engine/Shaders/Passes/UnlitTextured.slang";
+        fragmentDesc.Path = "Engine/Shaders/Passes/ForwardPBR.slang";
         fragmentDesc.EntryPoint = "fragmentMain";
         fragmentDesc.Stage = ShaderStage::Fragment;
         fragmentDesc.Target = ShaderTarget::VulkanSPIRV;
         fragmentDesc.GenerateDebugInfo = true;
         fragmentDesc.EnableOptimization = false;
 
-        XENGINE_LOG_INFO("Compiling UnlitTextured.slang fragmentMain");
+        XENGINE_LOG_INFO("Compiling ForwardPBR.slang fragmentMain");
         CompiledShader fragmentShader = shaderSystem->Compile(fragmentDesc);
         if (!fragmentShader.IsValid())
         {
-            XENGINE_LOG_ERROR(fragmentShader.Diagnostics.empty() ? "UnlitTextured fragment shader compilation failed" :
+            XENGINE_LOG_ERROR(fragmentShader.Diagnostics.empty() ? "ForwardPBR fragment shader compilation failed" :
                                                                     fragmentShader.Diagnostics);
             return;
         }
 
-        m_MeshVertexShader = device->CreateShader(MakeRHIShaderDesc(vertexShader, "UnlitTextured vertex"));
+        m_MeshVertexShader = device->CreateShader(MakeRHIShaderDesc(vertexShader, "ForwardPBR vertex"));
         if (!m_MeshVertexShader)
         {
-            XENGINE_LOG_ERROR("Failed to create UnlitTextured vertex RHI shader");
+            XENGINE_LOG_ERROR("Failed to create ForwardPBR vertex RHI shader");
             return;
         }
 
-        m_MeshFragmentShader = device->CreateShader(MakeRHIShaderDesc(fragmentShader, "UnlitTextured fragment"));
+        m_MeshFragmentShader = device->CreateShader(MakeRHIShaderDesc(fragmentShader, "ForwardPBR fragment"));
         if (!m_MeshFragmentShader)
         {
-            XENGINE_LOG_ERROR("Failed to create UnlitTextured fragment RHI shader");
+            XENGINE_LOG_ERROR("Failed to create ForwardPBR fragment RHI shader");
             return;
         }
 
@@ -276,18 +307,18 @@ namespace XEngine
         pipelineDesc.VertexLayout.Stride = sizeof(MeshVertex);
         pipelineDesc.VertexLayout.Attributes = {
             RHIVertexAttributeDesc { 0, RHIFormat::R32G32B32Float, static_cast<u32>(offsetof(MeshVertex, Position)) },
-            RHIVertexAttributeDesc { 1, RHIFormat::R32G32B32Float, static_cast<u32>(offsetof(MeshVertex, Color)) },
+            RHIVertexAttributeDesc { 1, RHIFormat::R32G32B32Float, static_cast<u32>(offsetof(MeshVertex, Normal)) },
             RHIVertexAttributeDesc { 2, RHIFormat::R32G32Float, static_cast<u32>(offsetof(MeshVertex, UV)) }
         };
-        pipelineDesc.BindGroupLayouts.push_back(m_MaterialSystem->GetBaseColorBindGroupLayout());
-        pipelineDesc.PushConstantSize = sizeof(Matrix4);
-        pipelineDesc.PushConstantStages = ShaderStage::Vertex;
-        pipelineDesc.DebugName = "Creating unlit textured graphics pipeline";
+        pipelineDesc.BindGroupLayouts.push_back(m_MaterialSystem->GetPBRMaterialBindGroupLayout());
+        pipelineDesc.PushConstantSize = sizeof(PBRPipelinePushConstants);
+        pipelineDesc.PushConstantStages = RHIShaderStageFlags::AllGraphics;
+        pipelineDesc.DebugName = "Creating PBR graphics pipeline";
 
         m_MeshPipeline = device->CreateGraphicsPipeline(pipelineDesc);
         if (!m_MeshPipeline)
         {
-            XENGINE_LOG_ERROR("Failed to create UnlitTextured graphics pipeline");
+            XENGINE_LOG_ERROR("Failed to create ForwardPBR graphics pipeline");
             return;
         }
 
@@ -373,7 +404,7 @@ namespace XEngine
         cube.MeshId = 1;
         cube.Material = m_TestMaterial;
         objects.push_back(cube);
-        AddForwardMeshPass(graph, m_MeshPipeline.get(), m_MaterialSystem.get(), objects);
+        AddForwardOpaquePass(graph, m_MeshPipeline.get(), m_MaterialSystem.get(), objects);
         AddPresentPass(graph);
         graph.Compile();
 
