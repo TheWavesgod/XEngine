@@ -5,6 +5,8 @@
 
 namespace XEngine
 {
+    // Runtime handle to a renderer-owned material record.
+    // It is distinct from AssetHandle and does not identify CPU-side asset data.
     struct MaterialTag {};
     using MaterialHandle = Handle<MaterialTag>;
 }

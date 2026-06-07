@@ -1,7 +1,7 @@
 #include "ForwardMeshPass.h"
 
 #include "../Materials/MaterialSystem.h"
-#include "../Mesh/StaticMesh.h"
+#include "../Resources/RenderMeshManager.h"
 #include "../RenderGraph/RenderGraph.h"
 #include "../RenderGraph/RenderGraphContext.h"
 
@@ -9,6 +9,20 @@
 
 namespace XEngine
 {
+    namespace
+    {
+        Matrix4 ToMatrix4(const Mat4& matrix)
+        {
+            Matrix4 result {};
+            const float* values = &matrix[0][0];
+            for (u32 i = 0; i < 16; ++i)
+            {
+                result.Values[i] = values[i];
+            }
+            return result;
+        }
+    }
+
     struct MeshPushConstants
     {
         Matrix4 ModelViewProjection;
@@ -18,6 +32,7 @@ namespace XEngine
         RenderGraph& graph,
         RHIPipeline* pipeline,
         MaterialSystem* materialSystem,
+        RenderMeshManager* meshManager,
         const std::vector<RenderObject>& objects)
     {
         RenderGraphPassDesc desc;
@@ -30,10 +45,10 @@ namespace XEngine
             {
                 // TODO Stage 6+: declare explicit graph buffer/texture accesses.
             },
-            [pipeline, materialSystem, &objects](RenderGraphContext& context)
+            [pipeline, materialSystem, meshManager, &objects](RenderGraphContext& context)
             {
                 RHICommandList* commandList = context.GetCommandList();
-                if (commandList == nullptr || pipeline == nullptr || materialSystem == nullptr)
+                if (commandList == nullptr || pipeline == nullptr || materialSystem == nullptr || meshManager == nullptr)
                 {
                     return;
                 }
@@ -42,13 +57,14 @@ namespace XEngine
 
                 for (const RenderObject& object : objects)
                 {
-                    if (object.Mesh == nullptr || !object.Mesh->VertexBuffer || !object.Mesh->IndexBuffer)
+                    const RenderMesh* mesh = meshManager->GetMesh(object.Mesh);
+                    if (mesh == nullptr || !mesh->VertexBuffer || !mesh->IndexBuffer)
                     {
                         continue;
                     }
 
-                    commandList->SetVertexBuffer(object.Mesh->VertexBuffer.get());
-                    commandList->SetIndexBuffer(object.Mesh->IndexBuffer.get(), object.Mesh->IndexFormat);
+                    commandList->SetVertexBuffer(mesh->VertexBuffer.get());
+                    commandList->SetIndexBuffer(mesh->IndexBuffer.get(), mesh->IndexFormat);
 
                     RHIBindGroup* bindGroup = materialSystem->GetBaseColorBindGroup(object.Material);
                     if (bindGroup == nullptr)
@@ -58,10 +74,18 @@ namespace XEngine
                     commandList->SetBindGroup(0, bindGroup);
 
                     MeshPushConstants constants;
-                    constants.ModelViewProjection = object.ModelViewProjection;
+                    constants.ModelViewProjection = ToMatrix4(object.WorldMatrix);
                     commandList->PushConstants(RHIShaderStageFlags::Vertex, &constants, sizeof(constants));
 
-                    commandList->DrawIndexed(object.Mesh->IndexCount, 1, 0, 0, 0);
+                    for (const RenderSubmesh& submesh : mesh->Submeshes)
+                    {
+                        commandList->DrawIndexed(
+                            submesh.IndexCount,
+                            1,
+                            submesh.FirstIndex,
+                            submesh.VertexOffset,
+                            0);
+                    }
                 }
             });
     }

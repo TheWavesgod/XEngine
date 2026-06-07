@@ -838,7 +838,8 @@ Stage 7B - TextureAsset + Private ImageImporter
 Stage 7C - MeshAsset + RenderMeshManager Bridge
 Stage 7D - MaterialAsset + RenderMaterial Bridge
 Stage 7E - glTF Importer V0
-Stage 7F - Scene Integration V0
+Stage 7F - Scene System V0 + RenderExtraction
+Stage 7G - InputSystem V0 + Debug Camera
 ```
 
 ## Stage 7A - Asset Core
@@ -875,6 +876,109 @@ No MaterialAsset import yet
 No GPU resources inside AssetSystem
 ```
 
+## Stage 7C - MeshAsset + RenderMeshManager Bridge
+
+```text
+MeshAsset CPU-side mesh data
+MeshVertex
+MeshSubmesh
+Vertices, indices, submeshes, and bounds
+AssetSystem CPU-side MeshAsset storage
+Procedural cube MeshAsset validation
+Renderer MeshHandle
+Renderer-private RenderMeshManager
+MeshAsset -> vertex/index RHIBuffer bridge
+ForwardOpaquePass draws RenderMesh through RenderMeshManager
+No glTF parsing yet
+No MaterialAsset yet
+No SceneAsset yet
+No GPU resources inside AssetSystem
+```
+
+## Stage 7D - MaterialAsset + RenderMaterial Bridge
+
+```text
+MaterialAsset CPU-side material data
+MaterialAsset stores base color, metallic, roughness, alpha mode, and TextureAsset references
+MaterialAsset contains no RHI or Vulkan resources
+AssetSystem CPU-side MaterialAsset storage
+AssetSystem test MaterialAsset validation helper
+Renderer MaterialSystem creates MaterialHandle from MaterialAsset
+Renderer MaterialSystem resolves TextureAsset handles through AssetSystem / TextureManager
+TextureManager caches textures created from AssetHandle references
+ForwardOpaquePass draws RenderMesh with MaterialHandle
+No glTF parsing yet
+No SceneAsset yet
+No GPU resources inside AssetSystem
+```
+
+## Stage 7E - glTF Importer V0
+
+```text
+Uses fastgltf 0.9
+GltfImporter is private to Asset module
+Public headers do not expose fastgltf
+Imports .gltf and .glb files through AssetSystem::ImportAsset
+Converts glTF meshes into MeshAsset
+Converts glTF materials into MaterialAsset
+Converts glTF images into TextureAsset where supported
+Supports static meshes and basic metallic-roughness material data
+Supports external images and GLB bufferView image data where decodable by stb_image
+Does not implement SceneAsset yet
+Does not implement animation, skinning, morph targets, or glTF extensions
+Does not create GPU resources inside AssetSystem
+Stage 7E is the final pure Asset import stage
+Stage 7F will connect imported assets to Scene / RenderObject
+```
+
+## Stage 7F - Scene System V0 + RenderExtraction
+
+```text
+Introduces Scene module
+Adds Entity handle
+Adds TransformComponent
+Adds MeshRendererComponent
+Adds CameraComponent data only
+Adds SceneSystem subsystem
+Scene stores AssetHandle references, not renderer handles
+Adds RenderScene and RenderObject in Renderer
+Adds RenderExtraction boundary
+RenderExtraction resolves MeshAsset into MeshHandle through RenderMeshManager
+RenderExtraction resolves MaterialAsset into MaterialHandle through MaterialSystem
+RenderMeshManager caches AssetHandle to MeshHandle mappings
+MaterialSystem caches AssetHandle to MaterialHandle mappings
+TextureManager keeps AssetHandle to TextureHandle caching
+ForwardOpaquePass draws RenderScene.OpaqueObjects
+RenderSystem creates a validation Scene entity from Cube or DamagedHelmet glTF assets
+RenderSystem falls back to a procedural cube entity if glTF validation import is unavailable
+Does not implement InputSystem
+Does not implement DebugCamera control yet
+Does not implement full ECS, scene serialization, animation, or skinning
+Stage 7G will implement InputSystem V0 + DebugCamera in Scene
+```
+
+## Stage 7G - InputSystem V0 + Debug Camera
+
+```text
+Introduces Input module
+Adds InputSystem subsystem
+Adds engine-level KeyCode / MouseButton types
+Platform events are translated into engine input events
+InputSystem tracks current/previous key and mouse state
+InputSystem tracks mouse position, mouse delta, and mouse wheel delta
+Adds UE-style Scene DebugCameraController
+RMB + mouse controls camera yaw/pitch
+RMB + WASD/QE controls camera movement
+Shift accelerates movement
+Mouse wheel adjusts movement speed
+SceneSystem owns a primary debug camera entity
+RenderSystem uses the primary Scene camera
+Debug camera can frame imported model bounds
+Validation prefers DamagedHelmet, then Cube with texture, then procedural cube
+DamagedHelmet should be viewable through auto-framing and interactive navigation
+Does not implement full editor viewport focus, input rebinding, gamepad input, picking, or gizmos
+```
+
 ## Asset / Renderer / RHI Boundary
 
 ```text
@@ -884,6 +988,8 @@ AssetSystem:
 Renderer:
   Owns render resource managers, material systems, and GPU-facing render representations.
   Converts TextureAsset data into RHITexture objects.
+  Converts MeshAsset data into vertex/index RHIBuffer objects.
+  Converts MaterialAsset data into MaterialHandle / bind group backed renderer materials.
 
 RHI:
   Owns backend GPU objects such as buffers, images, samplers, descriptor sets, and pipelines.

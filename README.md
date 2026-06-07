@@ -213,6 +213,93 @@ Stage 7B does not implement MeshAsset import.
 Stage 7B does not implement MaterialAsset import.
 Stage 7B does not create GPU resources inside AssetSystem.
 
+Stage 7C adds:
+- MeshAsset CPU-side mesh data
+- MeshVertex
+- MeshSubmesh
+- Mesh bounds
+- CPU-side MeshAsset storage in AssetSystem
+- Procedural cube MeshAsset validation
+- MeshHandle renderer-side runtime handle
+- RenderMeshManager
+- MeshAsset to RHIBuffer bridge
+- ForwardOpaquePass drawing through RenderMeshManager
+
+Stage 7C does not parse glTF yet.
+Stage 7C does not implement MaterialAsset.
+Stage 7C does not implement SceneAsset.
+Stage 7C does not create GPU resources inside AssetSystem.
+
+Stage 7D adds:
+- MaterialAsset CPU-side material data
+- CPU-side MaterialAsset storage in AssetSystem
+- Test MaterialAsset validation helper
+- MaterialAsset to renderer MaterialHandle bridge
+- TextureAsset handle resolution through AssetSystem and TextureManager
+- TextureManager AssetHandle texture cache
+- ForwardOpaquePass using MeshHandle plus MaterialHandle
+
+Stage 7D does not parse glTF yet.
+Stage 7D does not implement SceneAsset.
+Stage 7D does not create GPU resources inside AssetSystem.
+Stage 7D does not implement bindless descriptors.
+
+Stage 7E adds:
+- Private GltfImporter
+- fastgltf 0.9 integration
+- .gltf / .glb import through AssetSystem
+- glTF mesh to MeshAsset conversion
+- glTF material to MaterialAsset conversion
+- glTF image to TextureAsset conversion where supported
+- Validation using Assets/models/gltf
+- Optional renderer smoke path using the Cube glTF asset with procedural fallback
+
+Stage 7E does not implement SceneAsset.
+Stage 7E does not implement animation.
+Stage 7E does not implement skinning.
+Stage 7E does not create GPU resources inside AssetSystem.
+
+Stage 7F adds:
+- Scene module
+- SceneSystem subsystem
+- Entity handles
+- TransformComponent
+- MeshRendererComponent with MeshAsset / MaterialAsset handles
+- CameraComponent data
+- RenderScene
+- RenderObject
+- RenderExtraction boundary
+- AssetHandle to MeshHandle / MaterialHandle caches in renderer managers
+- ForwardOpaquePass drawing RenderScene opaque objects
+- Validation Scene entity created from glTF assets with procedural cube fallback
+
+Stage 7F does not implement InputSystem.
+Stage 7F does not implement interactive DebugCamera.
+Stage 7F does not implement full ECS.
+Stage 7F does not implement scene serialization.
+Stage 7F does not implement animation or skinning.
+
+Stage 7G adds:
+- InputSystem V0
+- Engine-level KeyCode / MouseButton input types
+- Platform event to input event translation
+- Current and previous keyboard state tracking
+- Current and previous mouse button state tracking
+- Mouse position, mouse delta, and mouse wheel tracking
+- Scene DebugCameraController
+- UE-style RMB + mouse yaw/pitch navigation
+- RMB + WASD/QE camera movement
+- Shift accelerated movement
+- Mouse wheel movement speed adjustment
+- Active Scene camera used by renderer
+- Automatic camera framing for imported model bounds
+- DamagedHelmet-first visual validation with Cube and procedural fallbacks
+
+Stage 7G does not implement full editor viewport focus.
+Stage 7G does not implement input rebinding.
+Stage 7G does not implement gamepad input.
+Stage 7G does not implement scene picking or gizmos.
+
 Stage 2B-2 adds:
 - Vulkan swapchain creation
 - Swapchain image views

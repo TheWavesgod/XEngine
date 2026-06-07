@@ -3,6 +3,7 @@
 #include "AssetImporter.h"
 
 #include <filesystem>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -26,4 +27,9 @@ namespace XEngine
     };
 
     TextureAsset LoadTextureAssetRGBA8(const std::filesystem::path& sourcePath, std::string* diagnostics);
+    TextureAsset LoadTextureAssetRGBA8FromMemory(
+        std::span<const std::byte> bytes,
+        const std::string& sourceName,
+        bool isSRGB,
+        std::string* diagnostics);
 }

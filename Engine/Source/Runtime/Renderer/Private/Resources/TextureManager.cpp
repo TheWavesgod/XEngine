@@ -17,6 +17,11 @@ namespace XEngine
         {
             return std::filesystem::path(path).lexically_normal().generic_string();
         }
+
+        u64 MakeAssetTextureCacheKey(AssetHandle handle)
+        {
+            return (static_cast<u64>(handle.Generation) << 32u) | static_cast<u64>(handle.Index);
+        }
     }
 
     void TextureManager::Initialize(RHIDevice* device)
@@ -59,6 +64,7 @@ namespace XEngine
         }
 
         XENGINE_LOG_INFO("TextureManager shutdown");
+        m_AssetTextureCache.clear();
         m_PathCache.clear();
         m_Textures.clear();
         m_DefaultWhiteTexture = {};
@@ -128,6 +134,32 @@ namespace XEngine
         XENGINE_LOG_INFO(std::string("Created RHI texture: ") + normalizedPath);
         TextureHandle handle = AddTextureRecord(normalizedPath, texture);
         m_PathCache.emplace(normalizedPath, handle);
+        return handle;
+    }
+
+    TextureHandle TextureManager::GetOrCreateTextureFromAsset(
+        AssetHandle assetHandle,
+        const TextureAsset& asset,
+        bool srgb)
+    {
+        if (!assetHandle.IsValid())
+        {
+            return CreateTextureFromAsset(asset, srgb);
+        }
+
+        const u64 key = MakeAssetTextureCacheKey(assetHandle);
+        const auto cached = m_AssetTextureCache.find(key);
+        if (cached != m_AssetTextureCache.end() && GetTexture(cached->second) != nullptr)
+        {
+            return cached->second;
+        }
+
+        TextureHandle handle = CreateTextureFromAsset(asset, srgb);
+        if (handle.IsValid() && GetTexture(handle) != nullptr)
+        {
+            m_AssetTextureCache[key] = handle;
+        }
+
         return handle;
     }
 

@@ -1,10 +1,3 @@
-﻿#pragma once
+#pragma once
 
-namespace XEngine
-{
-    enum class MouseCode
-    {
-        Unknown
-    };
-}
-
+#include <XEngine/Input/InputTypes.h>

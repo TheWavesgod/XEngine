@@ -1,7 +1,7 @@
 #include "ForwardOpaquePass.h"
 
 #include "../Materials/MaterialSystem.h"
-#include "../Mesh/StaticMesh.h"
+#include "../Resources/RenderMeshManager.h"
 #include "../RenderGraph/RenderGraph.h"
 #include "../RenderGraph/RenderGraphContext.h"
 
@@ -9,6 +9,20 @@
 
 namespace XEngine
 {
+    namespace
+    {
+        Matrix4 ToMatrix4(const Mat4& matrix)
+        {
+            Matrix4 result {};
+            const float* values = &matrix[0][0];
+            for (u32 i = 0; i < 16; ++i)
+            {
+                result.Values[i] = values[i];
+            }
+            return result;
+        }
+    }
+
     struct PBRPushConstants
     {
         Matrix4 ModelViewProjection;
@@ -20,7 +34,9 @@ namespace XEngine
         RenderGraph& graph,
         RHIPipeline* pbrPipeline,
         MaterialSystem* materialSystem,
-        const std::vector<RenderObject>& objects)
+        RenderMeshManager* meshManager,
+        const RenderScene& renderScene,
+        const Mat4& viewProjection)
     {
         RenderGraphPassDesc desc;
         desc.Name = "ForwardOpaquePass";
@@ -33,19 +49,20 @@ namespace XEngine
                 // TODO Stage 9:
                 // Declare HDR color/depth graph resources when RenderGraph grows real resource tracking.
             },
-            [pbrPipeline, materialSystem, &objects](RenderGraphContext& context)
+            [pbrPipeline, materialSystem, meshManager, &renderScene, viewProjection](RenderGraphContext& context)
             {
                 RHICommandList* commandList = context.GetCommandList();
-                if (commandList == nullptr || pbrPipeline == nullptr || materialSystem == nullptr)
+                if (commandList == nullptr || pbrPipeline == nullptr || materialSystem == nullptr || meshManager == nullptr)
                 {
                     return;
                 }
 
                 commandList->SetGraphicsPipeline(pbrPipeline);
 
-                for (const RenderObject& object : objects)
+                for (const RenderObject& object : renderScene.OpaqueObjects)
                 {
-                    if (object.Mesh == nullptr || !object.Mesh->VertexBuffer || !object.Mesh->IndexBuffer)
+                    const RenderMesh* mesh = meshManager->GetMesh(object.Mesh);
+                    if (mesh == nullptr || !mesh->VertexBuffer || !mesh->IndexBuffer)
                     {
                         continue;
                     }
@@ -72,12 +89,12 @@ namespace XEngine
                         continue;
                     }
 
-                    commandList->SetVertexBuffer(object.Mesh->VertexBuffer.get());
-                    commandList->SetIndexBuffer(object.Mesh->IndexBuffer.get(), object.Mesh->IndexFormat);
+                    commandList->SetVertexBuffer(mesh->VertexBuffer.get());
+                    commandList->SetIndexBuffer(mesh->IndexBuffer.get(), mesh->IndexFormat);
                     commandList->SetBindGroup(0, bindGroup);
 
                     PBRPushConstants constants;
-                    constants.ModelViewProjection = object.ModelViewProjection;
+                    constants.ModelViewProjection = ToMatrix4(viewProjection * object.WorldMatrix);
                     constants.BaseColorFactor = gpuMaterial->BaseColorFactor;
                     constants.MaterialFactors = Vec4 {
                         gpuMaterial->MetallicFactor,
@@ -87,7 +104,15 @@ namespace XEngine
                     };
                     commandList->PushConstants(RHIShaderStageFlags::AllGraphics, &constants, sizeof(constants));
 
-                    commandList->DrawIndexed(object.Mesh->IndexCount, 1, 0, 0, 0);
+                    for (const RenderSubmesh& submesh : mesh->Submeshes)
+                    {
+                        commandList->DrawIndexed(
+                            submesh.IndexCount,
+                            1,
+                            submesh.FirstIndex,
+                            submesh.VertexOffset,
+                            0);
+                    }
                 }
             });
     }

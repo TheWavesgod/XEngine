@@ -1,7 +1,10 @@
-﻿#pragma once
+#pragma once
+
+#include <XEngine/Scene/Components/CameraComponent.h>
+#include <XEngine/Scene/Components/MeshRendererComponent.h>
+#include <XEngine/Scene/Components/TransformComponent.h>
 
 namespace XEngine
 {
-    // TODO: Include component headers as the ECS grows.
+    // Convenience include for the minimal Stage 7F Scene component set.
 }
-

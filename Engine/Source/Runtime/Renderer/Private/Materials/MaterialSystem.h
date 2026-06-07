@@ -1,17 +1,21 @@
 #pragma once
 
+#include <XEngine/Asset/AssetHandle.h>
 #include <XEngine/Renderer/Material.h>
 #include <XEngine/RHI/Resources/RHIBindGroup.h>
 #include <XEngine/RHI/Resources/RHISampler.h>
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace XEngine
 {
+    class AssetSystem;
     class RHIDevice;
     class TextureManager;
+    struct MaterialAsset;
 
     struct MaterialRecord
     {
@@ -30,6 +34,17 @@ namespace XEngine
         void Shutdown();
 
         MaterialHandle CreateMaterial(const std::string& name, const MaterialDesc& desc);
+        // Converts CPU-side Asset material data into a renderer material.
+        // TextureAsset handles are resolved through AssetSystem and TextureManager.
+        MaterialHandle CreateMaterialFromAsset(
+            const MaterialAsset& asset,
+            AssetSystem& assetSystem,
+            TextureManager& textureManager);
+        MaterialHandle GetOrCreateMaterialFromAsset(
+            AssetHandle assetHandle,
+            const MaterialAsset& asset,
+            AssetSystem& assetSystem,
+            TextureManager& textureManager);
 
         const MaterialDesc* GetMaterialDesc(MaterialHandle handle) const;
         MaterialDesc* GetMaterialDesc(MaterialHandle handle);
@@ -61,6 +76,7 @@ namespace XEngine
         std::shared_ptr<RHIBindGroupLayout> m_PBRMaterialBindGroupLayout;
         std::shared_ptr<RHISampler> m_DefaultSampler;
         std::vector<MaterialRecord> m_Materials;
+        std::unordered_map<u64, MaterialHandle> m_AssetMaterialCache;
         MaterialHandle m_DefaultLitMaterial;
         MaterialHandle m_DefaultUnlitMaterial;
         MaterialHandle m_MissingMaterial;

@@ -1,6 +1,8 @@
 add_subdirectory(Source/Foundation)
 add_subdirectory(Source/Runtime/Engine)
 add_subdirectory(Source/Runtime/Asset)
+add_subdirectory(Source/Runtime/Input)
+add_subdirectory(Source/Runtime/Scene)
 add_subdirectory(Source/Runtime/Platform)
 add_subdirectory(Source/Runtime/Shader)
 add_subdirectory(Source/Runtime/RHI)
@@ -12,6 +14,8 @@ target_link_libraries(XEngineRuntime
         XEngineFoundation
         XEngineCoreRuntime
         XEngineAsset
+        XEngineInput
+        XEngineScene
         XEnginePlatform
         XEngineShader
         XEngineRHI

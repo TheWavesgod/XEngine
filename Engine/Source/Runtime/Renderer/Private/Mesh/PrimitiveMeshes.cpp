@@ -27,15 +27,15 @@ namespace XEngine
 
     StaticMesh CreateHardcodedCubeMesh(RHIDevice& device)
     {
-        const std::array<MeshVertex, 8> vertices = {
-            MeshVertex { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, NormalizeNormal({ -0.5f, -0.5f, -0.5f }), { 0.0f, 0.0f } },
-            MeshVertex { {  0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, NormalizeNormal({  0.5f, -0.5f, -0.5f }), { 1.0f, 0.0f } },
-            MeshVertex { {  0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f }, NormalizeNormal({  0.5f,  0.5f, -0.5f }), { 1.0f, 1.0f } },
-            MeshVertex { { -0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f }, NormalizeNormal({ -0.5f,  0.5f, -0.5f }), { 0.0f, 1.0f } },
-            MeshVertex { { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 1.0f }, NormalizeNormal({ -0.5f, -0.5f,  0.5f }), { 0.0f, 0.0f } },
-            MeshVertex { {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 1.0f }, NormalizeNormal({  0.5f, -0.5f,  0.5f }), { 1.0f, 0.0f } },
-            MeshVertex { {  0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 1.0f }, NormalizeNormal({  0.5f,  0.5f,  0.5f }), { 1.0f, 1.0f } },
-            MeshVertex { { -0.5f,  0.5f,  0.5f }, { 0.2f, 0.6f, 1.0f }, NormalizeNormal({ -0.5f,  0.5f,  0.5f }), { 0.0f, 1.0f } }
+        const std::array<LegacyMeshVertex, 8> vertices = {
+            LegacyMeshVertex { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, NormalizeNormal({ -0.5f, -0.5f, -0.5f }), { 0.0f, 0.0f } },
+            LegacyMeshVertex { {  0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, NormalizeNormal({  0.5f, -0.5f, -0.5f }), { 1.0f, 0.0f } },
+            LegacyMeshVertex { {  0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f }, NormalizeNormal({  0.5f,  0.5f, -0.5f }), { 1.0f, 1.0f } },
+            LegacyMeshVertex { { -0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f }, NormalizeNormal({ -0.5f,  0.5f, -0.5f }), { 0.0f, 1.0f } },
+            LegacyMeshVertex { { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 1.0f }, NormalizeNormal({ -0.5f, -0.5f,  0.5f }), { 0.0f, 0.0f } },
+            LegacyMeshVertex { {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 1.0f }, NormalizeNormal({  0.5f, -0.5f,  0.5f }), { 1.0f, 0.0f } },
+            LegacyMeshVertex { {  0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 1.0f }, NormalizeNormal({  0.5f,  0.5f,  0.5f }), { 1.0f, 1.0f } },
+            LegacyMeshVertex { { -0.5f,  0.5f,  0.5f }, { 0.2f, 0.6f, 1.0f }, NormalizeNormal({ -0.5f,  0.5f,  0.5f }), { 0.0f, 1.0f } }
         };
 
         const std::array<u32, 36> indices = {
@@ -53,7 +53,7 @@ namespace XEngine
         mesh.IndexFormat = RHIIndexFormat::UInt32;
 
         RHIBufferDesc vertexDesc;
-        vertexDesc.Size = sizeof(MeshVertex) * vertices.size();
+        vertexDesc.Size = sizeof(LegacyMeshVertex) * vertices.size();
         vertexDesc.Usage = RHIBufferUsage::Vertex;
         vertexDesc.MemoryUsage = RHIMemoryUsage::CPUToGPU;
         vertexDesc.DebugName = "Cube vertices";

@@ -1,17 +1,36 @@
-﻿#pragma once
+#pragma once
+
+#include <XEngine/Core/Types.h>
 
 namespace XEngine
 {
-    class Entity
-    {
-    public:
-        explicit Entity(unsigned int id = 0) : m_Id(id) {}
-        unsigned int GetId() const { return m_Id; }
+    constexpr u32 InvalidEntityIndex = 0xffffffffu;
 
-    private:
-        unsigned int m_Id = 0;
+    // Lightweight runtime entity handle owned by Scene.
+    // It is valid only for the lifetime of its Scene and is not a persistent scene id.
+    struct Entity
+    {
+        u32 Index = InvalidEntityIndex;
+        u32 Generation = 0;
+
+        bool IsValid() const
+        {
+            return Index != InvalidEntityIndex;
+        }
+
+        explicit operator bool() const
+        {
+            return IsValid();
+        }
+
+        friend bool operator==(const Entity& lhs, const Entity& rhs)
+        {
+            return lhs.Index == rhs.Index && lhs.Generation == rhs.Generation;
+        }
+
+        friend bool operator!=(const Entity& lhs, const Entity& rhs)
+        {
+            return !(lhs == rhs);
+        }
     };
 }
-
-
-

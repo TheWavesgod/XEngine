@@ -10,6 +10,8 @@ file(GLOB_RECURSE XENGINE_RENDERER_SOURCES CONFIGURE_DEPENDS
     Private/Materials/*.cpp
     Private/Resources/*.h
     Private/Resources/*.cpp
+    Private/Scene/*.h
+    Private/Scene/*.cpp
     Private/RenderSystem.cpp
 )
 
@@ -31,4 +33,5 @@ target_link_libraries(XEngineRenderer
         XEngineRHI
     PRIVATE
         XEngineAsset
+        XEngineScene
 )

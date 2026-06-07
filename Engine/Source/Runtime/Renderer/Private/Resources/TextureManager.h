@@ -1,5 +1,6 @@
 #pragma once
 
+#include <XEngine/Asset/AssetHandle.h>
 #include <XEngine/Core/Types.h>
 #include <XEngine/Renderer/Texture.h>
 #include <XEngine/RHI/Resources/RHITexture.h>
@@ -30,11 +31,16 @@ namespace XEngine
 
         TextureHandle LoadTexture2D(const std::string& path, bool srgb = true);
         TextureHandle CreateTextureFromAsset(const TextureAsset& asset, bool srgb = true);
+        TextureHandle GetOrCreateTextureFromAsset(
+            AssetHandle assetHandle,
+            const TextureAsset& asset,
+            bool srgb = true);
 
         TextureHandle CreateSolidColorTexture(
             const char* name,
             u8 r,
             u8 g,
+            
             u8 b,
             u8 a,
             bool srgb = false);
@@ -53,6 +59,7 @@ namespace XEngine
         RHIDevice* m_Device = nullptr;
         std::vector<TextureRecord> m_Textures;
         std::unordered_map<std::string, TextureHandle> m_PathCache;
+        std::unordered_map<u64, TextureHandle> m_AssetTextureCache;
         TextureHandle m_DefaultWhiteTexture;
         TextureHandle m_DefaultBlackTexture;
         TextureHandle m_DefaultNormalTexture;

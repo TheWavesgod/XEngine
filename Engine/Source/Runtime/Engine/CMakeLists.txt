@@ -12,10 +12,12 @@ target_include_directories(XEngineCoreRuntime
     PRIVATE
         Private
         ../Asset/Public
+        ../Input/Public
         ../Platform/Public
         ../Shader/Public
         ../RHI/Public
         ../Renderer/Public
+        ../Scene/Public
 )
 
 target_compile_features(XEngineCoreRuntime PUBLIC cxx_std_20)

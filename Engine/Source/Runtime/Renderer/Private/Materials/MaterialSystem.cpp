@@ -2,6 +2,9 @@
 
 #include "../Resources/TextureManager.h"
 
+#include <XEngine/Asset/AssetSystem.h>
+#include <XEngine/Asset/Assets/MaterialAsset.h>
+#include <XEngine/Asset/Assets/TextureAsset.h>
 #include <XEngine/Core/Assert.h>
 #include <XEngine/Logging/Log.h>
 #include <XEngine/RHI/RHIDevice.h>
@@ -16,6 +19,63 @@ namespace XEngine
         constexpr u32 MaterialFlagMasked = 1u << 1u;
         constexpr u32 MaterialFlagBlend = 1u << 2u;
         constexpr u32 MaterialFlagDoubleSided = 1u << 3u;
+
+        u64 MakeAssetMaterialCacheKey(AssetHandle handle)
+        {
+            return (static_cast<u64>(handle.Generation) << 32u) | static_cast<u64>(handle.Index);
+        }
+
+        MaterialShadingModel ToRendererShadingModel(MaterialAssetShadingModel model)
+        {
+            switch (model)
+            {
+            case MaterialAssetShadingModel::Unlit:
+                return MaterialShadingModel::Unlit;
+            case MaterialAssetShadingModel::Lit:
+            default:
+                return MaterialShadingModel::Lit;
+            }
+        }
+
+        MaterialAlphaMode ToRendererAlphaMode(MaterialAssetAlphaMode mode)
+        {
+            switch (mode)
+            {
+            case MaterialAssetAlphaMode::Masked:
+                return MaterialAlphaMode::Masked;
+            case MaterialAssetAlphaMode::Blend:
+                return MaterialAlphaMode::Blend;
+            case MaterialAssetAlphaMode::Opaque:
+            default:
+                return MaterialAlphaMode::Opaque;
+            }
+        }
+
+        TextureHandle ResolveTextureAssetHandle(
+            AssetHandle textureAssetHandle,
+            AssetSystem& assetSystem,
+            TextureManager& textureManager,
+            TextureHandle fallback,
+            bool srgb)
+        {
+            if (textureAssetHandle.IsValid())
+            {
+                const TextureAsset* textureAsset = assetSystem.GetTextureAsset(textureAssetHandle);
+                if (textureAsset != nullptr)
+                {
+                    TextureHandle texture = textureManager.GetOrCreateTextureFromAsset(
+                        textureAssetHandle,
+                        *textureAsset,
+                        srgb);
+                    if (texture.IsValid() && textureManager.GetTexture(texture) != nullptr)
+                    {
+                        return texture;
+                    }
+                }
+            }
+
+            return fallback;
+        }
     }
 
     void MaterialSystem::Initialize(TextureManager* textureManager, RHIDevice* device)
@@ -137,6 +197,7 @@ namespace XEngine
         }
 
         XENGINE_LOG_INFO("MaterialSystem shutdown");
+        m_AssetMaterialCache.clear();
         m_Materials.clear();
         m_DefaultSampler.reset();
         m_PBRMaterialBindGroupLayout.reset();
@@ -158,6 +219,88 @@ namespace XEngine
         }
 
         return AddMaterialRecord(name, desc);
+    }
+
+    MaterialHandle MaterialSystem::CreateMaterialFromAsset(
+        const MaterialAsset& asset,
+        AssetSystem& assetSystem,
+        TextureManager& textureManager)
+    {
+        if (!m_Initialized)
+        {
+            XENGINE_LOG_ERROR("Cannot create material from asset before MaterialSystem is initialized");
+            return {};
+        }
+
+        if (!asset.IsValid())
+        {
+            XENGINE_LOG_WARN("Cannot create renderer material from invalid MaterialAsset");
+            return m_MissingMaterial;
+        }
+
+        MaterialDesc desc;
+        desc.ShadingModel = ToRendererShadingModel(asset.ShadingModel);
+        desc.AlphaMode = ToRendererAlphaMode(asset.AlphaMode);
+        desc.BaseColorFactor = asset.BaseColorFactor;
+        desc.MetallicFactor = asset.MetallicFactor;
+        desc.RoughnessFactor = asset.RoughnessFactor;
+        desc.AlphaCutoff = asset.AlphaCutoff;
+        desc.Padding0 = asset.Padding0;
+        desc.DoubleSided = asset.DoubleSided;
+
+        desc.BaseColorTexture = ResolveTextureAssetHandle(
+            asset.BaseColorTexture,
+            assetSystem,
+            textureManager,
+            textureManager.GetDefaultWhiteTexture(),
+            true);
+        desc.NormalTexture = ResolveTextureAssetHandle(
+            asset.NormalTexture,
+            assetSystem,
+            textureManager,
+            textureManager.GetDefaultNormalTexture(),
+            false);
+        desc.MetallicRoughnessTexture = ResolveTextureAssetHandle(
+            asset.MetallicRoughnessTexture,
+            assetSystem,
+            textureManager,
+            textureManager.GetDefaultWhiteTexture(),
+            false);
+        desc.AOTexture = ResolveTextureAssetHandle(
+            asset.AOTexture,
+            assetSystem,
+            textureManager,
+            textureManager.GetDefaultWhiteTexture(),
+            false);
+
+        return CreateMaterial(asset.Name, desc);
+    }
+
+    MaterialHandle MaterialSystem::GetOrCreateMaterialFromAsset(
+        AssetHandle assetHandle,
+        const MaterialAsset& asset,
+        AssetSystem& assetSystem,
+        TextureManager& textureManager)
+    {
+        if (!assetHandle.IsValid())
+        {
+            return CreateMaterialFromAsset(asset, assetSystem, textureManager);
+        }
+
+        const u64 key = MakeAssetMaterialCacheKey(assetHandle);
+        const auto cached = m_AssetMaterialCache.find(key);
+        if (cached != m_AssetMaterialCache.end() && IsValid(cached->second))
+        {
+            return cached->second;
+        }
+
+        MaterialHandle handle = CreateMaterialFromAsset(asset, assetSystem, textureManager);
+        if (IsValid(handle))
+        {
+            m_AssetMaterialCache[key] = handle;
+        }
+
+        return handle;
     }
 
     const MaterialDesc* MaterialSystem::GetMaterialDesc(MaterialHandle handle) const

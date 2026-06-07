@@ -1,7 +1,5 @@
 #include <XEngine/Renderer/RenderSystem.h>
 
-#include "Mesh/PrimitiveMeshes.h"
-#include "Mesh/StaticMesh.h"
 #include "Materials/MaterialSystem.h"
 #include "Passes/ClearPass.h"
 #include "Passes/ForwardOpaquePass.h"
@@ -9,9 +7,13 @@
 #include "Passes/TrianglePass.h"
 #include "RenderGraph/RenderGraph.h"
 #include "RenderGraph/RenderGraphContext.h"
+#include "Resources/RenderMeshManager.h"
 #include "Resources/TextureManager.h"
+#include "Scene/RenderExtraction.h"
 
 #include <XEngine/Asset/AssetSystem.h>
+#include <XEngine/Asset/Assets/MaterialAsset.h>
+#include <XEngine/Asset/Assets/MeshAsset.h>
 #include <XEngine/Asset/Assets/TextureAsset.h>
 #include <XEngine/Core/Assert.h>
 #include <XEngine/Engine/Engine.h>
@@ -23,12 +25,15 @@
 #include <XEngine/RHI/RHISystem.h>
 #include <XEngine/RHI/Resources/RHIPipeline.h>
 #include <XEngine/RHI/Resources/RHIShader.h>
+#include <XEngine/Scene/Scene.h>
+#include <XEngine/Scene/SceneSystem.h>
 #include <XEngine/Shader/ShaderModule.h>
 #include <XEngine/Shader/ShaderSystem.h>
 
 #include <cmath>
 #include <cstddef>
 #include <filesystem>
+#include <glm/gtc/matrix_transform.hpp>
 #include <string>
 #include <vector>
 
@@ -147,6 +152,83 @@ namespace XEngine
             Vec4 BaseColorFactor;
             Vec4 MaterialFactors;
         };
+
+        bool FindFirstMeshAndMaterial(
+            const AssetImportResult& importResult,
+            const AssetSystem& assetSystem,
+            AssetHandle& outMesh,
+            AssetHandle& outMaterial)
+        {
+            for (AssetHandle handle : importResult.ImportedAssets)
+            {
+                if (!outMesh.IsValid() && assetSystem.GetMeshAsset(handle) != nullptr)
+                {
+                    outMesh = handle;
+                }
+
+                if (!outMaterial.IsValid() && assetSystem.GetMaterialAsset(handle) != nullptr)
+                {
+                    outMaterial = handle;
+                }
+            }
+
+            return outMesh.IsValid() && outMaterial.IsValid();
+        }
+
+        Entity CreateValidationSceneEntity(
+            Scene& scene,
+            const char* name,
+            AssetHandle meshAsset,
+            AssetHandle materialAsset)
+        {
+            Entity entity = scene.CreateEntity(name != nullptr ? name : "Renderable");
+            TransformComponent& transform = scene.AddTransform(entity);
+            transform.Dirty = true;
+
+            MeshRendererComponent& renderer = scene.AddMeshRenderer(entity);
+            renderer.MeshAsset = meshAsset;
+            renderer.MaterialAsset = materialAsset;
+            return entity;
+        }
+
+        std::filesystem::path FindGltfValidationAsset(const char* preferredName, const std::filesystem::path& fallback)
+        {
+            if (std::filesystem::exists(fallback))
+            {
+                return fallback;
+            }
+
+            const std::filesystem::path root = "Assets/models/gltf";
+            if (!std::filesystem::exists(root))
+            {
+                return {};
+            }
+
+            for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(root))
+            {
+                if (!entry.is_regular_file())
+                {
+                    continue;
+                }
+
+                const std::filesystem::path path = entry.path();
+                const std::string generic = path.generic_string();
+                if ((path.extension() == ".gltf" || path.extension() == ".glb") &&
+                    generic.find(preferredName) != std::string::npos)
+                {
+                    return path;
+                }
+            }
+
+            return {};
+        }
+
+        void FrameCameraForMesh(SceneSystem& sceneSystem, const MeshAsset& meshAsset)
+        {
+            const Vec3 center = meshAsset.Bounds.GetCenter();
+            const float radius = std::max(glm::length(meshAsset.Bounds.GetExtents()), 0.5f);
+            sceneSystem.FrameDebugCamera(center, radius);
+        }
     }
 
     RenderSystem::RenderSystem() = default;
@@ -194,8 +276,10 @@ namespace XEngine
         m_TextureManager = std::make_unique<TextureManager>();
         m_TextureManager->Initialize(device);
 
-        TextureHandle baseColorTexture = m_TextureManager->GetDefaultWhiteTexture();
-        AssetSystem* assetSystem = context.Engine->GetSubsystemManager().GetSubsystem<AssetSystem>();
+        AssetHandle baseColorTextureAssetHandle;
+        m_AssetSystem = context.Engine->GetSubsystemManager().GetSubsystem<AssetSystem>();
+        m_SceneSystem = context.Engine->GetSubsystemManager().GetSubsystem<SceneSystem>();
+        AssetSystem* assetSystem = m_AssetSystem;
         const std::string checkerPath = "Assets/Textures/checker.jpg";
         if (std::filesystem::exists(checkerPath))
         {
@@ -207,7 +291,7 @@ namespace XEngine
                     nullptr;
                 if (textureAsset != nullptr)
                 {
-                    baseColorTexture = m_TextureManager->CreateTextureFromAsset(*textureAsset, true);
+                    baseColorTextureAssetHandle = importResult.MainAsset;
                 }
                 else
                 {
@@ -227,26 +311,84 @@ namespace XEngine
         m_MaterialSystem = std::make_unique<MaterialSystem>();
         m_MaterialSystem->Initialize(m_TextureManager.get(), device);
 
-        MaterialDesc testMaterialDesc;
-        testMaterialDesc.ShadingModel = MaterialShadingModel::Lit;
-        testMaterialDesc.BaseColorFactor = Vec4 { 1.0f, 0.8f, 0.6f, 1.0f };
-        testMaterialDesc.MetallicFactor = 0.0f;
-        testMaterialDesc.RoughnessFactor = 0.5f;
-        testMaterialDesc.BaseColorTexture = baseColorTexture;
-        testMaterialDesc.NormalTexture = m_TextureManager->GetDefaultNormalTexture();
-        testMaterialDesc.MetallicRoughnessTexture = m_TextureManager->GetDefaultWhiteTexture();
-        testMaterialDesc.AOTexture = m_TextureManager->GetDefaultWhiteTexture();
-        m_TestMaterial = m_MaterialSystem->CreateMaterial("Stage6E_PBRMaterial", testMaterialDesc);
-        if (m_MaterialSystem->IsValid(m_TestMaterial))
-        {
-            XENGINE_LOG_INFO("Stage 6E PBR material created.");
-        }
+        m_RenderMeshManager = std::make_unique<RenderMeshManager>();
+        m_RenderMeshManager->Initialize(device);
 
-        m_CubeMesh = std::make_unique<StaticMesh>(CreateHardcodedCubeMesh(*device));
-        if (!m_CubeMesh->VertexBuffer || !m_CubeMesh->IndexBuffer)
+        bool validationSceneCreated = false;
+        Scene* activeScene = m_SceneSystem != nullptr ? m_SceneSystem->GetActiveScene() : nullptr;
+        if (assetSystem != nullptr && activeScene != nullptr)
         {
-            XENGINE_LOG_ERROR("Failed to create hardcoded cube mesh buffers");
-            return;
+            const std::filesystem::path gltfCandidates[] = {
+                FindGltfValidationAsset("DamagedHelmet", "Assets/models/gltf/DamagedHelmet/DamagedHelmet.gltf"),
+                FindGltfValidationAsset("Cube", "Assets/models/gltf/Cube/Cube.gltf")
+            };
+
+            for (const std::filesystem::path& gltfValidationPath : gltfCandidates)
+            {
+                if (gltfValidationPath.empty())
+                {
+                    continue;
+                }
+
+                if (!std::filesystem::exists(gltfValidationPath))
+                {
+                    continue;
+                }
+
+                AssetImportResult gltfImport = assetSystem->ImportAsset(gltfValidationPath);
+                if (gltfImport.Succeeded())
+                {
+                    AssetHandle importedMeshAsset;
+                    AssetHandle importedMaterialAsset;
+                    if (FindFirstMeshAndMaterial(gltfImport, *assetSystem, importedMeshAsset, importedMaterialAsset))
+                    {
+                        CreateValidationSceneEntity(
+                            *activeScene,
+                            "Stage7G_glTF_Validation",
+                            importedMeshAsset,
+                            importedMaterialAsset);
+
+                        if (const MeshAsset* meshAsset = assetSystem->GetMeshAsset(importedMeshAsset))
+                        {
+                            FrameCameraForMesh(*m_SceneSystem, *meshAsset);
+                        }
+
+                        XENGINE_LOG_INFO(
+                            std::string("Stage 7G using validation model: ") +
+                            gltfValidationPath.generic_string());
+                        validationSceneCreated = true;
+                        break;
+                    }
+                }
+                else
+                {
+                    XENGINE_LOG_WARN(
+                        std::string("Stage 7G glTF validation import failed: ") +
+                        gltfImport.Diagnostics);
+                }
+            }
+
+            if (!validationSceneCreated)
+            {
+                const AssetHandle meshAsset = assetSystem->CreateProceduralCubeMeshAsset("Stage7F_ProceduralCube");
+                const AssetHandle materialAsset = assetSystem->CreateTestMaterialAsset(
+                    "Stage7F_FallbackMaterial",
+                    baseColorTextureAssetHandle);
+                if (meshAsset.IsValid() && materialAsset.IsValid())
+                {
+                    CreateValidationSceneEntity(*activeScene, "Stage7G_ProceduralFallback", meshAsset, materialAsset);
+                    if (const MeshAsset* mesh = assetSystem->GetMeshAsset(meshAsset))
+                    {
+                        FrameCameraForMesh(*m_SceneSystem, *mesh);
+                    }
+                    validationSceneCreated = true;
+                    XENGINE_LOG_INFO("Stage 7G falling back to procedural cube.");
+                }
+            }
+        }
+        else
+        {
+            XENGINE_LOG_WARN("Stage 7G validation Scene setup skipped because AssetSystem or SceneSystem is unavailable.");
         }
 
         ShaderCompileDesc vertexDesc;
@@ -264,6 +406,13 @@ namespace XEngine
             XENGINE_LOG_ERROR(vertexShader.Diagnostics.empty() ? "ForwardPBR vertex shader compilation failed" :
                                                                   vertexShader.Diagnostics);
             return;
+        }
+
+        if (context.Config != nullptr && context.Config->WindowHeight > 0)
+        {
+            m_AspectRatio =
+                static_cast<float>(context.Config->WindowWidth) /
+                static_cast<float>(context.Config->WindowHeight);
         }
 
         ShaderCompileDesc fragmentDesc;
@@ -308,7 +457,7 @@ namespace XEngine
         pipelineDesc.VertexLayout.Attributes = {
             RHIVertexAttributeDesc { 0, RHIFormat::R32G32B32Float, static_cast<u32>(offsetof(MeshVertex, Position)) },
             RHIVertexAttributeDesc { 1, RHIFormat::R32G32B32Float, static_cast<u32>(offsetof(MeshVertex, Normal)) },
-            RHIVertexAttributeDesc { 2, RHIFormat::R32G32Float, static_cast<u32>(offsetof(MeshVertex, UV)) }
+            RHIVertexAttributeDesc { 2, RHIFormat::R32G32Float, static_cast<u32>(offsetof(MeshVertex, TexCoord0)) }
         };
         pipelineDesc.BindGroupLayouts.push_back(m_MaterialSystem->GetPBRMaterialBindGroupLayout());
         pipelineDesc.PushConstantSize = sizeof(PBRPipelinePushConstants);
@@ -322,10 +471,14 @@ namespace XEngine
             return;
         }
 
-        m_Model = Identity();
-        const Matrix4 view = LookAt({ 0.0f, 0.0f, 3.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f });
-        const Matrix4 projection = Perspective(60.0f * Pi / 180.0f, 1280.0f / 720.0f, 0.1f, 100.0f);
-        m_ModelViewProjection = Multiply(projection, Multiply(view, m_Model));
+        Mat4 projection = glm::perspective(60.0f * Pi / 180.0f, m_AspectRatio, 0.1f, 100.0f);
+        projection[1][1] *= -1.0f;
+        const Mat4 view = glm::lookAt(
+            Vec3 { 0.0f, 1.5f, 4.0f },
+            Vec3 { 0.0f, 0.0f, 0.0f },
+            Vec3 { 0.0f, 1.0f, 0.0f });
+        // Fallback camera used only if Scene has no primary camera.
+        m_ViewProjection = projection * view;
 
         m_Initialized = true;
     }
@@ -349,8 +502,12 @@ namespace XEngine
         m_MeshPipeline.reset();
         m_MeshFragmentShader.reset();
         m_MeshVertexShader.reset();
-        m_CubeMesh.reset();
-        m_TestMaterial = {};
+        m_RenderScene.Clear();
+        if (m_RenderMeshManager)
+        {
+            m_RenderMeshManager->Shutdown();
+            m_RenderMeshManager.reset();
+        }
         if (m_MaterialSystem)
         {
             m_MaterialSystem->Shutdown();
@@ -361,6 +518,8 @@ namespace XEngine
             m_TextureManager->Shutdown();
             m_TextureManager.reset();
         }
+        m_AssetSystem = nullptr;
+        m_SceneSystem = nullptr;
         m_RHISystem = nullptr;
         m_Initialized = false;
     }
@@ -395,16 +554,41 @@ namespace XEngine
         RenderGraph graph;
         graph.Clear();
         AddClearPass(graph, clearColor);
-        std::vector<RenderObject> objects;
-        RenderObject cube;
-        cube.Mesh = m_CubeMesh.get();
-        cube.Model = m_Model;
-        cube.ModelViewProjection = m_ModelViewProjection;
-        cube.ObjectId = 1;
-        cube.MeshId = 1;
-        cube.Material = m_TestMaterial;
-        objects.push_back(cube);
-        AddForwardOpaquePass(graph, m_MeshPipeline.get(), m_MaterialSystem.get(), objects);
+
+        Scene* activeScene = m_SceneSystem != nullptr ? m_SceneSystem->GetActiveScene() : nullptr;
+        if (activeScene != nullptr && m_AssetSystem != nullptr && m_RenderMeshManager && m_MaterialSystem && m_TextureManager)
+        {
+            RenderExtraction::Extract(
+                *activeScene,
+                *m_AssetSystem,
+                *m_RenderMeshManager,
+                *m_MaterialSystem,
+                *m_TextureManager,
+                m_RenderScene);
+        }
+        else
+        {
+            m_RenderScene.Clear();
+        }
+
+        Mat4 viewProjection = m_ViewProjection;
+        const CameraComponent* primaryCamera = m_SceneSystem != nullptr ? m_SceneSystem->GetPrimaryCamera() : nullptr;
+        const TransformComponent* primaryCameraTransform =
+            m_SceneSystem != nullptr ? m_SceneSystem->GetPrimaryCameraTransform() : nullptr;
+        if (primaryCamera != nullptr && primaryCameraTransform != nullptr)
+        {
+            viewProjection =
+                BuildCameraProjectionMatrix(*primaryCamera, m_AspectRatio) *
+                BuildCameraViewMatrix(*primaryCameraTransform);
+        }
+
+        AddForwardOpaquePass(
+            graph,
+            m_MeshPipeline.get(),
+            m_MaterialSystem.get(),
+            m_RenderMeshManager.get(),
+            m_RenderScene,
+            viewProjection);
         AddPresentPass(graph);
         graph.Compile();
 

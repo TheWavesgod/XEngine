@@ -13,6 +13,7 @@ add_library(XEnginePlatform ${XENGINE_PLATFORM_SOURCES})
 target_include_directories(XEnginePlatform
     PUBLIC
         Public
+        ../Input/Public
     PRIVATE
         Private
 )

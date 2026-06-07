@@ -9,7 +9,7 @@
 
 namespace XEngine
 {
-    struct MeshVertex
+    struct LegacyMeshVertex
     {
         Vector3 Position;
         Vector3 Color;

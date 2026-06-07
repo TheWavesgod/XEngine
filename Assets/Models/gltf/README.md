@@ -1,6 +1,6 @@
 # glTF Validation Assets
 
-This folder contains glTF assets used to validate XEngine's AssetSystem and future GltfImporter.
+This folder contains validation glTF assets for XEngine Stage 7E.
 
 Current assets:
 - Cube with texture
@@ -11,9 +11,11 @@ Stage 7A:
 - No glTF parsing is performed yet.
 
 Stage 7E:
-- GltfImporter V0 will parse these assets using fastgltf 0.9.
+- GltfImporter V0 imports these assets using fastgltf 0.9.
+- Imported data becomes TextureAsset, MeshAsset, and MaterialAsset CPU-side assets.
+- SceneAsset and scene hierarchy integration are intentionally deferred to Stage 7F.
 
 Notes:
 - Keep original license and README files for each model when available.
-- Do not commit large unnecessary sample repositories.
+- Do not commit entire sample asset repositories.
 - These assets are validation assets, not engine source code.

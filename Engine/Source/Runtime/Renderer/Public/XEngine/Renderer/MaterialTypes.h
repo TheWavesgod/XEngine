@@ -6,12 +6,14 @@
 
 namespace XEngine
 {
+    // Renderer-side shading category used by MaterialSystem and pipelines.
     enum class MaterialShadingModel
     {
         Unlit,
         Lit
     };
 
+    // Renderer-side alpha behavior. Full transparent sorting is handled by later stages.
     enum class MaterialAlphaMode
     {
         Opaque,
@@ -19,6 +21,8 @@ namespace XEngine
         Blend
     };
 
+    // Renderer-facing material description. It owns TextureHandle references only;
+    // Asset MaterialAsset data is converted into this by MaterialSystem.
     struct MaterialDesc
     {
         MaterialShadingModel ShadingModel = MaterialShadingModel::Lit;
@@ -39,6 +43,8 @@ namespace XEngine
         bool DoubleSided = false;
     };
 
+    // GPU upload layout for material constants and bindless-ready texture indices.
+    // Stage 7D still uses classic bind groups for actual texture binding.
     struct GPUMaterialData
     {
         Vec4 BaseColorFactor { 1.0f, 1.0f, 1.0f, 1.0f };

@@ -1,12 +1,12 @@
-﻿#pragma once
+#pragma once
+
+#include <XEngine/Input/InputTypes.h>
 
 namespace XEngine
 {
     struct KeyEvent
     {
-        int Key = 0;
+        KeyCode Key = KeyCode::Unknown;
+        bool Repeat = false;
     };
 }
-
-
-

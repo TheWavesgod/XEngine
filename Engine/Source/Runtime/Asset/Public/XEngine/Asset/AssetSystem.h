@@ -4,12 +4,14 @@
 #include <XEngine/Asset/AssetImportTypes.h>
 #include <XEngine/Asset/AssetMetadata.h>
 #include <XEngine/Asset/AssetTypes.h>
+#include <XEngine/Asset/Assets/MaterialAsset.h>
+#include <XEngine/Asset/Assets/MeshAsset.h>
 #include <XEngine/Asset/Assets/TextureAsset.h>
 #include <XEngine/Engine/Subsystem.h>
 
 #include <filesystem>
 #include <memory>
-#include <unordered_map>
+#include <string>
 
 namespace XEngine
 {
@@ -39,7 +41,19 @@ namespace XEngine
 
         AssetImportResult ImportAsset(const std::filesystem::path& sourcePath);
 
+        const MeshAsset* GetMeshAsset(AssetHandle handle) const;
+        const MaterialAsset* GetMaterialAsset(AssetHandle handle) const;
         const TextureAsset* GetTextureAsset(AssetHandle handle) const;
+
+        // Creates a CPU-side procedural cube MeshAsset for Stage 7C renderer validation.
+        // Real mesh import through glTF is introduced in Stage 7E.
+        AssetHandle CreateProceduralCubeMeshAsset(const std::string& name);
+
+        // Creates a CPU-side test MaterialAsset for renderer validation.
+        // This temporary Stage 7D helper is replaced by glTF material import in Stage 7E.
+        AssetHandle CreateTestMaterialAsset(
+            const std::string& name,
+            AssetHandle baseColorTexture);
 
         AssetType GuessAssetTypeFromPath(const std::filesystem::path& sourcePath) const;
 
@@ -50,13 +64,21 @@ namespace XEngine
             const std::filesystem::path& sourcePath,
             TextureAsset textureAsset);
 
+        // Private-to-Asset module entry point for future mesh importers.
+        AssetHandle RegisterMeshAsset(
+            const std::filesystem::path& sourcePath,
+            MeshAsset meshAsset);
+
+        // Private-to-Asset module entry point for future material importers.
+        AssetHandle RegisterMaterialAsset(
+            const std::filesystem::path& sourcePath,
+            MaterialAsset materialAsset);
+
     private:
+        struct Impl;
+
         void RegisterValidationAssetMetadata();
 
-        std::unique_ptr<AssetRegistry> m_Registry;
-        std::unique_ptr<ImporterRegistry> m_ImporterRegistry;
-        std::unordered_map<u32, TextureAsset> m_TextureAssets;
-
-        bool m_Initialized = false;
+        std::unique_ptr<Impl> m_Impl;
     };
 }

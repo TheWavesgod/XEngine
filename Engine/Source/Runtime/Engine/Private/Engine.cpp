@@ -3,10 +3,12 @@
 #include <XEngine/Asset/AssetSystem.h>
 #include <XEngine/Core/Assert.h>
 #include <XEngine/Engine/SubsystemContext.h>
+#include <XEngine/Input/InputSystem.h>
 #include <XEngine/Logging/Log.h>
 #include <XEngine/Platform/PlatformSystem.h>
 #include <XEngine/RHI/RHISystem.h>
 #include <XEngine/Renderer/RenderSystem.h>
+#include <XEngine/Scene/SceneSystem.h>
 #include <XEngine/Shader/ShaderSystem.h>
 
 #include <string>
@@ -44,6 +46,7 @@ namespace XEngine
         if (m_Config.CreateMainWindow)
         {
             m_SubsystemManager.AddSubsystem<PlatformSystem>();
+            m_SubsystemManager.AddSubsystem<InputSystem>();
         }
 
         if (m_Config.EnableShaderCompiler)
@@ -52,6 +55,7 @@ namespace XEngine
         }
 
         m_SubsystemManager.AddSubsystem<AssetSystem>();
+        m_SubsystemManager.AddSubsystem<SceneSystem>();
 
         if (m_Config.CreateGraphicsDevice)
         {
