@@ -76,9 +76,11 @@ namespace XEngine
         m_PitchRadians -= mouseDelta.y * m_MouseSensitivity;
         m_PitchRadians = std::clamp(m_PitchRadians, -MaxPitch, MaxPitch);
 
-        const Vec3 forward = GetForward(m_YawRadians, m_PitchRadians);
-        const Vec3 right = glm::normalize(glm::cross(forward, Vec3 { 0.0f, 1.0f, 0.0f }));
-        const Vec3 up { 0.0f, 1.0f, 0.0f };
+        ApplyOrientationToTransform(*transform);
+
+        const Vec3 forward = glm::normalize(transform->Rotation * Vec3{ 0.0f, 0.0f, -1.0f });
+        const Vec3 right   = glm::normalize(transform->Rotation * Vec3{ 1.0f, 0.0f,  0.0f });
+        const Vec3 up      = Vec3{ 0.0f, 1.0f, 0.0f };
 
         Vec3 movement { 0.0f, 0.0f, 0.0f };
         if (input.IsKeyDown(KeyCode::W))
@@ -116,7 +118,6 @@ namespace XEngine
             transform->Position += glm::normalize(movement) * m_MoveSpeed * speedScale * deltaTime;
         }
 
-        ApplyOrientationToTransform(*transform);
         transform->Dirty = true;
     }
 
