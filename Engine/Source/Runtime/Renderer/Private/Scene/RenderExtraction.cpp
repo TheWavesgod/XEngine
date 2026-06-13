@@ -1,5 +1,6 @@
 #include "RenderExtraction.h"
 
+#include "../Resources/RenderResourceContext.h"
 #include "../Materials/MaterialSystem.h"
 #include "../Resources/RenderMeshManager.h"
 #include "../Resources/TextureManager.h"
@@ -48,9 +49,7 @@ namespace XEngine
     void RenderExtraction::Extract(
         const Scene& scene,
         AssetSystem& assetSystem,
-        RenderMeshManager& meshManager,
-        MaterialSystem& materialSystem,
-        TextureManager& textureManager,
+        RenderResourceContext& resources,
         RenderScene& outRenderScene)
     {
         outRenderScene.Clear();
@@ -76,12 +75,18 @@ namespace XEngine
                 continue;
             }
 
-            const MeshHandle mesh = meshManager.GetOrCreateMeshFromAsset(renderer->MeshAsset, *meshAsset);
-            const MaterialHandle material = materialSystem.GetOrCreateMaterialFromAsset(
+            if (!resources.IsValid())
+            {
+                continue;
+            }
+
+            const MeshHandle mesh = resources.Meshes->GetOrCreateMeshFromAsset(renderer->MeshAsset, *meshAsset);
+            const MaterialHandle material = resources.Materials->GetOrCreateMaterialFromAsset(
                 renderer->MaterialAsset,
                 *materialAsset,
                 assetSystem,
-                textureManager);
+                *resources.Textures);
+                
             if (!mesh.IsValid() || !material.IsValid())
             {
                 continue;

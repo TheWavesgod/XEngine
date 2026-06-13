@@ -7,15 +7,14 @@
 namespace XEngine
 {
     class RenderGraph;
-    class RHIPipeline;
-    class MaterialSystem;
-    class RenderMeshManager;
+
+    struct RenderFrameContext;
+    struct RenderResourceContext;
+
 
     void AddForwardOpaquePass(
         RenderGraph& graph,
-        RHIPipeline* pbrPipeline,
-        MaterialSystem* materialSystem,
-        RenderMeshManager* meshManager,
+        const RenderFrameContext& frameContext,
         const RenderScene& renderScene,
-        const Mat4& viewProjection);
+        RenderResourceContext& resources);
 }

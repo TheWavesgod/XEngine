@@ -5,10 +5,8 @@
 namespace XEngine
 {
     class AssetSystem;
-    class MaterialSystem;
-    class RenderMeshManager;
     class Scene;
-    class TextureManager;
+    struct RenderResourceContext;
 
     // Converts Scene AssetHandle references into renderer handles.
     // This is the boundary between Scene data and renderer-owned GPU resources.
@@ -18,9 +16,7 @@ namespace XEngine
         static void Extract(
             const Scene& scene,
             AssetSystem& assetSystem,
-            RenderMeshManager& meshManager,
-            MaterialSystem& materialSystem,
-            TextureManager& textureManager,
+            RenderResourceContext& resources,
             RenderScene& outRenderScene);
     };
 }

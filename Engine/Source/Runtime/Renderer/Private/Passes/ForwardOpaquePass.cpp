@@ -1,9 +1,11 @@
 #include "ForwardOpaquePass.h"
 
+#include "../Resources/RenderResourceContext.h"
 #include "../Materials/MaterialSystem.h"
 #include "../Resources/RenderMeshManager.h"
 #include "../RenderGraph/RenderGraph.h"
 #include "../RenderGraph/RenderGraphContext.h"
+#include "../Pipeline/RenderFrameContext.h"
 
 #include <XEngine/RHI/RHICommandList.h>
 
@@ -32,11 +34,9 @@ namespace XEngine
 
     void AddForwardOpaquePass(
         RenderGraph& graph,
-        RHIPipeline* pbrPipeline,
-        MaterialSystem* materialSystem,
-        RenderMeshManager* meshManager,
+        const RenderFrameContext& frameContext,
         const RenderScene& renderScene,
-        const Mat4& viewProjection)
+        RenderResourceContext& resources)
     {
         RenderGraphPassDesc desc;
         desc.Name = "ForwardOpaquePass";
@@ -49,10 +49,10 @@ namespace XEngine
                 // TODO Stage 9:
                 // Declare HDR color/depth graph resources when RenderGraph grows real resource tracking.
             },
-            [pbrPipeline, materialSystem, meshManager, &renderScene, viewProjection](RenderGraphContext& context)
+            [&frameContext, &renderScene, &resources](RenderGraphContext& context)
             {
                 RHICommandList* commandList = context.GetCommandList();
-                if (commandList == nullptr || pbrPipeline == nullptr || materialSystem == nullptr || meshManager == nullptr)
+                if (commandList == nullptr || pbrPipeline == nullptr || !resources.IsValid())
                 {
                     return;
                 }
@@ -61,27 +61,27 @@ namespace XEngine
 
                 for (const RenderObject& object : renderScene.OpaqueObjects)
                 {
-                    const RenderMesh* mesh = meshManager->GetMesh(object.Mesh);
+                    const RenderMesh* mesh = resources.Meshes->GetMesh(object.Mesh);
                     if (mesh == nullptr || !mesh->VertexBuffer || !mesh->IndexBuffer)
                     {
                         continue;
                     }
 
                     MaterialHandle material = object.Material;
-                    const MaterialDesc* materialDesc = materialSystem->GetMaterialDesc(material);
-                    const GPUMaterialData* gpuMaterial = materialSystem->GetGPUMaterialData(material);
+                    const MaterialDesc* materialDesc = resources.Materials->GetMaterialDesc(material);
+                    const GPUMaterialData* gpuMaterial = resources.Materials->GetGPUMaterialData(material);
                     if (materialDesc == nullptr || gpuMaterial == nullptr ||
                         materialDesc->ShadingModel != MaterialShadingModel::Lit)
                     {
-                        material = materialSystem->GetDefaultLitMaterial();
-                        materialDesc = materialSystem->GetMaterialDesc(material);
-                        gpuMaterial = materialSystem->GetGPUMaterialData(material);
+                        material = resources.Materials->GetDefaultLitMaterial();
+                        materialDesc = resources.Materials->GetMaterialDesc(material);
+                        gpuMaterial = resources.Materials->GetGPUMaterialData(material);
                     }
 
-                    RHIBindGroup* bindGroup = materialSystem->GetPBRMaterialBindGroup(material);
+                    RHIBindGroup* bindGroup = resources.Materials->GetPBRMaterialBindGroup(material);
                     if (bindGroup == nullptr)
                     {
-                        bindGroup = materialSystem->GetPBRMaterialBindGroup(materialSystem->GetDefaultLitMaterial());
+                        bindGroup = resources.Materials->GetPBRMaterialBindGroup(resources.Materials->GetDefaultLitMaterial());
                     }
 
                     if (bindGroup == nullptr || materialDesc == nullptr || gpuMaterial == nullptr)
@@ -93,6 +93,7 @@ namespace XEngine
                     commandList->SetIndexBuffer(mesh->IndexBuffer.get(), mesh->IndexFormat);
                     commandList->SetBindGroup(0, bindGroup);
 
+                    const Mat4& viewProjection = frameContext.ViewProjectionMatrix;
                     PBRPushConstants constants;
                     constants.ModelViewProjection = ToMatrix4(viewProjection * object.WorldMatrix);
                     constants.BaseColorFactor = gpuMaterial->BaseColorFactor;

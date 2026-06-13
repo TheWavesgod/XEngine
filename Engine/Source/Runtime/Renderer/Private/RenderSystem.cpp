@@ -502,7 +502,9 @@ namespace XEngine
         m_MeshPipeline.reset();
         m_MeshFragmentShader.reset();
         m_MeshVertexShader.reset();
+
         m_RenderScene.Clear();
+        
         if (m_RenderMeshManager)
         {
             m_RenderMeshManager->Shutdown();
@@ -518,9 +520,11 @@ namespace XEngine
             m_TextureManager->Shutdown();
             m_TextureManager.reset();
         }
+        
         m_AssetSystem = nullptr;
         m_SceneSystem = nullptr;
         m_RHISystem = nullptr;
+        
         m_Initialized = false;
     }
 
