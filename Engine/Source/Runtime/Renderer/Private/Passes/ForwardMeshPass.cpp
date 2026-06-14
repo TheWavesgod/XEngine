@@ -1,7 +1,8 @@
 #include "ForwardMeshPass.h"
 
-#include "../Materials/MaterialSystem.h"
+#include "../Resources/RenderMaterialSystem.h"
 #include "../Resources/RenderMeshManager.h"
+#include "../Resources/RenderShaderTypes.h"
 #include "../RenderGraph/RenderGraph.h"
 #include "../RenderGraph/RenderGraphContext.h"
 
@@ -9,29 +10,10 @@
 
 namespace XEngine
 {
-    namespace
-    {
-        Matrix4 ToMatrix4(const Mat4& matrix)
-        {
-            Matrix4 result {};
-            const float* values = &matrix[0][0];
-            for (u32 i = 0; i < 16; ++i)
-            {
-                result.Values[i] = values[i];
-            }
-            return result;
-        }
-    }
-
-    struct MeshPushConstants
-    {
-        Matrix4 ModelViewProjection;
-    };
-
     void AddForwardMeshPass(
         RenderGraph& graph,
         RHIPipeline* pipeline,
-        MaterialSystem* materialSystem,
+        RenderMaterialSystem* materialSystem,
         RenderMeshManager* meshManager,
         const std::vector<RenderObject>& objects)
     {
@@ -74,7 +56,7 @@ namespace XEngine
                     commandList->SetBindGroup(0, bindGroup);
 
                     MeshPushConstants constants;
-                    constants.ModelViewProjection = ToMatrix4(object.WorldMatrix);
+                    constants.ModelViewProjection = object.WorldMatrix;
                     commandList->PushConstants(RHIShaderStageFlags::Vertex, &constants, sizeof(constants));
 
                     for (const RenderSubmesh& submesh : mesh->Submeshes)

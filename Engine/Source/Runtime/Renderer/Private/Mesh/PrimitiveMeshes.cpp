@@ -1,41 +1,23 @@
 #include "PrimitiveMeshes.h"
 
+#include <XEngine/Math/MathFunctions.h>
 #include <XEngine/RHI/RHIDevice.h>
 
 #include <array>
-#include <cmath>
 
 namespace XEngine
 {
-    namespace
-    {
-        Vector3 NormalizeNormal(Vector3 value)
-        {
-            const float lengthSquared =
-                value.X * value.X +
-                value.Y * value.Y +
-                value.Z * value.Z;
-            if (lengthSquared <= 0.0f)
-            {
-                return { 0.0f, 0.0f, 1.0f };
-            }
-
-            const float invLength = 1.0f / std::sqrt(lengthSquared);
-            return { value.X * invLength, value.Y * invLength, value.Z * invLength };
-        }
-    }
-
     StaticMesh CreateHardcodedCubeMesh(RHIDevice& device)
     {
         const std::array<LegacyMeshVertex, 8> vertices = {
-            LegacyMeshVertex { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, NormalizeNormal({ -0.5f, -0.5f, -0.5f }), { 0.0f, 0.0f } },
-            LegacyMeshVertex { {  0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, NormalizeNormal({  0.5f, -0.5f, -0.5f }), { 1.0f, 0.0f } },
-            LegacyMeshVertex { {  0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f }, NormalizeNormal({  0.5f,  0.5f, -0.5f }), { 1.0f, 1.0f } },
-            LegacyMeshVertex { { -0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f }, NormalizeNormal({ -0.5f,  0.5f, -0.5f }), { 0.0f, 1.0f } },
-            LegacyMeshVertex { { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 1.0f }, NormalizeNormal({ -0.5f, -0.5f,  0.5f }), { 0.0f, 0.0f } },
-            LegacyMeshVertex { {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 1.0f }, NormalizeNormal({  0.5f, -0.5f,  0.5f }), { 1.0f, 0.0f } },
-            LegacyMeshVertex { {  0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 1.0f }, NormalizeNormal({  0.5f,  0.5f,  0.5f }), { 1.0f, 1.0f } },
-            LegacyMeshVertex { { -0.5f,  0.5f,  0.5f }, { 0.2f, 0.6f, 1.0f }, NormalizeNormal({ -0.5f,  0.5f,  0.5f }), { 0.0f, 1.0f } }
+            LegacyMeshVertex { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, Normalize(Vec3 { -0.5f, -0.5f, -0.5f }), { 0.0f, 0.0f } },
+            LegacyMeshVertex { {  0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, Normalize(Vec3 {  0.5f, -0.5f, -0.5f }), { 1.0f, 0.0f } },
+            LegacyMeshVertex { {  0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f }, Normalize(Vec3 {  0.5f,  0.5f, -0.5f }), { 1.0f, 1.0f } },
+            LegacyMeshVertex { { -0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f }, Normalize(Vec3 { -0.5f,  0.5f, -0.5f }), { 0.0f, 1.0f } },
+            LegacyMeshVertex { { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 1.0f }, Normalize(Vec3 { -0.5f, -0.5f,  0.5f }), { 0.0f, 0.0f } },
+            LegacyMeshVertex { {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 1.0f }, Normalize(Vec3 {  0.5f, -0.5f,  0.5f }), { 1.0f, 0.0f } },
+            LegacyMeshVertex { {  0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 1.0f }, Normalize(Vec3 {  0.5f,  0.5f,  0.5f }), { 1.0f, 1.0f } },
+            LegacyMeshVertex { { -0.5f,  0.5f,  0.5f }, { 0.2f, 0.6f, 1.0f }, Normalize(Vec3 { -0.5f,  0.5f,  0.5f }), { 0.0f, 1.0f } }
         };
 
         const std::array<u32, 36> indices = {

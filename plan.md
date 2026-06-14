@@ -1035,6 +1035,67 @@ Later Stage 7 sub-stages add texture, mesh, material, glTF, and scene integratio
 
 # Stage 8 - Lighting + Shadow
 
+## Stage 8A - Renderer Architecture Stabilization
+
+```text
+COMPLETE
+```
+
+- Clarifies Renderer naming and distinguishes RenderPipeline from the RHI graphics pipeline.
+- Adds RenderFrameContext and RenderResourceContext.
+- Adds the RenderPipeline base class and ForwardRenderPipeline.
+- Moves per-frame pass composition out of RenderSystem.
+- Keeps one unified linear RenderGraph per frame.
+- Adds RenderShaderLibrary for persistent RHIShader reuse.
+- Adds RenderPipelineStateCache for persistent graphics pipeline reuse.
+- Keeps RenderTextureManager, RenderMeshManager, and RenderMaterialSystem as Asset-to-GPU bridges.
+- Keeps the existing RHIPipeline name to avoid a broad Vulkan/backend rename.
+- Does not implement lights, shadows, RenderFeature, HDR, post-processing, or RHIPipelineCache.
+
+Current frame flow:
+
+```text
+SceneSystem
+  -> RenderExtraction
+  -> RenderScene
+  -> ForwardRenderPipeline
+  -> RenderGraph
+  -> ClearPass / ForwardOpaquePass / PresentPass
+  -> RHI
+```
+
+Future stages:
+
+```text
+Stage 8B - LightComponent + RenderLight Extraction
+Stage 8C - GPU Light Data + PBR Shader Integration
+Stage 8D - Directional Shadow Map V0
+```
+
+## Stage 8B-pre - Coordinate Convention Cleanup
+
+Mid-term cleanup:
+- Keeps GLM as the Math backend through XEngine aliases.
+- Consolidates common operations behind XEngine Math helpers.
+- Removes redundant GPU matrix/vector wrapper types and pure-copy packing.
+- Allows shader-visible structs to use Mat4 and Vec4 with layout checks.
+- Removes legacy image loading from Renderer; decoding stays in Asset private importers.
+- Keeps CMake source discovery aligned with the current Renderer and Math files.
+
+```text
+COMPLETE
+```
+
+- Defines XEngine world coordinates as +X forward, +Y right, +Z up, left-handed.
+- Centralizes coordinate axes and transform direction helpers in Math.
+- Converts glTF position, normal, tangent, and triangle winding during import.
+- Centralizes left-handed camera/view/projection matrix construction.
+- Adds an RHI clip-space convention and a single Renderer projection adaptation point.
+- Moves AABB transformation and combination into Math.
+- Moves GPU matrix packing out of renderer passes.
+- Updates DebugCamera to the XEngine world convention.
+- Does not implement lights, shadows, GPU light buffers, or RenderFeature.
+
 ## Status
 
 ```text

@@ -1,28 +1,23 @@
 #pragma once
 
 #include "RenderPipeline.h"
-
-#include <memory>
+#include "../RenderGraph/RenderGraph.h"
 
 namespace XEngine
 {
-    class RenderGraph;
-
-    class ForwardPipeline final : public RenderPipeline
+    class ForwardRenderPipeline final : public RenderPipeline
     {
     public:
-        ForwardPipeline();
-        ~ForwardPipeline() override;
-
         bool Initialize(RenderResourceContext& resources) override;
         void Shutdown() override;
 
-        void Render(const RenderFrameContext& frameContext,
+        void Render(
+            const RenderFrameContext& frame,
             const RenderScene& scene,
             RenderResourceContext& resources) override;
 
     private:
-        std::shared_ptr<RenderGraph> m_RenderGraph;
+        RenderGraph m_Graph;
         bool m_Initialized = false;
     };
-} // namespace XEngine
+}

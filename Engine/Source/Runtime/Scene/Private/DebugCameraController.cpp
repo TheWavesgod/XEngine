@@ -1,10 +1,10 @@
 #include <XEngine/Scene/DebugCameraController.h>
 
 #include <XEngine/Input/InputSystem.h>
+#include <XEngine/Math/CoordinateSystem.h>
+#include <XEngine/Math/MathFunctions.h>
 #include <XEngine/Scene/Components/TransformComponent.h>
 #include <XEngine/Scene/Scene.h>
-
-#include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -14,15 +14,6 @@ namespace XEngine
     namespace
     {
         constexpr float MaxPitch = 1.55334306f;
-
-        Vec3 GetForward(float yaw, float pitch)
-        {
-            return glm::normalize(Vec3 {
-                std::cos(pitch) * std::sin(yaw),
-                std::sin(pitch),
-                -std::cos(pitch) * std::cos(yaw)
-            });
-        }
     }
 
     void DebugCameraController::Attach(Scene* scene, Entity cameraEntity)
@@ -72,15 +63,15 @@ namespace XEngine
         }
 
         const Vec2 mouseDelta = input.GetMouseDelta();
-        m_YawRadians -= mouseDelta.x * m_MouseSensitivity;
+        m_YawRadians += mouseDelta.x * m_MouseSensitivity;
         m_PitchRadians -= mouseDelta.y * m_MouseSensitivity;
         m_PitchRadians = std::clamp(m_PitchRadians, -MaxPitch, MaxPitch);
 
         ApplyOrientationToTransform(*transform);
 
-        const Vec3 forward = glm::normalize(transform->Rotation * Vec3{ 0.0f, 0.0f, -1.0f });
-        const Vec3 right   = glm::normalize(transform->Rotation * Vec3{ 1.0f, 0.0f,  0.0f });
-        const Vec3 up      = Vec3{ 0.0f, 1.0f, 0.0f };
+        const Vec3 forward = CoordinateSystem::GetForwardVector(transform->Rotation);
+        const Vec3 right = CoordinateSystem::GetRightVector(transform->Rotation);
+        const Vec3 up = CoordinateSystem::Up;
 
         Vec3 movement { 0.0f, 0.0f, 0.0f };
         if (input.IsKeyDown(KeyCode::W))
@@ -113,9 +104,9 @@ namespace XEngine
             m_FastMoveMultiplier :
             1.0f;
 
-        if (glm::length(movement) > 0.0f)
+        if (LengthSquared(movement) > 0.0f)
         {
-            transform->Position += glm::normalize(movement) * m_MoveSpeed * speedScale * deltaTime;
+            transform->Position += Normalize(movement) * m_MoveSpeed * speedScale * deltaTime;
         }
 
         transform->Dirty = true;
@@ -135,11 +126,13 @@ namespace XEngine
         }
 
         radius = std::max(radius, 0.5f);
-        transform->Position = center + Vec3 { 0.0f, radius * 0.25f, radius * 2.5f };
+        transform->Position =
+            center - CoordinateSystem::Forward * (radius * 2.5f) +
+            CoordinateSystem::Up * (radius * 0.25f);
 
-        const Vec3 direction = glm::normalize(center - transform->Position);
-        m_YawRadians = std::atan2(direction.x, -direction.z);
-        m_PitchRadians = std::asin(std::clamp(direction.y, -1.0f, 1.0f));
+        const Vec3 direction = Normalize(center - transform->Position);
+        m_YawRadians = std::atan2(direction.y, direction.x);
+        m_PitchRadians = std::asin(std::clamp(direction.z, -1.0f, 1.0f));
         m_MoveSpeed = std::max(0.5f, radius * 0.5f);
 
         ApplyOrientationToTransform(*transform);
@@ -173,15 +166,15 @@ namespace XEngine
 
     void DebugCameraController::UpdateOrientationFromTransform(const TransformComponent& transform)
     {
-        const Vec3 forward = glm::normalize(transform.Rotation * Vec3 { 0.0f, 0.0f, -1.0f });
-        m_YawRadians = std::atan2(forward.x, -forward.z);
-        m_PitchRadians = std::asin(std::clamp(forward.y, -1.0f, 1.0f));
+        const Vec3 forward = CoordinateSystem::GetForwardVector(transform.Rotation);
+        m_YawRadians = std::atan2(forward.y, forward.x);
+        m_PitchRadians = std::asin(std::clamp(forward.z, -1.0f, 1.0f));
     }
 
     void DebugCameraController::ApplyOrientationToTransform(TransformComponent& transform) const
     {
-        const Quat yaw = glm::angleAxis(m_YawRadians, Vec3 { 0.0f, 1.0f, 0.0f });
-        const Quat pitch = glm::angleAxis(m_PitchRadians, Vec3 { 1.0f, 0.0f, 0.0f });
+        const Quat yaw = AngleAxis(m_YawRadians, CoordinateSystem::Up);
+        const Quat pitch = AngleAxis(-m_PitchRadians, CoordinateSystem::Right);
         transform.Rotation = yaw * pitch;
     }
 }

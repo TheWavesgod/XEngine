@@ -1,37 +1,20 @@
 #include "ForwardOpaquePass.h"
 
 #include "../Resources/RenderResourceContext.h"
-#include "../Materials/MaterialSystem.h"
+#include "../Resources/GraphicsPipelineStateKey.h"
+#include "../Resources/RenderPipelineStateCache.h"
+#include "../Resources/RenderMaterialSystem.h"
 #include "../Resources/RenderMeshManager.h"
+#include "../Resources/RenderShaderTypes.h"
 #include "../RenderGraph/RenderGraph.h"
 #include "../RenderGraph/RenderGraphContext.h"
 #include "../Pipeline/RenderFrameContext.h"
 
 #include <XEngine/RHI/RHICommandList.h>
+#include <XEngine/RHI/RHIDevice.h>
 
 namespace XEngine
 {
-    namespace
-    {
-        Matrix4 ToMatrix4(const Mat4& matrix)
-        {
-            Matrix4 result {};
-            const float* values = &matrix[0][0];
-            for (u32 i = 0; i < 16; ++i)
-            {
-                result.Values[i] = values[i];
-            }
-            return result;
-        }
-    }
-
-    struct PBRPushConstants
-    {
-        Matrix4 ModelViewProjection;
-        Vec4 BaseColorFactor { 1.0f, 1.0f, 1.0f, 1.0f };
-        Vec4 MaterialFactors { 0.0f, 1.0f, 0.5f, 0.0f };
-    };
-
     void AddForwardOpaquePass(
         RenderGraph& graph,
         const RenderFrameContext& frameContext,
@@ -52,12 +35,10 @@ namespace XEngine
             [&frameContext, &renderScene, &resources](RenderGraphContext& context)
             {
                 RHICommandList* commandList = context.GetCommandList();
-                if (commandList == nullptr || pbrPipeline == nullptr || !resources.IsValid())
+                if (commandList == nullptr || frameContext.Device == nullptr || !resources.IsValid())
                 {
                     return;
                 }
-
-                commandList->SetGraphicsPipeline(pbrPipeline);
 
                 for (const RenderObject& object : renderScene.OpaqueObjects)
                 {
@@ -89,13 +70,33 @@ namespace XEngine
                         continue;
                     }
 
+                    GraphicsPipelineStateKey pipelineKey;
+                    pipelineKey.PassKind = RenderPassKind::ForwardOpaque;
+                    pipelineKey.ShadingModel = materialDesc->ShadingModel;
+                    pipelineKey.AlphaMode = materialDesc->AlphaMode;
+                    pipelineKey.VertexLayout = VertexLayoutKind::MeshVertex;
+                    pipelineKey.ColorFormat = frameContext.Device->GetSwapchainFormat();
+                    pipelineKey.DepthFormat = RHIFormat::D32Float;
+                    pipelineKey.DepthTestEnabled = true;
+                    pipelineKey.DepthWriteEnabled = materialDesc->AlphaMode != MaterialAlphaMode::Blend;
+                    pipelineKey.BlendEnabled = materialDesc->AlphaMode == MaterialAlphaMode::Blend;
+                    pipelineKey.DoubleSided = materialDesc->DoubleSided;
+
+                    RHIPipeline* pipeline =
+                        resources.PipelineStates->GetOrCreateGraphicsPipeline(pipelineKey);
+                    if (pipeline == nullptr)
+                    {
+                        continue;
+                    }
+
+                    commandList->SetGraphicsPipeline(pipeline);
                     commandList->SetVertexBuffer(mesh->VertexBuffer.get());
                     commandList->SetIndexBuffer(mesh->IndexBuffer.get(), mesh->IndexFormat);
                     commandList->SetBindGroup(0, bindGroup);
 
                     const Mat4& viewProjection = frameContext.ViewProjectionMatrix;
                     PBRPushConstants constants;
-                    constants.ModelViewProjection = ToMatrix4(viewProjection * object.WorldMatrix);
+                    constants.ModelViewProjection = viewProjection * object.WorldMatrix;
                     constants.BaseColorFactor = gpuMaterial->BaseColorFactor;
                     constants.MaterialFactors = Vec4 {
                         gpuMaterial->MetallicFactor,

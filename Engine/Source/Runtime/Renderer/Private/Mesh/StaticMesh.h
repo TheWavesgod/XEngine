@@ -1,7 +1,7 @@
 #pragma once
 
 #include <XEngine/Core/Types.h>
-#include <XEngine/Math/Vector.h>
+#include <XEngine/Math/MathTypes.h>
 #include <XEngine/RHI/RHITypes.h>
 #include <XEngine/RHI/Resources/RHIBuffer.h>
 
@@ -11,10 +11,10 @@ namespace XEngine
 {
     struct LegacyMeshVertex
     {
-        Vector3 Position;
-        Vector3 Color;
-        Vector3 Normal;
-        Vector2 UV;
+        Vec3 Position;
+        Vec3 Color;
+        Vec3 Normal;
+        Vec2 UV;
     };
 
     class StaticMesh

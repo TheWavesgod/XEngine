@@ -206,7 +206,7 @@ Stage 7B adds:
 
 IAssetImporter is private to the Asset module.
 stb_image is private to Asset importer implementation.
-Renderer no longer owns image decoding long-term; old renderer image loading files are deprecated compatibility shells.
+Renderer does not own image decoding; the old renderer ImageLoader compatibility files have been removed.
 
 Stage 7B does not parse glTF yet.
 Stage 7B does not implement MeshAsset import.
@@ -299,6 +299,59 @@ Stage 7G does not implement full editor viewport focus.
 Stage 7G does not implement input rebinding.
 Stage 7G does not implement gamepad input.
 Stage 7G does not implement scene picking or gizmos.
+
+Stage 8A stabilizes renderer architecture.
+
+Current renderer frame flow:
+
+```text
+SceneSystem
+  -> RenderExtraction
+  -> RenderScene
+  -> ForwardRenderPipeline
+  -> RenderGraph
+  -> Passes
+  -> RHI
+```
+
+- RenderSystem is a high-level coordinator.
+- ForwardRenderPipeline owns frame composition and one linear per-frame RenderGraph.
+- RenderShaderLibrary owns and reuses RHIShader objects.
+- RenderPipelineStateCache owns and reuses graphics RHIPipeline objects.
+- RenderTextureManager, RenderMeshManager, and RenderMaterialSystem bridge Asset data to GPU resources.
+- ForwardOpaquePass requests graphics pipelines through RenderPipelineStateCache.
+
+The current RHI type is still named `RHIPipeline`; Stage 8A treats it as the graphics-pipeline
+type and avoids a broad backend rename.
+
+Stage 8A does not add lighting, shadows, HDR, post-processing, RenderFeature, or RHIPipelineCache.
+
+Stage 8B-pre establishes the XEngine world coordinate convention:
+
+```text
++X = Forward
++Y = Right
++Z = Up
+Left-handed world space
+```
+
+External glTF positions, directions, tangents, and triangle winding are converted into XEngine
+coordinates once during import. Scene and Renderer use XEngine coordinates internally. Graphics
+API clip-space differences are adapted through the RHI projection convention boundary.
+
+Common AABB, camera matrix, coordinate conversion, and transform-axis helpers are centralized.
+Renderer passes and scene extraction no longer define general-purpose matrix or bounds utilities.
+
+Stage 8B-pre does not implement lights, shadows, GPU light buffers, or RenderFeature.
+
+Mid-term cleanup keeps GLM as the backend implementation of XEngine Math. Engine-facing code uses
+the `XEngine::Vec2`, `Vec3`, `Vec4`, `Mat4`, and `Quat` aliases from `MathTypes.h`, while common
+operations are exposed through XEngine Math helpers instead of scattered direct GLM calls.
+
+Shader-visible renderer structs may use `Mat4` and `Vec4` directly when their layout is validated
+with compile-time checks. Redundant `Matrix4`, `Vector4`, and pure-copy GPU matrix packing helpers
+have been removed. Image decoding remains private to Asset importers; RenderSystem only coordinates
+asset-backed render resource managers.
 
 Stage 2B-2 adds:
 - Vulkan swapchain creation

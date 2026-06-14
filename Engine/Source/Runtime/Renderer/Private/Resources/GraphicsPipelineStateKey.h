@@ -1,0 +1,61 @@
+#pragma once
+
+#include <XEngine/Renderer/MaterialTypes.h>
+#include <XEngine/RHI/RHITypes.h>
+
+#include <cstddef>
+#include <functional>
+
+namespace XEngine
+{
+    enum class RenderPassKind
+    {
+        ForwardOpaque,
+        ShadowDepth,
+        PostProcess
+    };
+
+    enum class VertexLayoutKind
+    {
+        MeshVertex
+    };
+
+    struct GraphicsPipelineStateKey
+    {
+        RenderPassKind PassKind = RenderPassKind::ForwardOpaque;
+        MaterialShadingModel ShadingModel = MaterialShadingModel::Lit;
+        MaterialAlphaMode AlphaMode = MaterialAlphaMode::Opaque;
+        VertexLayoutKind VertexLayout = VertexLayoutKind::MeshVertex;
+        RHIFormat ColorFormat = RHIFormat::Undefined;
+        RHIFormat DepthFormat = RHIFormat::D32Float;
+        bool DepthTestEnabled = true;
+        bool DepthWriteEnabled = true;
+        bool BlendEnabled = false;
+        bool DoubleSided = false;
+
+        bool operator==(const GraphicsPipelineStateKey& other) const = default;
+    };
+
+    struct GraphicsPipelineStateKeyHash
+    {
+        std::size_t operator()(const GraphicsPipelineStateKey& key) const
+        {
+            std::size_t value = 0;
+            const auto combine = [&value](std::size_t part)
+            {
+                value ^= part + 0x9e3779b9u + (value << 6u) + (value >> 2u);
+            };
+            combine(std::hash<int> {}(static_cast<int>(key.PassKind)));
+            combine(std::hash<int> {}(static_cast<int>(key.ShadingModel)));
+            combine(std::hash<int> {}(static_cast<int>(key.AlphaMode)));
+            combine(std::hash<int> {}(static_cast<int>(key.VertexLayout)));
+            combine(std::hash<int> {}(static_cast<int>(key.ColorFormat)));
+            combine(std::hash<int> {}(static_cast<int>(key.DepthFormat)));
+            combine(std::hash<bool> {}(key.DepthTestEnabled));
+            combine(std::hash<bool> {}(key.DepthWriteEnabled));
+            combine(std::hash<bool> {}(key.BlendEnabled));
+            combine(std::hash<bool> {}(key.DoubleSided));
+            return value;
+        }
+    };
+}

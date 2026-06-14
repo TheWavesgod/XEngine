@@ -1,4 +1,4 @@
-#include "TextureManager.h"
+#include "RenderTextureManager.h"
 
 #include <XEngine/Asset/Assets/TextureAsset.h>
 #include <XEngine/Core/Assert.h>
@@ -24,22 +24,22 @@ namespace XEngine
         }
     }
 
-    void TextureManager::Initialize(RHIDevice* device)
+    void RenderTextureManager::Initialize(RHIDevice* device)
     {
         if (m_Initialized)
         {
             return;
         }
 
-        XENGINE_ASSERT(device != nullptr, "TextureManager requires RHIDevice");
+        XENGINE_ASSERT(device != nullptr, "RenderTextureManager requires RHIDevice");
         if (device == nullptr || !device->IsValid())
         {
-            XENGINE_LOG_ERROR("TextureManager requires a valid RHIDevice");
+            XENGINE_LOG_ERROR("RenderTextureManager requires a valid RHIDevice");
             return;
         }
 
         m_Device = device;
-        XENGINE_LOG_INFO("TextureManager initialized");
+        XENGINE_LOG_INFO("RenderTextureManager initialized");
 
         m_DefaultWhiteTexture = CreateSolidColorTexture("DefaultWhiteTexture", 255, 255, 255, 255, false);
         XENGINE_LOG_INFO("Default white texture created");
@@ -56,14 +56,14 @@ namespace XEngine
         m_Initialized = true;
     }
 
-    void TextureManager::Shutdown()
+    void RenderTextureManager::Shutdown()
     {
         if (!m_Initialized && m_Textures.empty())
         {
             return;
         }
 
-        XENGINE_LOG_INFO("TextureManager shutdown");
+        XENGINE_LOG_INFO("RenderTextureManager shutdown");
         m_AssetTextureCache.clear();
         m_PathCache.clear();
         m_Textures.clear();
@@ -75,12 +75,12 @@ namespace XEngine
         m_Initialized = false;
     }
 
-    TextureHandle TextureManager::LoadTexture2D(const std::string& path, bool srgb)
+    TextureHandle RenderTextureManager::LoadTexture2D(const std::string& path, bool srgb)
     {
         (void)srgb;
         if (m_Device == nullptr || !m_Device->IsValid())
         {
-            XENGINE_LOG_ERROR("Texture load failed because TextureManager has no valid RHIDevice");
+            XENGINE_LOG_ERROR("Texture load failed because RenderTextureManager has no valid RHIDevice");
             return m_MissingTexture;
         }
 
@@ -92,11 +92,11 @@ namespace XEngine
         return m_MissingTexture;
     }
 
-    TextureHandle TextureManager::CreateTextureFromAsset(const TextureAsset& asset, bool srgb)
+    TextureHandle RenderTextureManager::CreateTextureFromAsset(const TextureAsset& asset, bool srgb)
     {
         if (m_Device == nullptr || !m_Device->IsValid())
         {
-            XENGINE_LOG_ERROR("Texture creation failed because TextureManager has no valid RHIDevice");
+            XENGINE_LOG_ERROR("Texture creation failed because RenderTextureManager has no valid RHIDevice");
             return m_MissingTexture;
         }
 
@@ -137,7 +137,7 @@ namespace XEngine
         return handle;
     }
 
-    TextureHandle TextureManager::GetOrCreateTextureFromAsset(
+    TextureHandle RenderTextureManager::GetOrCreateTextureFromAsset(
         AssetHandle assetHandle,
         const TextureAsset& asset,
         bool srgb)
@@ -163,7 +163,7 @@ namespace XEngine
         return handle;
     }
 
-    TextureHandle TextureManager::CreateSolidColorTexture(
+    TextureHandle RenderTextureManager::CreateSolidColorTexture(
         const char* name,
         u8 r,
         u8 g,
@@ -200,12 +200,12 @@ namespace XEngine
         return AddTextureRecord(name != nullptr ? name : "<unnamed>", texture);
     }
 
-    RHITexture* TextureManager::GetTexture(TextureHandle handle)
+    RHITexture* RenderTextureManager::GetTexture(TextureHandle handle)
     {
-        return const_cast<RHITexture*>(static_cast<const TextureManager*>(this)->GetTexture(handle));
+        return const_cast<RHITexture*>(static_cast<const RenderTextureManager*>(this)->GetTexture(handle));
     }
 
-    const RHITexture* TextureManager::GetTexture(TextureHandle handle) const
+    const RHITexture* RenderTextureManager::GetTexture(TextureHandle handle) const
     {
         if (!handle.IsValid() || handle.Index >= m_Textures.size())
         {
@@ -221,27 +221,27 @@ namespace XEngine
         return record.Texture.get();
     }
 
-    TextureHandle TextureManager::GetDefaultWhiteTexture() const
+    TextureHandle RenderTextureManager::GetDefaultWhiteTexture() const
     {
         return m_DefaultWhiteTexture;
     }
 
-    TextureHandle TextureManager::GetDefaultBlackTexture() const
+    TextureHandle RenderTextureManager::GetDefaultBlackTexture() const
     {
         return m_DefaultBlackTexture;
     }
 
-    TextureHandle TextureManager::GetDefaultNormalTexture() const
+    TextureHandle RenderTextureManager::GetDefaultNormalTexture() const
     {
         return m_DefaultNormalTexture;
     }
 
-    TextureHandle TextureManager::GetMissingTexture() const
+    TextureHandle RenderTextureManager::GetMissingTexture() const
     {
         return m_MissingTexture;
     }
 
-    TextureHandle TextureManager::AddTextureRecord(std::string path, std::shared_ptr<RHITexture> texture)
+    TextureHandle RenderTextureManager::AddTextureRecord(std::string path, std::shared_ptr<RHITexture> texture)
     {
         if (!texture)
         {

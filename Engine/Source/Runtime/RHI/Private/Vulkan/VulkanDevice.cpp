@@ -241,6 +241,16 @@ namespace XEngine
         return RHIBackend::Vulkan;
     }
 
+    RHIClipSpaceConvention VulkanDevice::GetClipSpaceConvention() const
+    {
+        RHIClipSpaceConvention convention;
+        convention.DepthZeroToOne = true;
+        convention.FlipProjectionY = true;
+        convention.UseInvertedViewportY = false;
+        convention.DefaultFrontFace = RHIFrontFace::CounterClockwise;
+        return convention;
+    }
+
     bool VulkanDevice::IsValid() const
     {
         return m_Initialized && m_Device != VK_NULL_HANDLE;

@@ -2,6 +2,7 @@
 
 #include <XEngine/Core/Types.h>
 #include <XEngine/RHI/RHITypes.h>
+#include <XEngine/RHI/RHIClipSpace.h>
 #include <XEngine/RHI/Resources/RHIBindGroup.h>
 #include <XEngine/RHI/Resources/RHIBuffer.h>
 #include <XEngine/RHI/Resources/RHIPipeline.h>
@@ -22,6 +23,7 @@ namespace XEngine
         virtual ~RHIDevice() = default;
 
         virtual RHIBackend GetBackend() const = 0;
+        virtual RHIClipSpaceConvention GetClipSpaceConvention() const = 0;
 
         virtual bool IsValid() const = 0;
 

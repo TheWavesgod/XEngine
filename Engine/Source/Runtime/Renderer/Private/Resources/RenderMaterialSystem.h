@@ -14,7 +14,7 @@ namespace XEngine
 {
     class AssetSystem;
     class RHIDevice;
-    class TextureManager;
+    class RenderTextureManager;
     struct MaterialAsset;
 
     struct MaterialRecord
@@ -27,24 +27,24 @@ namespace XEngine
         u32 Generation = 0;
     };
 
-    class MaterialSystem
+    class RenderMaterialSystem
     {
     public:
-        void Initialize(TextureManager* textureManager, RHIDevice* device);
+        void Initialize(RenderTextureManager* textureManager, RHIDevice* device);
         void Shutdown();
 
         MaterialHandle CreateMaterial(const std::string& name, const MaterialDesc& desc);
         // Converts CPU-side Asset material data into a renderer material.
-        // TextureAsset handles are resolved through AssetSystem and TextureManager.
+        // TextureAsset handles are resolved through AssetSystem and RenderTextureManager.
         MaterialHandle CreateMaterialFromAsset(
             const MaterialAsset& asset,
             AssetSystem& assetSystem,
-            TextureManager& textureManager);
+            RenderTextureManager& textureManager);
         MaterialHandle GetOrCreateMaterialFromAsset(
             AssetHandle assetHandle,
             const MaterialAsset& asset,
             AssetSystem& assetSystem,
-            TextureManager& textureManager);
+            RenderTextureManager& textureManager);
 
         const MaterialDesc* GetMaterialDesc(MaterialHandle handle) const;
         MaterialDesc* GetMaterialDesc(MaterialHandle handle);
@@ -71,7 +71,7 @@ namespace XEngine
         TextureHandle ResolveTexture(TextureHandle texture, TextureHandle fallback) const;
 
         RHIDevice* m_Device = nullptr;
-        TextureManager* m_TextureManager = nullptr;
+        RenderTextureManager* m_TextureManager = nullptr;
         std::shared_ptr<RHIBindGroupLayout> m_BaseColorBindGroupLayout;
         std::shared_ptr<RHIBindGroupLayout> m_PBRMaterialBindGroupLayout;
         std::shared_ptr<RHISampler> m_DefaultSampler;

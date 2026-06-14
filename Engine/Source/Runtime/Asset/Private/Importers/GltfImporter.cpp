@@ -7,6 +7,7 @@
 #include <XEngine/Asset/Assets/MeshAsset.h>
 #include <XEngine/Asset/Assets/TextureAsset.h>
 #include <XEngine/Logging/Log.h>
+#include <XEngine/Math/CoordinateConversion.h>
 
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
@@ -467,14 +468,14 @@ namespace XEngine
                 for (std::size_t vertexIndex = 0; vertexIndex < positions.size(); ++vertexIndex)
                 {
                     MeshVertex vertex;
-                    vertex.Position = positions[vertexIndex];
+                    vertex.Position = CoordinateConversion::GltfPositionToXEngine(positions[vertexIndex]);
                     if (vertexIndex < normals.size())
                     {
-                        vertex.Normal = normals[vertexIndex];
+                        vertex.Normal = CoordinateConversion::GltfDirectionToXEngine(normals[vertexIndex]);
                     }
                     if (vertexIndex < tangents.size())
                     {
-                        vertex.Tangent = tangents[vertexIndex];
+                        vertex.Tangent = CoordinateConversion::GltfTangentToXEngine(tangents[vertexIndex]);
                     }
                     if (vertexIndex < uvs.size())
                     {
@@ -487,9 +488,18 @@ namespace XEngine
                 }
 
                 mesh.Indices.reserve(mesh.Indices.size() + localIndices.size());
-                for (u32 index : localIndices)
+                if (CoordinateConversion::GltfToXEngineFlipsHandedness())
                 {
-                    mesh.Indices.push_back(index);
+                    for (std::size_t index = 0; index + 2 < localIndices.size(); index += 3)
+                    {
+                        mesh.Indices.push_back(localIndices[index]);
+                        mesh.Indices.push_back(localIndices[index + 2]);
+                        mesh.Indices.push_back(localIndices[index + 1]);
+                    }
+                }
+                else
+                {
+                    mesh.Indices.insert(mesh.Indices.end(), localIndices.begin(), localIndices.end());
                 }
 
                 MeshSubmesh submesh;

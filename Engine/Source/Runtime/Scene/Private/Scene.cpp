@@ -1,9 +1,7 @@
 #include <XEngine/Scene/Scene.h>
 
 #include <XEngine/Core/Assert.h>
-
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
+#include <XEngine/Math/MathFunctions.h>
 
 #include <algorithm>
 #include <utility>
@@ -19,45 +17,11 @@ namespace XEngine
             return;
         }
 
-        LocalMatrix =
-            glm::translate(Mat4 { 1.0f }, Position) *
-            glm::mat4_cast(Rotation) *
-            glm::scale(Mat4 { 1.0f }, Scale);
+        LocalMatrix = Translate(Position) * Rotate(Rotation) * XEngine::Scale(Scale);
 
         // TODO later stage: add parent/child hierarchy and transform propagation.
         WorldMatrix = LocalMatrix;
         Dirty = false;
-    }
-
-    Mat4 BuildCameraViewMatrix(const TransformComponent& transform)
-    {
-        return glm::inverse(transform.WorldMatrix);
-    }
-
-    Mat4 BuildCameraProjectionMatrix(const CameraComponent& camera, float aspectRatio)
-    {
-        if (camera.ProjectionMode == CameraProjectionMode::Orthographic)
-        {
-            const float halfHeight = camera.OrthographicHeight * 0.5f;
-            const float halfWidth = halfHeight * aspectRatio;
-            Mat4 projection = glm::ortho(
-                -halfWidth,
-                halfWidth,
-                -halfHeight,
-                halfHeight,
-                camera.NearPlane,
-                camera.FarPlane);
-            projection[1][1] *= -1.0f;
-            return projection;
-        }
-
-        Mat4 projection = glm::perspective(
-            camera.VerticalFovRadians,
-            aspectRatio,
-            camera.NearPlane,
-            camera.FarPlane);
-        projection[1][1] *= -1.0f;
-        return projection;
     }
 
     Scene::Scene() = default;

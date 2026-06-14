@@ -14,7 +14,7 @@ namespace XEngine
     struct MeshVertex
     {
         Vec3 Position { 0.0f, 0.0f, 0.0f };
-        Vec3 Normal { 0.0f, 1.0f, 0.0f };
+        Vec3 Normal { 0.0f, 0.0f, 1.0f };
         Vec4 Tangent { 1.0f, 0.0f, 0.0f, 1.0f };
         Vec2 TexCoord0 { 0.0f, 0.0f };
     };

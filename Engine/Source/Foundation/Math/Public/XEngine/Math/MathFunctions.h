@@ -1,13 +1,55 @@
 #pragma once
 
-#include <XEngine/Math/MathTypes.h>
+#include <XEngine/Math/CameraMatrices.h>
 
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 namespace XEngine
 {
+    template<typename T>
+    inline auto Dot(const T& lhs, const T& rhs)
+    {
+        return glm::dot(lhs, rhs);
+    }
+
+    template<typename T>
+    inline T Cross(const T& lhs, const T& rhs)
+    {
+        return glm::cross(lhs, rhs);
+    }
+
+    template<typename T>
+    inline T Normalize(const T& value)
+    {
+        return glm::normalize(value);
+    }
+
+    template<typename T>
+    inline auto Length(const T& value)
+    {
+        return glm::length(value);
+    }
+
+    template<typename T>
+    inline auto LengthSquared(const T& value)
+    {
+        return glm::dot(value, value);
+    }
+
+    template<typename T>
+    inline T Inverse(const T& value)
+    {
+        return glm::inverse(value);
+    }
+
+    template<typename T>
+    inline T Transpose(const T& value)
+    {
+        return glm::transpose(value);
+    }
+
     inline float Radians(float degrees)
     {
         return glm::radians(degrees);
@@ -18,16 +60,38 @@ namespace XEngine
         return glm::degrees(radians);
     }
 
+    template<typename T>
+    inline T Clamp(const T& value, const T& minimum, const T& maximum)
+    {
+        return glm::clamp(value, minimum, maximum);
+    }
+
+    template<typename T, typename U>
+    inline T Lerp(const T& from, const T& to, const U& alpha)
+    {
+        return glm::mix(from, to, alpha);
+    }
+
+    template<typename T>
+    inline T Min(const T& lhs, const T& rhs)
+    {
+        return glm::min(lhs, rhs);
+    }
+
+    template<typename T>
+    inline T Max(const T& lhs, const T& rhs)
+    {
+        return glm::max(lhs, rhs);
+    }
+
     inline Mat4 Perspective(float fovRadians, float aspect, float nearPlane, float farPlane)
     {
-        Mat4 result = glm::perspective(fovRadians, aspect, nearPlane, farPlane);
-        result[1][1] *= -1.0f;
-        return result;
+        return PerspectiveLH_ZO(fovRadians, aspect, nearPlane, farPlane);
     }
 
     inline Mat4 LookAt(const Vec3& eye, const Vec3& center, const Vec3& up)
     {
-        return glm::lookAt(eye, center, up);
+        return LookAtLH_XForward(eye, center, up);
     }
 
     inline Mat4 Translate(const Vec3& translation)
@@ -37,11 +101,26 @@ namespace XEngine
 
     inline Mat4 Rotate(const Quat& rotation)
     {
-        return glm::toMat4(rotation);
+        return glm::mat4_cast(rotation);
     }
 
     inline Mat4 Scale(const Vec3& scale)
     {
         return glm::scale(Mat4(1.0f), scale);
+    }
+
+    inline Quat AngleAxis(float angleRadians, const Vec3& axis)
+    {
+        return glm::angleAxis(angleRadians, axis);
+    }
+
+    inline Vec3 TransformPoint(const Mat4& transform, const Vec3& point)
+    {
+        return Vec3(transform * Vec4(point, 1.0f));
+    }
+
+    inline Vec3 TransformVector(const Mat4& transform, const Vec3& vector)
+    {
+        return Vec3(transform * Vec4(vector, 0.0f));
     }
 }

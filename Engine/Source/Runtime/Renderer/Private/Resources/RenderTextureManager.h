@@ -23,7 +23,7 @@ namespace XEngine
         u32 Generation = 0;
     };
 
-    class TextureManager
+    class RenderTextureManager
     {
     public:
         void Initialize(RHIDevice* device);
@@ -40,7 +40,6 @@ namespace XEngine
             const char* name,
             u8 r,
             u8 g,
-            
             u8 b,
             u8 a,
             bool srgb = false);

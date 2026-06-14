@@ -6,7 +6,7 @@
 
 namespace XEngine
 {
-    // Renderer-side shading category used by MaterialSystem and pipelines.
+    // Renderer-side shading category used by RenderMaterialSystem and pipelines.
     enum class MaterialShadingModel
     {
         Unlit,
@@ -22,7 +22,7 @@ namespace XEngine
     };
 
     // Renderer-facing material description. It owns TextureHandle references only;
-    // Asset MaterialAsset data is converted into this by MaterialSystem.
+    // Asset MaterialAsset data is converted into this by RenderMaterialSystem.
     struct MaterialDesc
     {
         MaterialShadingModel ShadingModel = MaterialShadingModel::Lit;

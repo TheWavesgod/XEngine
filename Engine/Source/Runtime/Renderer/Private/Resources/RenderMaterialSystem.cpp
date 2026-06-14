@@ -1,6 +1,6 @@
-#include "MaterialSystem.h"
+#include "RenderMaterialSystem.h"
 
-#include "../Resources/TextureManager.h"
+#include "RenderTextureManager.h"
 
 #include <XEngine/Asset/AssetSystem.h>
 #include <XEngine/Asset/Assets/MaterialAsset.h>
@@ -54,7 +54,7 @@ namespace XEngine
         TextureHandle ResolveTextureAssetHandle(
             AssetHandle textureAssetHandle,
             AssetSystem& assetSystem,
-            TextureManager& textureManager,
+            RenderTextureManager& textureManager,
             TextureHandle fallback,
             bool srgb)
         {
@@ -78,18 +78,18 @@ namespace XEngine
         }
     }
 
-    void MaterialSystem::Initialize(TextureManager* textureManager, RHIDevice* device)
+    void RenderMaterialSystem::Initialize(RenderTextureManager* textureManager, RHIDevice* device)
     {
         if (m_Initialized)
         {
             return;
         }
 
-        XENGINE_ASSERT(textureManager != nullptr, "MaterialSystem requires TextureManager");
-        XENGINE_ASSERT(device != nullptr, "MaterialSystem requires RHIDevice");
+        XENGINE_ASSERT(textureManager != nullptr, "RenderMaterialSystem requires RenderTextureManager");
+        XENGINE_ASSERT(device != nullptr, "RenderMaterialSystem requires RHIDevice");
         if (textureManager == nullptr || device == nullptr || !device->IsValid())
         {
-            XENGINE_LOG_ERROR("MaterialSystem requires TextureManager and a valid RHIDevice");
+            XENGINE_LOG_ERROR("RenderMaterialSystem requires RenderTextureManager and a valid RHIDevice");
             return;
         }
 
@@ -186,17 +186,17 @@ namespace XEngine
         m_MissingMaterial = AddMaterialRecord("MissingMaterial", missing);
 
         m_Initialized = true;
-        XENGINE_LOG_INFO("MaterialSystem initialized");
+        XENGINE_LOG_INFO("RenderMaterialSystem initialized");
     }
 
-    void MaterialSystem::Shutdown()
+    void RenderMaterialSystem::Shutdown()
     {
         if (!m_Initialized && m_Materials.empty())
         {
             return;
         }
 
-        XENGINE_LOG_INFO("MaterialSystem shutdown");
+        XENGINE_LOG_INFO("RenderMaterialSystem shutdown");
         m_AssetMaterialCache.clear();
         m_Materials.clear();
         m_DefaultSampler.reset();
@@ -210,25 +210,25 @@ namespace XEngine
         m_Initialized = false;
     }
 
-    MaterialHandle MaterialSystem::CreateMaterial(const std::string& name, const MaterialDesc& desc)
+    MaterialHandle RenderMaterialSystem::CreateMaterial(const std::string& name, const MaterialDesc& desc)
     {
         if (!m_Initialized)
         {
-            XENGINE_LOG_ERROR("Cannot create material before MaterialSystem is initialized");
+            XENGINE_LOG_ERROR("Cannot create material before RenderMaterialSystem is initialized");
             return {};
         }
 
         return AddMaterialRecord(name, desc);
     }
 
-    MaterialHandle MaterialSystem::CreateMaterialFromAsset(
+    MaterialHandle RenderMaterialSystem::CreateMaterialFromAsset(
         const MaterialAsset& asset,
         AssetSystem& assetSystem,
-        TextureManager& textureManager)
+        RenderTextureManager& textureManager)
     {
         if (!m_Initialized)
         {
-            XENGINE_LOG_ERROR("Cannot create material from asset before MaterialSystem is initialized");
+            XENGINE_LOG_ERROR("Cannot create material from asset before RenderMaterialSystem is initialized");
             return {};
         }
 
@@ -276,11 +276,11 @@ namespace XEngine
         return CreateMaterial(asset.Name, desc);
     }
 
-    MaterialHandle MaterialSystem::GetOrCreateMaterialFromAsset(
+    MaterialHandle RenderMaterialSystem::GetOrCreateMaterialFromAsset(
         AssetHandle assetHandle,
         const MaterialAsset& asset,
         AssetSystem& assetSystem,
-        TextureManager& textureManager)
+        RenderTextureManager& textureManager)
     {
         if (!assetHandle.IsValid())
         {
@@ -303,7 +303,7 @@ namespace XEngine
         return handle;
     }
 
-    const MaterialDesc* MaterialSystem::GetMaterialDesc(MaterialHandle handle) const
+    const MaterialDesc* RenderMaterialSystem::GetMaterialDesc(MaterialHandle handle) const
     {
         if (!IsValid(handle))
         {
@@ -313,12 +313,12 @@ namespace XEngine
         return &m_Materials[handle.Index].Desc;
     }
 
-    MaterialDesc* MaterialSystem::GetMaterialDesc(MaterialHandle handle)
+    MaterialDesc* RenderMaterialSystem::GetMaterialDesc(MaterialHandle handle)
     {
-        return const_cast<MaterialDesc*>(static_cast<const MaterialSystem*>(this)->GetMaterialDesc(handle));
+        return const_cast<MaterialDesc*>(static_cast<const RenderMaterialSystem*>(this)->GetMaterialDesc(handle));
     }
 
-    const GPUMaterialData* MaterialSystem::GetGPUMaterialData(MaterialHandle handle) const
+    const GPUMaterialData* RenderMaterialSystem::GetGPUMaterialData(MaterialHandle handle) const
     {
         if (!IsValid(handle))
         {
@@ -328,7 +328,7 @@ namespace XEngine
         return &m_Materials[handle.Index].GPUData;
     }
 
-    RHIBindGroup* MaterialSystem::GetBaseColorBindGroup(MaterialHandle handle) const
+    RHIBindGroup* RenderMaterialSystem::GetBaseColorBindGroup(MaterialHandle handle) const
     {
         if (!IsValid(handle))
         {
@@ -338,12 +338,12 @@ namespace XEngine
         return m_Materials[handle.Index].BaseColorBindGroup.get();
     }
 
-    RHIBindGroupLayout* MaterialSystem::GetBaseColorBindGroupLayout() const
+    RHIBindGroupLayout* RenderMaterialSystem::GetBaseColorBindGroupLayout() const
     {
         return m_BaseColorBindGroupLayout.get();
     }
 
-    RHIBindGroup* MaterialSystem::GetPBRMaterialBindGroup(MaterialHandle handle) const
+    RHIBindGroup* RenderMaterialSystem::GetPBRMaterialBindGroup(MaterialHandle handle) const
     {
         if (!IsValid(handle))
         {
@@ -353,27 +353,27 @@ namespace XEngine
         return m_Materials[handle.Index].PBRBindGroup.get();
     }
 
-    RHIBindGroupLayout* MaterialSystem::GetPBRMaterialBindGroupLayout() const
+    RHIBindGroupLayout* RenderMaterialSystem::GetPBRMaterialBindGroupLayout() const
     {
         return m_PBRMaterialBindGroupLayout.get();
     }
 
-    MaterialHandle MaterialSystem::GetDefaultLitMaterial() const
+    MaterialHandle RenderMaterialSystem::GetDefaultLitMaterial() const
     {
         return m_DefaultLitMaterial;
     }
 
-    MaterialHandle MaterialSystem::GetDefaultUnlitMaterial() const
+    MaterialHandle RenderMaterialSystem::GetDefaultUnlitMaterial() const
     {
         return m_DefaultUnlitMaterial;
     }
 
-    MaterialHandle MaterialSystem::GetMissingMaterial() const
+    MaterialHandle RenderMaterialSystem::GetMissingMaterial() const
     {
         return m_MissingMaterial;
     }
 
-    bool MaterialSystem::IsValid(MaterialHandle handle) const
+    bool RenderMaterialSystem::IsValid(MaterialHandle handle) const
     {
         if (!handle.IsValid() || handle.Index >= m_Materials.size())
         {
@@ -383,7 +383,7 @@ namespace XEngine
         return m_Materials[handle.Index].Generation == handle.Generation;
     }
 
-    MaterialHandle MaterialSystem::AddMaterialRecord(std::string name, const MaterialDesc& desc)
+    MaterialHandle RenderMaterialSystem::AddMaterialRecord(std::string name, const MaterialDesc& desc)
     {
         MaterialDesc resolvedDesc = ResolveFallbackTextures(desc);
 
@@ -403,7 +403,7 @@ namespace XEngine
         return handle;
     }
 
-    MaterialDesc MaterialSystem::ResolveFallbackTextures(const MaterialDesc& desc) const
+    MaterialDesc RenderMaterialSystem::ResolveFallbackTextures(const MaterialDesc& desc) const
     {
         MaterialDesc resolved = desc;
         if (m_TextureManager == nullptr)
@@ -420,7 +420,7 @@ namespace XEngine
         return resolved;
     }
 
-    GPUMaterialData MaterialSystem::BuildGPUMaterialData(const MaterialDesc& desc) const
+    GPUMaterialData RenderMaterialSystem::BuildGPUMaterialData(const MaterialDesc& desc) const
     {
         GPUMaterialData gpu;
         gpu.BaseColorFactor = desc.BaseColorFactor;
@@ -457,7 +457,7 @@ namespace XEngine
         return gpu;
     }
 
-    std::shared_ptr<RHIBindGroup> MaterialSystem::CreateBaseColorBindGroup(const MaterialDesc& desc) const
+    std::shared_ptr<RHIBindGroup> RenderMaterialSystem::CreateBaseColorBindGroup(const MaterialDesc& desc) const
     {
         if (m_Device == nullptr || m_TextureManager == nullptr ||
             !m_BaseColorBindGroupLayout || !m_DefaultSampler)
@@ -492,7 +492,7 @@ namespace XEngine
         return m_Device->CreateBindGroup(bindGroupDesc);
     }
 
-    std::shared_ptr<RHIBindGroup> MaterialSystem::CreatePBRBindGroup(const MaterialDesc& desc) const
+    std::shared_ptr<RHIBindGroup> RenderMaterialSystem::CreatePBRBindGroup(const MaterialDesc& desc) const
     {
         if (m_Device == nullptr || m_TextureManager == nullptr ||
             !m_PBRMaterialBindGroupLayout || !m_DefaultSampler)
@@ -552,7 +552,7 @@ namespace XEngine
         return m_Device->CreateBindGroup(bindGroupDesc);
     }
 
-    RHITexture* MaterialSystem::ResolveRHITexture(TextureHandle texture, TextureHandle fallback) const
+    RHITexture* RenderMaterialSystem::ResolveRHITexture(TextureHandle texture, TextureHandle fallback) const
     {
         if (m_TextureManager == nullptr)
         {
@@ -568,7 +568,7 @@ namespace XEngine
         return m_TextureManager->GetTexture(fallback);
     }
 
-    TextureHandle MaterialSystem::ResolveTexture(TextureHandle texture, TextureHandle fallback) const
+    TextureHandle RenderMaterialSystem::ResolveTexture(TextureHandle texture, TextureHandle fallback) const
     {
         if (m_TextureManager == nullptr || m_TextureManager->GetTexture(texture) == nullptr)
         {

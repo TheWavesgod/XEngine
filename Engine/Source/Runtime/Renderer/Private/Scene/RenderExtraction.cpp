@@ -1,51 +1,18 @@
 #include "RenderExtraction.h"
 
 #include "../Resources/RenderResourceContext.h"
-#include "../Materials/MaterialSystem.h"
+#include "../Resources/RenderMaterialSystem.h"
 #include "../Resources/RenderMeshManager.h"
-#include "../Resources/TextureManager.h"
+#include "../Resources/RenderTextureManager.h"
 
 #include <XEngine/Asset/AssetSystem.h>
 #include <XEngine/Asset/Assets/MaterialAsset.h>
 #include <XEngine/Asset/Assets/MeshAsset.h>
+#include <XEngine/Math/AABB.h>
 #include <XEngine/Scene/Scene.h>
-
-#include <glm/common.hpp>
-
-#include <limits>
 
 namespace XEngine
 {
-    namespace
-    {
-        AABB TransformBounds(const AABB& bounds, const Mat4& world)
-        {
-            const Vec3 corners[] = {
-                { bounds.Min.x, bounds.Min.y, bounds.Min.z },
-                { bounds.Max.x, bounds.Min.y, bounds.Min.z },
-                { bounds.Min.x, bounds.Max.y, bounds.Min.z },
-                { bounds.Max.x, bounds.Max.y, bounds.Min.z },
-                { bounds.Min.x, bounds.Min.y, bounds.Max.z },
-                { bounds.Max.x, bounds.Min.y, bounds.Max.z },
-                { bounds.Min.x, bounds.Max.y, bounds.Max.z },
-                { bounds.Max.x, bounds.Max.y, bounds.Max.z },
-            };
-
-            AABB transformed;
-            transformed.Min = Vec3 { std::numeric_limits<float>::max() };
-            transformed.Max = Vec3 { std::numeric_limits<float>::lowest() };
-
-            for (const Vec3& corner : corners)
-            {
-                const Vec4 point = world * Vec4 { corner, 1.0f };
-                transformed.Min = glm::min(transformed.Min, Vec3 { point });
-                transformed.Max = glm::max(transformed.Max, Vec3 { point });
-            }
-
-            return transformed;
-        }
-    }
-
     void RenderExtraction::Extract(
         const Scene& scene,
         AssetSystem& assetSystem,
@@ -97,7 +64,7 @@ namespace XEngine
             object.PreviousWorldMatrix = transform->PreviousWorldMatrix;
             object.Mesh = mesh;
             object.Material = material;
-            object.WorldBounds = TransformBounds(meshAsset->Bounds, transform->WorldMatrix);
+            object.WorldBounds = TransformAABB(meshAsset->Bounds, transform->WorldMatrix);
             object.ObjectId = entity.Index + 1u;
             outRenderScene.OpaqueObjects.push_back(object);
         }

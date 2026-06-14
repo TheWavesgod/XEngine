@@ -4,8 +4,6 @@
 
 namespace XEngine
 {
-    struct TransformComponent;
-
     enum class CameraProjectionMode
     {
         Perspective,
@@ -25,7 +23,4 @@ namespace XEngine
         float OrthographicHeight = 10.0f;
         bool Primary = false;
     };
-
-    Mat4 BuildCameraViewMatrix(const TransformComponent& transform);
-    Mat4 BuildCameraProjectionMatrix(const CameraComponent& camera, float aspectRatio);
 }

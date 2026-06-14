@@ -7,21 +7,27 @@
 
 namespace XEngine
 {
-    class TextureManager;
+    class RenderTextureManager;
     class RenderMeshManager;
-    class MaterialSystem;
+    class RenderMaterialSystem;
+    class RenderShaderLibrary;
+    class RenderPipelineStateCache;
 
     struct RenderResourceContext
     {
-        TextureManager* Textures = nullptr;
+        RenderTextureManager* Textures = nullptr;
         RenderMeshManager* Meshes = nullptr;
-        MaterialSystem* Materials = nullptr;
+        RenderMaterialSystem* Materials = nullptr;
+        RenderShaderLibrary* Shaders = nullptr;
+        RenderPipelineStateCache* PipelineStates = nullptr;
 
-        bool IsValid() const 
+        bool IsValid() const
         {
             return Textures != nullptr
                 && Meshes != nullptr
-                && Materials != nullptr;
+                && Materials != nullptr
+                && Shaders != nullptr
+                && PipelineStates != nullptr;
         }
     };
 }

@@ -40,6 +40,7 @@ namespace XEngine
         void Shutdown();
 
         RHIBackend GetBackend() const override;
+        RHIClipSpaceConvention GetClipSpaceConvention() const override;
         bool IsValid() const override;
         RHICommandList* BeginFrame() override;
         void ClearSwapchain(const RHIColor& color) override;

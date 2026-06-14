@@ -4,6 +4,8 @@ file(GLOB_RECURSE XENGINE_RENDERER_SOURCES CONFIGURE_DEPENDS
     Private/Passes/*.cpp
     Private/RenderGraph/*.h
     Private/RenderGraph/*.cpp
+    Private/Pipeline/*.h
+    Private/Pipeline/*.cpp
     Private/Mesh/*.h
     Private/Mesh/*.cpp
     Private/Materials/*.h
