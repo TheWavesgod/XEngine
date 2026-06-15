@@ -2,6 +2,7 @@
 
 #include "../Resources/RenderResourceContext.h"
 #include "../Resources/GraphicsPipelineStateKey.h"
+#include "../Resources/RenderFrameResources.h"
 #include "../Resources/RenderPipelineStateCache.h"
 #include "../Resources/RenderMaterialSystem.h"
 #include "../Resources/RenderMeshManager.h"
@@ -36,6 +37,13 @@ namespace XEngine
             {
                 RHICommandList* commandList = context.GetCommandList();
                 if (commandList == nullptr || frameContext.Device == nullptr || !resources.IsValid())
+                {
+                    return;
+                }
+
+                RHIBindGroup* frameBindGroup =
+                    resources.FrameResources->GetFrameBindGroup(frameContext.FrameIndex);
+                if (frameBindGroup == nullptr)
                 {
                     return;
                 }
@@ -92,11 +100,14 @@ namespace XEngine
                     commandList->SetGraphicsPipeline(pipeline);
                     commandList->SetVertexBuffer(mesh->VertexBuffer.get());
                     commandList->SetIndexBuffer(mesh->IndexBuffer.get(), mesh->IndexFormat);
-                    commandList->SetBindGroup(0, bindGroup);
 
-                    const Mat4& viewProjection = frameContext.ViewProjectionMatrix;
+                    // Set 0: per-frame data shared by all objects in this pass.
+                    // Includes camera and scene lighting.
+                    commandList->SetBindGroup(0, frameBindGroup);
+                    commandList->SetBindGroup(1, bindGroup);
+
                     PBRPushConstants constants;
-                    constants.ModelViewProjection = viewProjection * object.WorldMatrix;
+                    constants.Model = object.WorldMatrix;
                     constants.BaseColorFactor = gpuMaterial->BaseColorFactor;
                     constants.MaterialFactors = Vec4 {
                         gpuMaterial->MetallicFactor,

@@ -10,14 +10,14 @@ namespace XEngine
     StaticMesh CreateHardcodedCubeMesh(RHIDevice& device)
     {
         const std::array<LegacyMeshVertex, 8> vertices = {
-            LegacyMeshVertex { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, Normalize(Vec3 { -0.5f, -0.5f, -0.5f }), { 0.0f, 0.0f } },
-            LegacyMeshVertex { {  0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, Normalize(Vec3 {  0.5f, -0.5f, -0.5f }), { 1.0f, 0.0f } },
-            LegacyMeshVertex { {  0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f }, Normalize(Vec3 {  0.5f,  0.5f, -0.5f }), { 1.0f, 1.0f } },
-            LegacyMeshVertex { { -0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f }, Normalize(Vec3 { -0.5f,  0.5f, -0.5f }), { 0.0f, 1.0f } },
-            LegacyMeshVertex { { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 1.0f }, Normalize(Vec3 { -0.5f, -0.5f,  0.5f }), { 0.0f, 0.0f } },
-            LegacyMeshVertex { {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 1.0f }, Normalize(Vec3 {  0.5f, -0.5f,  0.5f }), { 1.0f, 0.0f } },
-            LegacyMeshVertex { {  0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 1.0f }, Normalize(Vec3 {  0.5f,  0.5f,  0.5f }), { 1.0f, 1.0f } },
-            LegacyMeshVertex { { -0.5f,  0.5f,  0.5f }, { 0.2f, 0.6f, 1.0f }, Normalize(Vec3 { -0.5f,  0.5f,  0.5f }), { 0.0f, 1.0f } }
+            LegacyMeshVertex { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, Math::Normalize(Vec3 { -0.5f, -0.5f, -0.5f }), { 0.0f, 0.0f } },
+            LegacyMeshVertex { {  0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, Math::Normalize(Vec3 {  0.5f, -0.5f, -0.5f }), { 1.0f, 0.0f } },
+            LegacyMeshVertex { {  0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f }, Math::Normalize(Vec3 {  0.5f,  0.5f, -0.5f }), { 1.0f, 1.0f } },
+            LegacyMeshVertex { { -0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f }, Math::Normalize(Vec3 { -0.5f,  0.5f, -0.5f }), { 0.0f, 1.0f } },
+            LegacyMeshVertex { { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 1.0f }, Math::Normalize(Vec3 { -0.5f, -0.5f,  0.5f }), { 0.0f, 0.0f } },
+            LegacyMeshVertex { {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 1.0f }, Math::Normalize(Vec3 {  0.5f, -0.5f,  0.5f }), { 1.0f, 0.0f } },
+            LegacyMeshVertex { {  0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 1.0f }, Math::Normalize(Vec3 {  0.5f,  0.5f,  0.5f }), { 1.0f, 1.0f } },
+            LegacyMeshVertex { { -0.5f,  0.5f,  0.5f }, { 0.2f, 0.6f, 1.0f }, Math::Normalize(Vec3 { -0.5f,  0.5f,  0.5f }), { 0.0f, 1.0f } }
         };
 
         const std::array<u32, 36> indices = {

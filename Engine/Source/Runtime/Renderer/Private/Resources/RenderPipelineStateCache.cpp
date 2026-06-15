@@ -1,5 +1,6 @@
 #include "RenderPipelineStateCache.h"
 
+#include "RenderFrameResources.h"
 #include "RenderMaterialSystem.h"
 #include "RenderShaderLibrary.h"
 #include "RenderShaderTypes.h"
@@ -16,17 +17,20 @@ namespace XEngine
     bool RenderPipelineStateCache::Initialize(
         RHIDevice* device,
         RenderShaderLibrary* shaderLibrary,
-        RenderMaterialSystem* materialSystem)
+        RenderMaterialSystem* materialSystem,
+        RenderFrameResources* frameResources)
     {
-        if (device == nullptr || !device->IsValid() || shaderLibrary == nullptr || materialSystem == nullptr)
+        if (device == nullptr || !device->IsValid() || shaderLibrary == nullptr ||
+            materialSystem == nullptr || frameResources == nullptr)
         {
-            XENGINE_LOG_ERROR("RenderPipelineStateCache requires device, shader library, and material system");
+            XENGINE_LOG_ERROR("RenderPipelineStateCache requires device, shader library, material system, and frame resources");
             return false;
         }
 
         m_Device = device;
         m_ShaderLibrary = shaderLibrary;
         m_MaterialSystem = materialSystem;
+        m_FrameResources = frameResources;
         XENGINE_LOG_INFO("RenderPipelineStateCache initialized");
         return true;
     }
@@ -38,6 +42,7 @@ namespace XEngine
             XENGINE_LOG_INFO("RenderPipelineStateCache shutdown");
         }
         m_GraphicsPipelines.clear();
+        m_FrameResources = nullptr;
         m_MaterialSystem = nullptr;
         m_ShaderLibrary = nullptr;
         m_Device = nullptr;
@@ -67,6 +72,7 @@ namespace XEngine
         const GraphicsPipelineStateKey& key)
     {
         if (m_Device == nullptr || m_ShaderLibrary == nullptr || m_MaterialSystem == nullptr ||
+            m_FrameResources == nullptr ||
             key.PassKind != RenderPassKind::ForwardOpaque)
         {
             return {};
@@ -102,6 +108,11 @@ namespace XEngine
             RHIVertexAttributeDesc { 1, RHIFormat::R32G32B32Float, static_cast<u32>(offsetof(MeshVertex, Normal)) },
             RHIVertexAttributeDesc { 2, RHIFormat::R32G32Float, static_cast<u32>(offsetof(MeshVertex, TexCoord0)) }
         };
+        // Forward pipeline layout convention:
+        // Set 0 = per-frame data.
+        // Set 1 = material data.
+        // Set 2 = object data or push constants.
+        desc.BindGroupLayouts.push_back(m_FrameResources->GetFrameBindGroupLayout());
         desc.BindGroupLayouts.push_back(m_MaterialSystem->GetPBRMaterialBindGroupLayout());
         desc.PushConstantSize = sizeof(PBRPushConstants);
         desc.PushConstantStages = RHIShaderStageFlags::AllGraphics;

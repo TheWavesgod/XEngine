@@ -26,8 +26,14 @@ namespace XEngine
         float TimeSeconds = 0.0f; 
         
         Mat4 ViewMatrix { 1.0f }; 
+
+        // ProjectionMatrix should already include RHI clip-space adaptation.
         Mat4 ProjectionMatrix { 1.0f }; 
         Mat4 ViewProjectionMatrix { 1.0f };
+
+        // CPU-side frame context. CameraWorldPosition is used for shader frame data
+        // and should already be in XEngine world coordinates.
+        Vec3 CameraWorldPosition { 0.0f };
     };
 
 } // namespace XEngine

@@ -25,3 +25,21 @@ namespace XEngine::CoordinateSystem
         return glm::normalize(rotation * Up);
     }
 }
+
+namespace XEngine::Math
+{
+    inline Vec3 GetForwardVector(const Quat& rotation)
+    {
+        return CoordinateSystem::GetForwardVector(rotation);
+    }
+
+    inline Vec3 GetRightVector(const Quat& rotation)
+    {
+        return CoordinateSystem::GetRightVector(rotation);
+    }
+
+    inline Vec3 GetUpVector(const Quat& rotation)
+    {
+        return CoordinateSystem::GetUpVector(rotation);
+    }
+}

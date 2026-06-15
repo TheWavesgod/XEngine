@@ -33,6 +33,9 @@ namespace XEngine
         bool BlendEnabled = false;
         bool DoubleSided = false;
 
+        // Bump this layout version when shader-visible bind group layout changes.
+        u32 PipelineLayoutVersion = 1;
+
         bool operator==(const GraphicsPipelineStateKey& other) const = default;
     };
 
@@ -55,6 +58,7 @@ namespace XEngine
             combine(std::hash<bool> {}(key.DepthWriteEnabled));
             combine(std::hash<bool> {}(key.BlendEnabled));
             combine(std::hash<bool> {}(key.DoubleSided));
+            combine(std::hash<u32> {}(key.PipelineLayoutVersion));
             return value;
         }
     };

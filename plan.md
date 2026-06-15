@@ -1072,6 +1072,18 @@ Stage 8C - GPU Light Data + PBR Shader Integration
 Stage 8D - Directional Shadow Map V0
 ```
 
+## Stage 8C - Per-frame GPU Data + Shader Lighting Integration
+
+- Adds `GPUFrameData`.
+- Adds `GPULightingData`.
+- Adds `RenderFrameResources`.
+- Uses one per-frame buffer per renderer frame slot.
+- Binds Set 0 per-frame data in `ForwardOpaquePass`.
+- Keeps material textures in Set 1.
+- Splits shader common code into Common / Lighting / BRDF / Material files.
+- Makes Directional Light affect the PBR shader through extracted scene lighting.
+- Does not implement shadows or IBL.
+
 ## Stage 8B-pre - Coordinate Convention Cleanup
 
 Mid-term cleanup:
@@ -1095,6 +1107,17 @@ COMPLETE
 - Moves GPU matrix packing out of renderer passes.
 - Updates DebugCamera to the XEngine world convention.
 - Does not implement lights, shadows, GPU light buffers, or RenderFeature.
+
+## Pre-Stage 8C - Transform Hierarchy + Rotator Cleanup
+
+- Adds local/world transform separation.
+- Adds degree-based Rotator.
+- Defines Roll/Pitch/Yaw around +X/+Y/+Z.
+- Adds Scene-managed parent-child hierarchy.
+- Adds the Scene-private TransformSystem.
+- Updates camera, light, and mesh extraction to read world transforms.
+- Adds engine color presets.
+- Moves common helper calls under XEngine::Math.
 
 ## Status
 

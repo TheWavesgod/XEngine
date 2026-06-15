@@ -69,8 +69,8 @@ namespace XEngine
 
         ApplyOrientationToTransform(*transform);
 
-        const Vec3 forward = CoordinateSystem::GetForwardVector(transform->Rotation);
-        const Vec3 right = CoordinateSystem::GetRightVector(transform->Rotation);
+        const Vec3 forward = Math::GetForwardVector(transform->GetLocalRotation());
+        const Vec3 right = Math::GetRightVector(transform->GetLocalRotation());
         const Vec3 up = CoordinateSystem::Up;
 
         Vec3 movement { 0.0f, 0.0f, 0.0f };
@@ -104,12 +104,12 @@ namespace XEngine
             m_FastMoveMultiplier :
             1.0f;
 
-        if (LengthSquared(movement) > 0.0f)
+        if (Math::LengthSquared(movement) > 0.0f)
         {
-            transform->Position += Normalize(movement) * m_MoveSpeed * speedScale * deltaTime;
+            transform->SetLocalPosition(
+                transform->GetLocalPosition() +
+                Math::Normalize(movement) * m_MoveSpeed * speedScale * deltaTime);
         }
-
-        transform->Dirty = true;
     }
 
     void DebugCameraController::FrameBounds(const Vec3& center, float radius)
@@ -126,17 +126,16 @@ namespace XEngine
         }
 
         radius = std::max(radius, 0.5f);
-        transform->Position =
+        transform->SetLocalPosition(
             center - CoordinateSystem::Forward * (radius * 2.5f) +
-            CoordinateSystem::Up * (radius * 0.25f);
+            CoordinateSystem::Up * (radius * 0.25f));
 
-        const Vec3 direction = Normalize(center - transform->Position);
+        const Vec3 direction = Math::Normalize(center - transform->GetLocalPosition());
         m_YawRadians = std::atan2(direction.y, direction.x);
         m_PitchRadians = std::asin(std::clamp(direction.z, -1.0f, 1.0f));
         m_MoveSpeed = std::max(0.5f, radius * 0.5f);
 
         ApplyOrientationToTransform(*transform);
-        transform->Dirty = true;
     }
 
     Entity DebugCameraController::GetCameraEntity() const
@@ -166,15 +165,15 @@ namespace XEngine
 
     void DebugCameraController::UpdateOrientationFromTransform(const TransformComponent& transform)
     {
-        const Vec3 forward = CoordinateSystem::GetForwardVector(transform.Rotation);
+        const Vec3 forward = Math::GetForwardVector(transform.GetLocalRotation());
         m_YawRadians = std::atan2(forward.y, forward.x);
         m_PitchRadians = std::asin(std::clamp(forward.z, -1.0f, 1.0f));
     }
 
     void DebugCameraController::ApplyOrientationToTransform(TransformComponent& transform) const
     {
-        const Quat yaw = AngleAxis(m_YawRadians, CoordinateSystem::Up);
-        const Quat pitch = AngleAxis(-m_PitchRadians, CoordinateSystem::Right);
-        transform.Rotation = yaw * pitch;
+        const Quat yaw = Math::AngleAxis(m_YawRadians, CoordinateSystem::Up);
+        const Quat pitch = Math::AngleAxis(-m_PitchRadians, CoordinateSystem::Right);
+        transform.SetLocalRotation(yaw * pitch);
     }
 }

@@ -353,6 +353,30 @@ with compile-time checks. Redundant `Matrix4`, `Vector4`, and pure-copy GPU matr
 have been removed. Image decoding remains private to Asset importers; RenderSystem only coordinates
 asset-backed render resource managers.
 
+Pre-Stage 8C establishes the transform hierarchy foundation:
+
+- TransformComponent stores local TRS and cached world TRS/matrices.
+- User-facing Euler rotations use degree-based `Math::Rotator`.
+- Roll, Pitch, and Yaw rotate around XEngine +X, +Y, and +Z respectively.
+- Scene owns parent and direct-child relationships and rejects hierarchy cycles.
+- The Scene-private TransformSystem recursively updates roots and descendants every frame.
+- Camera, light, and mesh extraction consume cached world transforms only.
+- Common runtime math operations live under `XEngine::Math`.
+- `XEngine::Colors` provides reusable engine color presets.
+
+Stage 8C adds per-frame GPU data and shader lighting integration.
+
+Renderer now uploads `GPUFrameData` once per frame:
+
+- Camera matrices and camera world position.
+- Ambient lighting and extracted scene lights.
+- One uniform buffer and bind group per renderer frame slot.
+
+`ForwardPBR.slang` reads camera and lighting data from set 0 instead of hardcoded shader values.
+Material textures remain in set 1, while object data stays in push constants. Shader code is split
+into reusable Common, Lighting, BRDF, Material, and Pass files. Stage 8C evaluates directional
+lights first and deliberately leaves shadows, IBL, HDR, bloom, and clustered lighting for later.
+
 Stage 2B-2 adds:
 - Vulkan swapchain creation
 - Swapchain image views

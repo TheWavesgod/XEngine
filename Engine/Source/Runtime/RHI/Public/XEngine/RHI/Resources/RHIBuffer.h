@@ -48,5 +48,6 @@ namespace XEngine
         virtual ~RHIBuffer() = default;
 
         virtual std::size_t GetSize() const = 0;
+        virtual bool Update(const void* data, std::size_t size, std::size_t offset = 0) = 0;
     };
 }

@@ -32,8 +32,9 @@ namespace XEngine
         Scene& scene = CreateEmptyScene();
         m_DebugCameraEntity = scene.CreateEntity("DebugCamera");
         TransformComponent& transform = scene.AddTransform(m_DebugCameraEntity);
-        transform.Position = Vec3 { 0.0f, 1.0f, 3.0f };
-        transform.Dirty = true;
+        transform.SetLocalPosition(Vec3 { -4.0f, 0.0f, 2.0f });
+        transform.SetLocalRotationDegrees(Math::Rotator { 0.0f, -15.0f, 0.0f });
+        transform.SetLocalScale(Vec3 { 1.0f, 1.0f, 1.0f });
 
         CameraComponent& camera = scene.AddCamera(m_DebugCameraEntity);
         camera.Primary = true;

@@ -10,6 +10,7 @@ namespace XEngine
     class RHIDevice;
     class RHIPipeline;
     class RenderMaterialSystem;
+    class RenderFrameResources;
     class RenderShaderLibrary;
 
     class RenderPipelineStateCache
@@ -18,7 +19,8 @@ namespace XEngine
         bool Initialize(
             RHIDevice* device,
             RenderShaderLibrary* shaderLibrary,
-            RenderMaterialSystem* materialSystem);
+            RenderMaterialSystem* materialSystem,
+            RenderFrameResources* frameResources);
         void Shutdown();
 
         RHIPipeline* GetOrCreateGraphicsPipeline(const GraphicsPipelineStateKey& key);
@@ -29,6 +31,7 @@ namespace XEngine
         RHIDevice* m_Device = nullptr;
         RenderShaderLibrary* m_ShaderLibrary = nullptr;
         RenderMaterialSystem* m_MaterialSystem = nullptr;
+        RenderFrameResources* m_FrameResources = nullptr;
         std::unordered_map<
             GraphicsPipelineStateKey,
             std::shared_ptr<RHIPipeline>,

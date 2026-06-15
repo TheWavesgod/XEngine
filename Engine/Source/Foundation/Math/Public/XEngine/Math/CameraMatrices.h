@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-namespace XEngine
+namespace XEngine::Math
 {
     inline Mat4 LookAtLH_XForward(const Vec3& eye, const Vec3& target, const Vec3& up)
     {
@@ -69,4 +69,12 @@ namespace XEngine
         projection[3][2] = -nearPlane / (farPlane - nearPlane);
         return projection;
     }
+}
+
+namespace XEngine
+{
+    using Math::BuildViewMatrixLH_XForward;
+    using Math::LookAtLH_XForward;
+    using Math::OrthographicLH_ZO;
+    using Math::PerspectiveLH_ZO;
 }

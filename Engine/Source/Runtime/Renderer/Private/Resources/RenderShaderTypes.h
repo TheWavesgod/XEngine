@@ -12,7 +12,7 @@ namespace XEngine
 
     struct alignas(16) PBRPushConstants
     {
-        Mat4 ModelViewProjection { 1.0f };
+        Mat4 Model { 1.0f };
         Vec4 BaseColorFactor { 1.0f, 1.0f, 1.0f, 1.0f };
         Vec4 MaterialFactors { 0.0f, 1.0f, 0.5f, 0.0f };
     };

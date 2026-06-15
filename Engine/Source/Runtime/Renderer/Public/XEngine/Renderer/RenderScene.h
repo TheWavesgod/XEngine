@@ -26,15 +26,42 @@ namespace XEngine
         u32 Flags = 0;
     };
 
+    enum class RenderLightType
+    {
+        Directional,
+        Point,
+        Spot
+    };
+
+    struct RenderLight
+    {
+        RenderLightType Type = RenderLightType::Directional;
+
+        Vec3 Position { 0.0f, 0.0f, 0.0f };
+        float Range = 0.0f;
+
+        Vec3 DirectionToLight { 0.0f, 0.0f, 1.0f };
+        float Intensity = 1.0f;
+
+        Vec3 Color { 1.0f, 1.0f, 1.0f };
+
+        float InnerConeAngleRadians = 0.0f;
+        float OuterConeAngleRadians = 0.0f;
+
+        bool CastShadow = false;
+        bool Enabled = true;
+    };
+
     // Renderer-facing scene data consumed by render passes.
-    // Stage 7F keeps only opaque objects; lights and transparent queues come later.
     struct RenderScene
     {
         std::vector<RenderObject> OpaqueObjects;
+        std::vector<RenderLight> Lights;
 
         void Clear()
         {
             OpaqueObjects.clear();
+            Lights.clear();
         }
     };
 }

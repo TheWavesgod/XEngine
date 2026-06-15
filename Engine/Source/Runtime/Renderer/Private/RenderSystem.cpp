@@ -6,6 +6,7 @@
 #include "Pipeline/RenderProjection.h"
 #include "Resources/RenderMeshManager.h"
 #include "Resources/RenderMaterialSystem.h"
+#include "Resources/RenderFrameResources.h"
 #include "Resources/RenderPipelineStateCache.h"
 #include "Resources/RenderResourceContext.h"
 #include "Resources/RenderShaderLibrary.h"
@@ -17,6 +18,7 @@
 #include <XEngine/Asset/Assets/MeshAsset.h>
 #include <XEngine/Asset/Assets/TextureAsset.h>
 #include <XEngine/Core/Assert.h>
+#include <XEngine/Core/Colors.h>
 #include <XEngine/Engine/Engine.h>
 #include <XEngine/Engine/SubsystemManager.h>
 #include <XEngine/Logging/Log.h>
@@ -66,7 +68,9 @@ namespace XEngine
         {
             Entity entity = scene.CreateEntity(name != nullptr ? name : "Renderable");
             TransformComponent& transform = scene.AddTransform(entity);
-            transform.Dirty = true;
+            transform.SetLocalPosition(Vec3 { 0.0f, 0.0f, 0.0f });
+            transform.SetLocalRotationDegrees(Math::Rotator { 0.0f, 90.0f, 0.0f });
+            transform.SetLocalScale(Vec3 { 1.0f, 1.0f, 1.0f });
 
             MeshRendererComponent& renderer = scene.AddMeshRenderer(entity);
             renderer.MeshAsset = meshAsset;
@@ -110,7 +114,7 @@ namespace XEngine
         void FrameCameraForMesh(SceneSystem& sceneSystem, const MeshAsset& meshAsset)
         {
             const Vec3 center = meshAsset.Bounds.GetCenter();
-            const float radius = std::max(Length(meshAsset.Bounds.GetExtents()), 0.5f);
+            const float radius = std::max(Math::Length(meshAsset.Bounds.GetExtents()), 0.5f);
             sceneSystem.FrameDebugCamera(center, radius);
         }
     }
@@ -127,6 +131,7 @@ namespace XEngine
         std::unique_ptr<RenderMeshManager> Meshes;
         std::unique_ptr<RenderMaterialSystem> Materials;
         std::unique_ptr<RenderShaderLibrary> Shaders;
+        std::unique_ptr<RenderFrameResources> FrameResources;
         std::unique_ptr<RenderPipelineStateCache> PipelineStates;
         RenderResourceContext Resources;
 
@@ -153,6 +158,11 @@ namespace XEngine
             {
                 ActivePipeline->Shutdown();
                 ActivePipeline.reset();
+            }
+            if (FrameResources)
+            {
+                FrameResources->Shutdown();
+                FrameResources.reset();
             }
             if (PipelineStates)
             {
@@ -210,6 +220,17 @@ namespace XEngine
                 return;
             }
 
+            const Entity lightEntity = activeScene->CreateEntity("Stage8_DirectionalLight");
+            TransformComponent& lightTransform = activeScene->AddTransform(lightEntity);
+            lightTransform.SetLocalPosition(Vec3 { 0.0f, 0.0f, 0.0f });
+            lightTransform.SetLocalRotationDegrees(Math::Rotator { 0.0f, -45.0f, 135.0f });
+
+            LightComponent& light = activeScene->AddLight(lightEntity);
+            light.Type = LightType::Directional;
+            light.Color = Colors::Sunlight;
+            light.Intensity = 3.0f;
+            light.CastShadow = true;
+
             const std::filesystem::path candidates[] = {
                 FindGltfValidationAsset("DamagedHelmet", "Assets/models/gltf/DamagedHelmet/DamagedHelmet.gltf"),
                 FindGltfValidationAsset("Cube", "Assets/models/gltf/Cube/Cube.gltf")
@@ -263,6 +284,8 @@ namespace XEngine
                 }
                 XENGINE_LOG_INFO("Stage 8A falling back to procedural cube.");
             }
+
+            activeScene->UpdateTransforms();
         }
 
         void Render(float deltaTime)
@@ -300,7 +323,7 @@ namespace XEngine
             frame.SwapchainWidth = SwapchainWidth;
             frame.SwapchainHeight = SwapchainHeight;
             frame.DeltaTime = deltaTime;
-            
+
             if (EngineInstance != nullptr)
             {
                 const Time& time = EngineInstance->GetTime();
@@ -316,16 +339,17 @@ namespace XEngine
                 const float aspect = SwapchainHeight > 0 ?
                     static_cast<float>(SwapchainWidth) / static_cast<float>(SwapchainHeight) :
                     1.0f;
-                frame.ViewMatrix = BuildViewMatrixLH_XForward(
-                    cameraTransform->Position,
-                    cameraTransform->Rotation);
+                frame.ViewMatrix = Math::BuildViewMatrixLH_XForward(
+                    cameraTransform->GetWorldPosition(),
+                    cameraTransform->GetWorldRotation());
+                frame.CameraWorldPosition = cameraTransform->GetWorldPosition();
 
                 Mat4 projection;
                 if (camera->ProjectionMode == CameraProjectionMode::Orthographic)
                 {
                     const float halfHeight = camera->OrthographicHeight * 0.5f;
                     const float halfWidth = halfHeight * aspect;
-                    projection = OrthographicLH_ZO(
+                    projection = Math::OrthographicLH_ZO(
                         -halfWidth,
                         halfWidth,
                         -halfHeight,
@@ -335,7 +359,7 @@ namespace XEngine
                 }
                 else
                 {
-                    projection = PerspectiveLH_ZO(
+                    projection = Math::PerspectiveLH_ZO(
                         camera->VerticalFovRadians,
                         aspect,
                         camera->NearPlane,
@@ -349,8 +373,13 @@ namespace XEngine
             }
             else
             {
+                frame.CameraWorldPosition = Vec3 { -4.0f, 0.0f, 1.5f };
                 frame.ViewProjectionMatrix = FallbackViewProjection;
             }
+
+            // Upload per-frame shader data after extraction so lighting reflects
+            // the current RenderScene.
+            Resources.FrameResources->Update(frame, SceneData);
 
             ActivePipeline->Render(frame, SceneData, Resources);
             device->EndFrame();
@@ -411,8 +440,18 @@ namespace XEngine
             impl.Shutdown();
             return;
         }
+        impl.FrameResources = std::make_unique<RenderFrameResources>();
+        if (!impl.FrameResources->Initialize(device))
+        {
+            impl.Shutdown();
+            return;
+        }
         impl.PipelineStates = std::make_unique<RenderPipelineStateCache>();
-        if (!impl.PipelineStates->Initialize(device, impl.Shaders.get(), impl.Materials.get()))
+        if (!impl.PipelineStates->Initialize(
+            device,
+            impl.Shaders.get(),
+            impl.Materials.get(),
+            impl.FrameResources.get()))
         {
             impl.Shutdown();
             return;
@@ -423,6 +462,7 @@ namespace XEngine
         impl.Resources.Materials = impl.Materials.get();
         impl.Resources.Shaders = impl.Shaders.get();
         impl.Resources.PipelineStates = impl.PipelineStates.get();
+        impl.Resources.FrameResources = impl.FrameResources.get();
 
         impl.ActivePipeline = std::make_unique<ForwardRenderPipeline>();
         if (!impl.ActivePipeline->Initialize(impl.Resources))
@@ -435,9 +475,9 @@ namespace XEngine
             static_cast<float>(impl.SwapchainWidth) / static_cast<float>(impl.SwapchainHeight) :
             1.0f;
         const Mat4 projection = ApplyRHIClipSpaceConvention(
-            PerspectiveLH_ZO(1.04719755f, aspect, 0.1f, 100.0f),
+            Math::PerspectiveLH_ZO(1.04719755f, aspect, 0.1f, 100.0f),
             device->GetClipSpaceConvention());
-        const Mat4 view = LookAtLH_XForward(
+        const Mat4 view = Math::LookAtLH_XForward(
             Vec3 { -4.0f, 0.0f, 1.5f },
             Vec3 { 0.0f, 0.0f, 0.0f },
             CoordinateSystem::Up);

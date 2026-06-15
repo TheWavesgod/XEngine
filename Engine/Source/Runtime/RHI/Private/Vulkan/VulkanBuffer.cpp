@@ -116,6 +116,35 @@ namespace XEngine
         return m_Size;
     }
 
+    bool VulkanBuffer::Update(const void* data, std::size_t size, std::size_t offset)
+    {
+        if (data == nullptr || size == 0)
+        {
+            return true;
+        }
+
+        if (m_Allocator == VK_NULL_HANDLE || m_Allocation == VK_NULL_HANDLE || offset + size > m_Size)
+        {
+            XENGINE_LOG_ERROR("Cannot update Vulkan buffer with invalid range");
+            return false;
+        }
+
+        void* mappedData = nullptr;
+        const VkResult result = vmaMapMemory(m_Allocator, m_Allocation, &mappedData);
+        if (result != VK_SUCCESS)
+        {
+            std::string message = "Failed to map Vulkan buffer for update: ";
+            message += VulkanResultToString(result);
+            XENGINE_LOG_ERROR(message);
+            return false;
+        }
+
+        std::memcpy(static_cast<u8*>(mappedData) + offset, data, size);
+        vmaFlushAllocation(m_Allocator, m_Allocation, offset, size);
+        vmaUnmapMemory(m_Allocator, m_Allocation);
+        return true;
+    }
+
     VkBuffer VulkanBuffer::GetHandle() const
     {
         return m_Buffer;

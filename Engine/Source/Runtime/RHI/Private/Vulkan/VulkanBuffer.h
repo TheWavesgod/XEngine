@@ -19,6 +19,7 @@ namespace XEngine
 
         bool IsValid() const;
         std::size_t GetSize() const override;
+        bool Update(const void* data, std::size_t size, std::size_t offset = 0) override;
         VkBuffer GetHandle() const;
 
     private:

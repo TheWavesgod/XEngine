@@ -1,5 +1,6 @@
 #include "VulkanDescriptor.h"
 
+#include "VulkanBuffer.h"
 #include "VulkanSampler.h"
 #include "VulkanTexture.h"
 #include "VulkanUtils.h"
@@ -127,41 +128,70 @@ namespace XEngine
         }
 
         std::vector<VkDescriptorImageInfo> imageInfos;
+        std::vector<VkDescriptorBufferInfo> bufferInfos;
         std::vector<VkWriteDescriptorSet> writes;
         imageInfos.reserve(desc.Resources.size());
+        bufferInfos.reserve(desc.Resources.size());
         writes.reserve(desc.Resources.size());
 
         for (const RHIBindingResource& resource : desc.Resources)
         {
-            if (resource.Type != RHIBindingType::CombinedImageSampler)
+            if (resource.Type == RHIBindingType::CombinedImageSampler)
             {
-                XENGINE_LOG_ERROR("VulkanBindGroup currently supports combined image sampler resources only");
-                return false;
+                auto* texture = dynamic_cast<VulkanTexture*>(resource.Texture);
+                auto* sampler = dynamic_cast<VulkanSampler*>(resource.Sampler);
+                if (texture == nullptr || sampler == nullptr ||
+                    texture->GetImageView() == VK_NULL_HANDLE || sampler->GetHandle() == VK_NULL_HANDLE)
+                {
+                    XENGINE_LOG_ERROR("Combined image sampler binding requires a valid Vulkan texture and sampler");
+                    return false;
+                }
+
+                VkDescriptorImageInfo imageInfo {};
+                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfo.imageView = texture->GetImageView();
+                imageInfo.sampler = sampler->GetHandle();
+                imageInfos.push_back(imageInfo);
+
+                VkWriteDescriptorSet write {};
+                write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                write.dstSet = m_Set;
+                write.dstBinding = resource.Binding;
+                write.descriptorCount = 1;
+                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                write.pImageInfo = &imageInfos.back();
+                writes.push_back(write);
+                continue;
             }
 
-            auto* texture = dynamic_cast<VulkanTexture*>(resource.Texture);
-            auto* sampler = dynamic_cast<VulkanSampler*>(resource.Sampler);
-            if (texture == nullptr || sampler == nullptr ||
-                texture->GetImageView() == VK_NULL_HANDLE || sampler->GetHandle() == VK_NULL_HANDLE)
+            if (resource.Type == RHIBindingType::UniformBuffer || resource.Type == RHIBindingType::StorageBuffer)
             {
-                XENGINE_LOG_ERROR("Combined image sampler binding requires a valid Vulkan texture and sampler");
-                return false;
+                auto* buffer = dynamic_cast<VulkanBuffer*>(resource.Buffer);
+                if (buffer == nullptr || buffer->GetHandle() == VK_NULL_HANDLE)
+                {
+                    XENGINE_LOG_ERROR("Buffer binding requires a valid Vulkan buffer");
+                    return false;
+                }
+
+                VkDescriptorBufferInfo bufferInfo {};
+                bufferInfo.buffer = buffer->GetHandle();
+                bufferInfo.offset = 0;
+                bufferInfo.range = buffer->GetSize();
+                bufferInfos.push_back(bufferInfo);
+
+                VkWriteDescriptorSet write {};
+                write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                write.dstSet = m_Set;
+                write.dstBinding = resource.Binding;
+                write.descriptorCount = 1;
+                write.descriptorType = ToVulkanDescriptorType(resource.Type);
+                write.pBufferInfo = &bufferInfos.back();
+                writes.push_back(write);
+                continue;
             }
 
-            VkDescriptorImageInfo imageInfo {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = texture->GetImageView();
-            imageInfo.sampler = sampler->GetHandle();
-            imageInfos.push_back(imageInfo);
-
-            VkWriteDescriptorSet write {};
-            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet = m_Set;
-            write.dstBinding = resource.Binding;
-            write.descriptorCount = 1;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            write.pImageInfo = &imageInfos.back();
-            writes.push_back(write);
+            XENGINE_LOG_ERROR("Unsupported Vulkan bind group resource type");
+            return false;
         }
 
         vkUpdateDescriptorSets(m_Device, static_cast<u32>(writes.size()), writes.data(), 0, nullptr);

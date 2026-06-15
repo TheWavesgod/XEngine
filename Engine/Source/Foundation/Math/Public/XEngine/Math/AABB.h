@@ -45,6 +45,10 @@ namespace XEngine
         }
     };
 
+}
+
+namespace XEngine::Math
+{
     inline AABB TransformAABB(const AABB& bounds, const Mat4& transform)
     {
         const Vec3 corners[] = {
@@ -74,5 +78,11 @@ namespace XEngine
         combined.Encapsulate(b);
         return combined;
     }
+}
+
+namespace XEngine
+{
+    using Math::CombineAABB;
+    using Math::TransformAABB;
 }
 

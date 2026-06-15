@@ -7,5 +7,6 @@
 #include <XEngine/Math/Frustum.h>
 #include <XEngine/Math/MathFunctions.h>
 #include <XEngine/Math/MathTypes.h>
+#include <XEngine/Math/Rotator.h>
 #include <XEngine/Math/Transform.h>
 

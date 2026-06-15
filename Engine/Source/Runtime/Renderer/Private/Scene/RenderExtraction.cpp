@@ -8,11 +8,25 @@
 #include <XEngine/Asset/AssetSystem.h>
 #include <XEngine/Asset/Assets/MaterialAsset.h>
 #include <XEngine/Asset/Assets/MeshAsset.h>
-#include <XEngine/Math/AABB.h>
+#include <XEngine/Math/Math.h>
 #include <XEngine/Scene/Scene.h>
 
 namespace XEngine
 {
+    static RenderLightType ConvertLightType(const LightType& type)
+    {
+        switch (type)
+        {
+        case LightType::Directional:
+            return RenderLightType::Directional;
+        case LightType::Point:
+            return RenderLightType::Point;
+        case LightType::Spot:
+        default:
+            return RenderLightType::Spot;
+        }
+    }
+
     void RenderExtraction::Extract(
         const Scene& scene,
         AssetSystem& assetSystem,
@@ -25,48 +39,75 @@ namespace XEngine
         {
             const TransformComponent* transform = scene.GetTransform(entity);
             const MeshRendererComponent* renderer = scene.GetMeshRenderer(entity);
-            if (transform == nullptr || renderer == nullptr || !renderer->Visible)
-            {
+
+            if (transform == nullptr)
                 continue;
+
+            // Extract render object with mesh and material
+            if ( renderer != nullptr && renderer->Visible)
+            {
+                const MeshAsset* meshAsset = assetSystem.GetMeshAsset(renderer->MeshAsset);
+                if (meshAsset == nullptr)
+                {
+                    continue;
+                }
+
+                const MaterialAsset* materialAsset = assetSystem.GetMaterialAsset(renderer->MaterialAsset);
+                if (materialAsset == nullptr)
+                {
+                    continue;
+                }
+
+                if (!resources.IsValid())
+                {
+                    continue;
+                }
+
+                const MeshHandle mesh = resources.Meshes->GetOrCreateMeshFromAsset(renderer->MeshAsset, *meshAsset);
+                const MaterialHandle material = resources.Materials->GetOrCreateMaterialFromAsset(
+                    renderer->MaterialAsset,
+                    *materialAsset,
+                    assetSystem,
+                    *resources.Textures);
+
+                if (!mesh.IsValid() || !material.IsValid())
+                {
+                    continue;
+                }
+
+                RenderObject object;
+                object.WorldMatrix = transform->GetWorldMatrix();
+                object.PreviousWorldMatrix = transform->GetPreviousWorldMatrix();
+                object.Mesh = mesh;
+                object.Material = material;
+                object.WorldBounds = Math::TransformAABB(
+                    meshAsset->Bounds,
+                    transform->GetWorldMatrix());
+                object.ObjectId = entity.Index + 1u;
+
+                outRenderScene.OpaqueObjects.push_back(object);
             }
 
-            const MeshAsset* meshAsset = assetSystem.GetMeshAsset(renderer->MeshAsset);
-            if (meshAsset == nullptr)
+            // Extract scene light
+            const LightComponent* light = scene.GetLight(entity);
+            if (light != nullptr && light->Enabled)
             {
-                continue;
-            }
+                RenderLight renderLight {};
+                renderLight.Type = ConvertLightType(light->Type);
+                renderLight.Position = transform->GetWorldPosition();
+                renderLight.Range = light->Range;
 
-            const MaterialAsset* materialAsset = assetSystem.GetMaterialAsset(renderer->MaterialAsset);
-            if (materialAsset == nullptr)
-            {
-                continue;
-            }
+                renderLight.Color = light->Color;
+                renderLight.Intensity = light->Intensity;
+                renderLight.InnerConeAngleRadians = Math::Radians(light->InnerConeAngleDegree);
+                renderLight.OuterConeAngleRadians = Math::Radians(light->OuterConeAngleDegree);
+                renderLight.CastShadow = light->CastShadow;
 
-            if (!resources.IsValid())
-            {
-                continue;
-            }
+                const Vec3 forward = Math::GetForwardVector(transform->GetWorldRotation());
+                renderLight.DirectionToLight = Math::Normalize(-forward);
 
-            const MeshHandle mesh = resources.Meshes->GetOrCreateMeshFromAsset(renderer->MeshAsset, *meshAsset);
-            const MaterialHandle material = resources.Materials->GetOrCreateMaterialFromAsset(
-                renderer->MaterialAsset,
-                *materialAsset,
-                assetSystem,
-                *resources.Textures);
-                
-            if (!mesh.IsValid() || !material.IsValid())
-            {
-                continue;
+                outRenderScene.Lights.push_back(renderLight);
             }
-
-            RenderObject object;
-            object.WorldMatrix = transform->WorldMatrix;
-            object.PreviousWorldMatrix = transform->PreviousWorldMatrix;
-            object.Mesh = mesh;
-            object.Material = material;
-            object.WorldBounds = TransformAABB(meshAsset->Bounds, transform->WorldMatrix);
-            object.ObjectId = entity.Index + 1u;
-            outRenderScene.OpaqueObjects.push_back(object);
         }
     }
 }

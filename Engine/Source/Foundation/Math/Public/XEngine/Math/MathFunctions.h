@@ -6,7 +6,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-namespace XEngine
+namespace XEngine::Math
 {
     template<typename T>
     inline auto Dot(const T& lhs, const T& rhs)
@@ -109,6 +109,19 @@ namespace XEngine
         return glm::scale(Mat4(1.0f), scale);
     }
 
+    inline Mat4 ComposeTRS(
+        const Vec3& position,
+        const Quat& rotation,
+        const Vec3& scaleValue)
+    {
+        return Translate(position) * Rotate(rotation) * Scale(scaleValue);
+    }
+
+    inline Vec3 ExtractTranslation(const Mat4& matrix)
+    {
+        return Vec3 { matrix[3] };
+    }
+
     inline Quat AngleAxis(float angleRadians, const Vec3& axis)
     {
         return glm::angleAxis(angleRadians, axis);
@@ -123,4 +136,29 @@ namespace XEngine
     {
         return Vec3(transform * Vec4(vector, 0.0f));
     }
+}
+
+namespace XEngine
+{
+    using Math::AngleAxis;
+    using Math::Clamp;
+    using Math::Cross;
+    using Math::Degrees;
+    using Math::Dot;
+    using Math::Inverse;
+    using Math::Length;
+    using Math::LengthSquared;
+    using Math::Lerp;
+    using Math::LookAt;
+    using Math::Max;
+    using Math::Min;
+    using Math::Normalize;
+    using Math::Perspective;
+    using Math::Radians;
+    using Math::Rotate;
+    using Math::Scale;
+    using Math::TransformPoint;
+    using Math::TransformVector;
+    using Math::Translate;
+    using Math::Transpose;
 }

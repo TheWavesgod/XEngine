@@ -12,6 +12,7 @@ namespace XEngine
     class RenderMaterialSystem;
     class RenderShaderLibrary;
     class RenderPipelineStateCache;
+    class RenderFrameResources;
 
     struct RenderResourceContext
     {
@@ -20,6 +21,7 @@ namespace XEngine
         RenderMaterialSystem* Materials = nullptr;
         RenderShaderLibrary* Shaders = nullptr;
         RenderPipelineStateCache* PipelineStates = nullptr;
+        RenderFrameResources* FrameResources = nullptr;
 
         bool IsValid() const
         {
@@ -27,7 +29,8 @@ namespace XEngine
                 && Meshes != nullptr
                 && Materials != nullptr
                 && Shaders != nullptr
-                && PipelineStates != nullptr;
+                && PipelineStates != nullptr
+                && FrameResources != nullptr;
         }
     };
 }

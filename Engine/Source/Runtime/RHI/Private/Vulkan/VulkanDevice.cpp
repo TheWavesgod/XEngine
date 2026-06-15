@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cstring>
 #include <functional>
+#include <iterator>
 #include <set>
 #include <string>
 #include <vector>
@@ -722,16 +723,18 @@ namespace XEngine
     {
         // TODO Stage 8/10: replace this global pool with a descriptor allocator / arena.
         // TODO Stage 11: replace per-material descriptors with BindlessResourceManager.
-        VkDescriptorPoolSize poolSize {};
-        poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSize.descriptorCount = 1024;
+        VkDescriptorPoolSize poolSizes[] = {
+            VkDescriptorPoolSize { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
+            VkDescriptorPoolSize { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 128 },
+            VkDescriptorPoolSize { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 64 }
+        };
 
         VkDescriptorPoolCreateInfo createInfo {};
         createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         createInfo.maxSets = 1024;
-        createInfo.poolSizeCount = 1;
-        createInfo.pPoolSizes = &poolSize;
+        createInfo.poolSizeCount = static_cast<u32>(std::size(poolSizes));
+        createInfo.pPoolSizes = poolSizes;
 
         VkResult result = vkCreateDescriptorPool(m_Device, &createInfo, nullptr, &m_DescriptorPool);
         if (result != VK_SUCCESS)

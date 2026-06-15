@@ -169,7 +169,23 @@ namespace XEngine
             command += " -O0";
         }
 
+        std::vector<std::filesystem::path> includeDirectories;
+        const std::filesystem::path shaderRoot = GetSourceRoot() / "Engine/Shaders";
+
+        // Stage 8C:
+        // Register shader include roots so pass shaders can share Common, Lighting,
+        // BRDF, and Material helper files.
+        includeDirectories.push_back(shaderRoot);
+        includeDirectories.push_back(shaderRoot / "Common");
+        includeDirectories.push_back(shaderRoot / "Lighting");
+        includeDirectories.push_back(shaderRoot / "Materials");
+        includeDirectories.push_back(shaderRoot / "Passes");
         for (const std::string& includeDirectory : desc.IncludeDirectories)
+        {
+            includeDirectories.push_back(includeDirectory);
+        }
+
+        for (const std::filesystem::path& includeDirectory : includeDirectories)
         {
             command += " -I";
             command += Quote(includeDirectory);
