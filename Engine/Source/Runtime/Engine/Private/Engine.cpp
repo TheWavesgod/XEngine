@@ -63,6 +63,11 @@ namespace XEngine
             m_SubsystemManager.AddSubsystem<RenderSystem>();
         }
 
+        if (m_Config.ConfigureSubsystems)
+        {
+            m_Config.ConfigureSubsystems(m_SubsystemManager);
+        }
+
         SubsystemContext context;
         context.Engine = this;
         context.Config = &m_Config;

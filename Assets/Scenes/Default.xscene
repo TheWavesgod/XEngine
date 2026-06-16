@@ -1,0 +1,91 @@
+{
+    "version": 1,
+    "entities": [
+        {
+            "name": "Main Camera",
+            "Transform": {
+                "position": [
+                    -4.0,
+                    0.0,
+                    2.0
+                ],
+                "rotationDegrees": [
+                    0.0,
+                    -15.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "Camera": {
+                "projection": "Perspective",
+                "verticalFovDegrees": 60.0,
+                "nearPlane": 0.01,
+                "farPlane": 100.0,
+                "orthographicHeight": 10.0,
+                "primary": true
+            }
+        },
+        {
+            "name": "Sun",
+            "Transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotationDegrees": [
+                    0.0,
+                    -45.0,
+                    135.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "Light": {
+                "type": "Directional",
+                "color": [
+                    1.0,
+                    0.95,
+                    0.82
+                ],
+                "intensity": 3.0,
+                "castShadow": true,
+                "enabled": true
+            }
+        },
+        {
+            "name": "Validation Helmet",
+            "Transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotationDegrees": [
+                    0.0,
+                    90.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "MeshRenderer": {
+                "mesh": "Assets/Models/gltf/DamagedHelmet/DamagedHelmet.gltf",
+                "material": "Assets/Models/gltf/DamagedHelmet/DamagedHelmet.gltf",
+                "visible": true,
+                "castShadow": true,
+                "receiveShadow": true
+            }
+        }
+    ]
+}

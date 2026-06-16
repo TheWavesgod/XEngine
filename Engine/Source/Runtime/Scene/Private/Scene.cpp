@@ -14,6 +14,7 @@ namespace XEngine
     namespace
     {
         const std::vector<Entity> EmptyChildren;
+        const std::string EmptyName;
 
         Vec3 SafeComponentDivide(const Vec3& value, const Vec3& divisor)
         {
@@ -31,6 +32,18 @@ namespace XEngine
 
     Scene::Scene() = default;
     Scene::~Scene() = default;
+
+    void Scene::Clear()
+    {
+        m_EntityRecords.clear();
+        m_Entities.clear();
+        m_Transforms.clear();
+        m_MeshRenderers.clear();
+        m_Cameras.clear();
+        m_Lights.clear();
+        m_Parents.clear();
+        m_Children.clear();
+    }
 
     Entity Scene::CreateEntity(const std::string& name)
     {
@@ -87,6 +100,26 @@ namespace XEngine
 
         const EntityRecord& record = m_EntityRecords[entity.Index];
         return record.Alive && record.Generation == entity.Generation;
+    }
+
+    void Scene::SetEntityName(Entity entity, const std::string& name)
+    {
+        if (!IsValid(entity))
+        {
+            return;
+        }
+
+        m_EntityRecords[entity.Index].Name = name;
+    }
+
+    const std::string& Scene::GetEntityName(Entity entity) const
+    {
+        if (!IsValid(entity))
+        {
+            return EmptyName;
+        }
+
+        return m_EntityRecords[entity.Index].Name;
     }
 
     TransformComponent& Scene::AddTransform(Entity entity)

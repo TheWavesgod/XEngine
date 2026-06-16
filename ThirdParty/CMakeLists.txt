@@ -104,3 +104,61 @@ if(XENGINE_ENABLE_SHADER_COMPILER)
         message(FATAL_ERROR "Slang is required when XENGINE_ENABLE_SHADER_COMPILER=ON. Please place Slang source under ThirdParty/slang.")
     endif()
 endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/json/include/nlohmann/json.hpp")
+    add_library(ThirdParty_json INTERFACE)
+    target_include_directories(ThirdParty_json INTERFACE
+        "${CMAKE_CURRENT_SOURCE_DIR}/json/include"
+    )
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/json/single_include/nlohmann/json.hpp")
+    add_library(ThirdParty_json INTERFACE)
+    target_include_directories(ThirdParty_json INTERFACE
+        "${CMAKE_CURRENT_SOURCE_DIR}/json/single_include"
+    )
+else()
+    message(FATAL_ERROR "nlohmann/json is required for Stage 8D. Please place json.hpp under ThirdParty/json/include or single_include.")
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp")
+    # Dear ImGui is editor-only. Runtime modules and Sandbox must not link this target.
+    add_library(ThirdParty_imgui STATIC
+        imgui/imgui.cpp
+        imgui/imgui_draw.cpp
+        imgui/imgui_widgets.cpp
+        imgui/imgui_tables.cpp
+        imgui/imgui_demo.cpp
+        imgui/backends/imgui_impl_sdl3.cpp
+        imgui/backends/imgui_impl_vulkan.cpp
+        imgui/misc/cpp/imgui_stdlib.cpp
+    )
+
+    target_include_directories(ThirdParty_imgui PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/imgui"
+        "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends"
+        "${CMAKE_CURRENT_SOURCE_DIR}/imgui/misc/cpp"
+    )
+
+    target_compile_features(ThirdParty_imgui PUBLIC cxx_std_20)
+    target_compile_definitions(ThirdParty_imgui PUBLIC
+        VK_NO_PROTOTYPES
+        IMGUI_IMPL_VULKAN_USE_VOLK
+    )
+
+    if(XENGINE_ENABLE_VULKAN)
+        find_package(Vulkan REQUIRED)
+        target_include_directories(ThirdParty_imgui PUBLIC ${Vulkan_INCLUDE_DIRS})
+        if(TARGET volk::volk)
+            target_link_libraries(ThirdParty_imgui PUBLIC volk::volk)
+        elseif(TARGET volk)
+            target_link_libraries(ThirdParty_imgui PUBLIC volk)
+        endif()
+    endif()
+
+    if(XENGINE_ENABLE_SDL)
+        if(XENGINE_SDL_LINK_SHARED)
+            target_link_libraries(ThirdParty_imgui PUBLIC SDL3::SDL3-shared)
+        else()
+            target_link_libraries(ThirdParty_imgui PUBLIC SDL3::SDL3-static)
+        endif()
+    endif()
+endif()

@@ -1,0 +1,226 @@
+{
+    "version": 1,
+    "entities": [
+        {
+            "name": "Shadow Camera",
+            "Transform": {
+                "position": [
+                    -8.0,
+                    0.0,
+                    4.0
+                ],
+                "rotationDegrees": [
+                    0.0,
+                    -22.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "Camera": {
+                "projection": "Perspective",
+                "verticalFovDegrees": 60.0,
+                "nearPlane": 0.05,
+                "farPlane": 80.0,
+                "orthographicHeight": 10.0,
+                "primary": true
+            }
+        },
+        {
+            "name": "Sun",
+            "Transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotationDegrees": [
+                    0.0,
+                    -45.0,
+                    135.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "Light": {
+                "type": "Directional",
+                "color": [
+                    1.0,
+                    0.95,
+                    0.82
+                ],
+                "intensity": 3.0,
+                "castShadow": true,
+                "enabled": true
+            }
+        },
+        {
+            "name": "Ground",
+            "Transform": {
+                "position": [
+                    8.0,
+                    0.0,
+                    -1.0
+                ],
+                "rotationDegrees": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    20.0,
+                    20.0,
+                    0.1
+                ]
+            },
+            "MeshRenderer": {
+                "mesh": "procedural:cube",
+                "material": "procedural:test-material",
+                "visible": true,
+                "castShadow": false,
+                "receiveShadow": true
+            }
+        },
+        {
+            "name": "Near Block",
+            "Transform": {
+                "position": [
+                    1.5,
+                    -1.5,
+                    -0.25
+                ],
+                "rotationDegrees": [
+                    0.0,
+                    0.0,
+                    20.0
+                ],
+                "scale": [
+                    0.8,
+                    0.8,
+                    1.5
+                ]
+            },
+            "MeshRenderer": {
+                "mesh": "procedural:cube",
+                "material": "procedural:test-material",
+                "visible": true,
+                "castShadow": true,
+                "receiveShadow": true
+            }
+        },
+        {
+            "name": "Mid Block",
+            "Transform": {
+                "position": [
+                    5.0,
+                    1.4,
+                    -0.1
+                ],
+                "rotationDegrees": [
+                    0.0,
+                    0.0,
+                    -12.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.8
+                ]
+            },
+            "MeshRenderer": {
+                "mesh": "procedural:cube",
+                "material": "procedural:test-material",
+                "visible": true,
+                "castShadow": true,
+                "receiveShadow": true
+            }
+        },
+        {
+            "name": "Far Block",
+            "Transform": {
+                "position": [
+                    11.0,
+                    -2.0,
+                    -0.2
+                ],
+                "rotationDegrees": [
+                    0.0,
+                    0.0,
+                    8.0
+                ],
+                "scale": [
+                    1.2,
+                    1.2,
+                    1.6
+                ]
+            },
+            "MeshRenderer": {
+                "mesh": "procedural:cube",
+                "material": "procedural:test-material",
+                "visible": true,
+                "castShadow": true,
+                "receiveShadow": true
+            }
+        },
+        {
+            "name": "Tall Pillar",
+            "Transform": {
+                "position": [
+                    3.5,
+                    2.8,
+                    1.0
+                ],
+                "rotationDegrees": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.25,
+                    0.25,
+                    4.0
+                ]
+            },
+            "MeshRenderer": {
+                "mesh": "procedural:cube",
+                "material": "procedural:test-material",
+                "visible": true,
+                "castShadow": true,
+                "receiveShadow": true
+            }
+        },
+        {
+            "name": "Thin Pillar",
+            "Transform": {
+                "position": [
+                    8.0,
+                    -3.0,
+                    0.5
+                ],
+                "rotationDegrees": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    0.15,
+                    0.15,
+                    3.0
+                ]
+            },
+            "MeshRenderer": {
+                "mesh": "procedural:cube",
+                "material": "procedural:test-material",
+                "visible": true,
+                "castShadow": true,
+                "receiveShadow": true
+            }
+        }
+    ]
+}

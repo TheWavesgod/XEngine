@@ -14,11 +14,7 @@
 #include "Scene/RenderExtraction.h"
 
 #include <XEngine/Asset/AssetSystem.h>
-#include <XEngine/Asset/Assets/MaterialAsset.h>
-#include <XEngine/Asset/Assets/MeshAsset.h>
-#include <XEngine/Asset/Assets/TextureAsset.h>
 #include <XEngine/Core/Assert.h>
-#include <XEngine/Core/Colors.h>
 #include <XEngine/Engine/Engine.h>
 #include <XEngine/Engine/SubsystemManager.h>
 #include <XEngine/Logging/Log.h>
@@ -31,94 +27,11 @@
 #include <XEngine/Scene/SceneSystem.h>
 #include <XEngine/Shader/ShaderSystem.h>
 
-#include <algorithm>
-#include <filesystem>
 #include <memory>
 #include <string>
 
 namespace XEngine
 {
-    namespace
-    {
-        bool FindFirstMeshAndMaterial(
-            const AssetImportResult& importResult,
-            const AssetSystem& assetSystem,
-            AssetHandle& outMesh,
-            AssetHandle& outMaterial)
-        {
-            for (AssetHandle handle : importResult.ImportedAssets)
-            {
-                if (!outMesh.IsValid() && assetSystem.GetMeshAsset(handle) != nullptr)
-                {
-                    outMesh = handle;
-                }
-                if (!outMaterial.IsValid() && assetSystem.GetMaterialAsset(handle) != nullptr)
-                {
-                    outMaterial = handle;
-                }
-            }
-            return outMesh.IsValid() && outMaterial.IsValid();
-        }
-
-        void CreateValidationSceneEntity(
-            Scene& scene,
-            const char* name,
-            AssetHandle meshAsset,
-            AssetHandle materialAsset)
-        {
-            Entity entity = scene.CreateEntity(name != nullptr ? name : "Renderable");
-            TransformComponent& transform = scene.AddTransform(entity);
-            transform.SetLocalPosition(Vec3 { 0.0f, 0.0f, 0.0f });
-            transform.SetLocalRotationDegrees(Math::Rotator { 0.0f, 90.0f, 0.0f });
-            transform.SetLocalScale(Vec3 { 1.0f, 1.0f, 1.0f });
-
-            MeshRendererComponent& renderer = scene.AddMeshRenderer(entity);
-            renderer.MeshAsset = meshAsset;
-            renderer.MaterialAsset = materialAsset;
-        }
-
-        std::filesystem::path FindGltfValidationAsset(
-            const char* preferredName,
-            const std::filesystem::path& fallback)
-        {
-            if (std::filesystem::exists(fallback))
-            {
-                return fallback;
-            }
-
-            const std::filesystem::path root = "Assets/models/gltf";
-            if (!std::filesystem::exists(root))
-            {
-                return {};
-            }
-
-            for (const std::filesystem::directory_entry& entry :
-                 std::filesystem::recursive_directory_iterator(root))
-            {
-                if (!entry.is_regular_file())
-                {
-                    continue;
-                }
-
-                const std::filesystem::path path = entry.path();
-                const std::string generic = path.generic_string();
-                if ((path.extension() == ".gltf" || path.extension() == ".glb") &&
-                    generic.find(preferredName) != std::string::npos)
-                {
-                    return path;
-                }
-            }
-            return {};
-        }
-
-        void FrameCameraForMesh(SceneSystem& sceneSystem, const MeshAsset& meshAsset)
-        {
-            const Vec3 center = meshAsset.Bounds.GetCenter();
-            const float radius = std::max(Math::Length(meshAsset.Bounds.GetExtents()), 0.5f);
-            sceneSystem.FrameDebugCamera(center, radius);
-        }
-    }
-
     struct RenderSystem::Impl
     {
         Engine* EngineInstance = nullptr;
@@ -137,6 +50,9 @@ namespace XEngine
 
         std::unique_ptr<RenderPipeline> ActivePipeline;
         RenderScene SceneData;
+        RendererDebugSettings DebugSettings;
+        std::function<void()> OverlayCallback;
+        std::function<bool(RenderView&)> ViewProvider;
 
         Mat4 FallbackViewProjection { 1.0f };
         u32 SwapchainWidth = 1280;
@@ -200,94 +116,6 @@ namespace XEngine
             Initialized = false;
         }
 
-        void CreateValidationScene()
-        {
-            AssetHandle baseColorTextureAsset;
-            const std::string checkerPath = "Assets/Textures/checker.jpg";
-            if (Assets != nullptr && std::filesystem::exists(checkerPath))
-            {
-                AssetImportResult checkerImport = Assets->ImportAsset(checkerPath);
-                if (checkerImport.Succeeded() && Assets->GetTextureAsset(checkerImport.MainAsset) != nullptr)
-                {
-                    baseColorTextureAsset = checkerImport.MainAsset;
-                }
-            }
-
-            Scene* activeScene = Scenes != nullptr ? Scenes->GetActiveScene() : nullptr;
-            if (Assets == nullptr || activeScene == nullptr)
-            {
-                XENGINE_LOG_WARN("Stage 8A validation scene skipped because AssetSystem or SceneSystem is unavailable.");
-                return;
-            }
-
-            const Entity lightEntity = activeScene->CreateEntity("Stage8_DirectionalLight");
-            TransformComponent& lightTransform = activeScene->AddTransform(lightEntity);
-            lightTransform.SetLocalPosition(Vec3 { 0.0f, 0.0f, 0.0f });
-            lightTransform.SetLocalRotationDegrees(Math::Rotator { 0.0f, -45.0f, 135.0f });
-
-            LightComponent& light = activeScene->AddLight(lightEntity);
-            light.Type = LightType::Directional;
-            light.Color = Colors::Sunlight;
-            light.Intensity = 3.0f;
-            light.CastShadow = true;
-
-            const std::filesystem::path candidates[] = {
-                FindGltfValidationAsset("DamagedHelmet", "Assets/models/gltf/DamagedHelmet/DamagedHelmet.gltf"),
-                FindGltfValidationAsset("Cube", "Assets/models/gltf/Cube/Cube.gltf")
-            };
-
-            for (const std::filesystem::path& path : candidates)
-            {
-                if (path.empty() || !std::filesystem::exists(path))
-                {
-                    continue;
-                }
-
-                AssetImportResult imported = Assets->ImportAsset(path);
-                AssetHandle meshAsset;
-                AssetHandle materialAsset;
-                if (imported.Succeeded() &&
-                    FindFirstMeshAndMaterial(imported, *Assets, meshAsset, materialAsset))
-                {
-                    CreateValidationSceneEntity(
-                        *activeScene,
-                        "Stage8A_glTF_Validation",
-                        meshAsset,
-                        materialAsset);
-                    if (const MeshAsset* mesh = Assets->GetMeshAsset(meshAsset))
-                    {
-                        FrameCameraForMesh(*Scenes, *mesh);
-                    }
-                    XENGINE_LOG_INFO(
-                        std::string("Stage 8A using validation model: ") + path.generic_string());
-                    return;
-                }
-
-                XENGINE_LOG_WARN(
-                    std::string("Stage 8A glTF validation import failed: ") + imported.Diagnostics);
-            }
-
-            const AssetHandle meshAsset = Assets->CreateProceduralCubeMeshAsset("Stage8A_ProceduralCube");
-            const AssetHandle materialAsset = Assets->CreateTestMaterialAsset(
-                "Stage8A_FallbackMaterial",
-                baseColorTextureAsset);
-            if (meshAsset.IsValid() && materialAsset.IsValid())
-            {
-                CreateValidationSceneEntity(
-                    *activeScene,
-                    "Stage8A_ProceduralFallback",
-                    meshAsset,
-                    materialAsset);
-                if (const MeshAsset* mesh = Assets->GetMeshAsset(meshAsset))
-                {
-                    FrameCameraForMesh(*Scenes, *mesh);
-                }
-                XENGINE_LOG_INFO("Stage 8A falling back to procedural cube.");
-            }
-
-            activeScene->UpdateTransforms();
-        }
-
         void Render(float deltaTime)
         {
             if (!Initialized || RHI == nullptr || !ActivePipeline)
@@ -331,14 +159,31 @@ namespace XEngine
                 frame.TimeSeconds = time.GetTotalTime();
             }
 
-            const CameraComponent* camera = Scenes != nullptr ? Scenes->GetPrimaryCamera() : nullptr;
-            const TransformComponent* cameraTransform =
-                Scenes != nullptr ? Scenes->GetPrimaryCameraTransform() : nullptr;
-            if (camera != nullptr && cameraTransform != nullptr)
+            const float aspect = SwapchainHeight > 0 ?
+                static_cast<float>(SwapchainWidth) / static_cast<float>(SwapchainHeight) :
+                1.0f;
+
+            RenderView renderView;
+            bool hasRenderView = false;
+            if (ViewProvider)
             {
-                const float aspect = SwapchainHeight > 0 ?
-                    static_cast<float>(SwapchainWidth) / static_cast<float>(SwapchainHeight) :
-                    1.0f;
+                hasRenderView = ViewProvider(renderView);
+            }
+
+            const CameraComponent* camera = Scenes != nullptr && !hasRenderView ? Scenes->GetPrimaryCamera() : nullptr;
+            const TransformComponent* cameraTransform =
+                Scenes != nullptr && !hasRenderView ? Scenes->GetPrimaryCameraTransform() : nullptr;
+            if (hasRenderView)
+            {
+                frame.ViewMatrix = renderView.View;
+                frame.ProjectionMatrix = ApplyRHIClipSpaceConvention(
+                    renderView.Projection,
+                    device->GetClipSpaceConvention());
+                frame.ViewProjectionMatrix = frame.ProjectionMatrix * frame.ViewMatrix;
+                frame.CameraWorldPosition = renderView.Position;
+            }
+            else if (camera != nullptr && cameraTransform != nullptr)
+            {
                 frame.ViewMatrix = Math::BuildViewMatrixLH_XForward(
                     cameraTransform->GetWorldPosition(),
                     cameraTransform->GetWorldRotation());
@@ -382,6 +227,10 @@ namespace XEngine
             Resources.FrameResources->Update(frame, SceneData);
 
             ActivePipeline->Render(frame, SceneData, Resources);
+            if (OverlayCallback)
+            {
+                OverlayCallback();
+            }
             device->EndFrame();
         }
     };
@@ -483,7 +332,8 @@ namespace XEngine
             CoordinateSystem::Up);
         impl.FallbackViewProjection = projection * view;
 
-        impl.CreateValidationScene();
+        // Scene creation/loading belongs to Sandbox or editor code; RenderSystem only renders
+        // the active Scene after RenderExtraction has converted it to renderer data.
         impl.Initialized = true;
     }
 
@@ -505,5 +355,31 @@ namespace XEngine
         {
             m_Impl->Render(deltaTime);
         }
+    }
+
+    void RenderSystem::SetOverlayCallback(std::function<void()> callback)
+    {
+        if (m_Impl)
+        {
+            m_Impl->OverlayCallback = std::move(callback);
+        }
+    }
+
+    void RenderSystem::SetViewProvider(std::function<bool(RenderView&)> provider)
+    {
+        if (m_Impl)
+        {
+            m_Impl->ViewProvider = std::move(provider);
+        }
+    }
+
+    RendererDebugSettings& RenderSystem::GetDebugSettings()
+    {
+        return m_Impl->DebugSettings;
+    }
+
+    const RendererDebugSettings& RenderSystem::GetDebugSettings() const
+    {
+        return m_Impl->DebugSettings;
     }
 }

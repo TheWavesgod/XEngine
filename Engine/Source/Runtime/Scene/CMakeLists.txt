@@ -18,6 +18,7 @@ target_link_libraries(XEngineScene
     PUBLIC
         XEngineFoundation
         XEngineCoreRuntime
+        XEngineSerialization
         XEngineAsset
         XEngineInput
 )

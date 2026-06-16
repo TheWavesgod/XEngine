@@ -1069,7 +1069,7 @@ Future stages:
 ```text
 Stage 8B - LightComponent + RenderLight Extraction
 Stage 8C - GPU Light Data + PBR Shader Integration
-Stage 8D - Directional Shadow Map V0
+Stage 8D - Runtime Serialization + SceneSerializer V0 + Validation Scene Migration
 ```
 
 ## Stage 8C - Per-frame GPU Data + Shader Lighting Integration
@@ -1118,6 +1118,72 @@ COMPLETE
 - Updates camera, light, and mesh extraction to read world transforms.
 - Adds engine color presets.
 - Moves common helper calls under XEngine::Math.
+
+## Stage 8D - Runtime Serialization + SceneSerializer V0 + Validation Scene Migration
+
+```text
+COMPLETE
+```
+
+- Cleans `ThirdParty/json` down to the header-only include tree plus license files.
+- Adds `ThirdParty_json` and the `XEngineSerialization` runtime module.
+- Adds JSON load/save helpers, serialization context, and `.xscene` version metadata.
+- Adds `SceneSerializer` in the Scene module for entities, transforms, cameras, lights,
+  mesh renderers, and hierarchy.
+- Moves validation scene content into `Assets/Scenes/*.xscene`.
+- Updates Sandbox to load `Assets/Scenes/Default.xscene` at startup.
+- Keeps RenderSystem focused on renderer resources, scene extraction, and frame rendering only.
+- Does not implement ImGui, editor panels, shadows, CSM, or scene save UI.
+
+## Stage 8E-1 - ThirdParty ImGui Cleanup + Editor ImGui Foundation
+
+```text
+COMPLETE
+```
+
+- Cleans `ThirdParty/imgui` to core files, SDL3 backend, Vulkan backend, stdlib helper, and license.
+- Adds `ThirdParty_imgui` as an editor-only static library target.
+- Adds `EditorApplication`, `EditorContext`, and a real `EditorSystem` skeleton.
+- Adds editor-private `ImGuiLayer` and `ImGuiVulkanBackend`.
+- Enables docking without multi-viewport.
+- Adds a temporary `XEngine Editor Debug` validation window.
+- Adds a generic renderer overlay callback and a Vulkan-native RHI bridge for editor overlay rendering.
+- Keeps ImGui out of Runtime public headers, Sandbox, Scene, Asset, Serialization, Renderer implementation, RHI implementation, and Shader modules.
+- Does not implement SceneHierarchyPanel, InspectorPanel, RendererDebugPanel, ViewportPanel, editor camera movement, gizmos, DebugDraw, shadows, CSM, asset browser, undo/redo, prefab, project system, or native file dialogs.
+
+## Stage 8E-2 - EditorCamera, ViewportPanel, Mouse Capture, and Axis Gizmo
+
+```text
+COMPLETE
+```
+
+- Adds editor-only `EditorCamera`.
+- Adds renderer-neutral `RenderView` and `RenderSystem::SetViewProvider`.
+- Editor chooses between EditorCamera and active Scene primary CameraComponent through `UseEditorCamera`.
+- Adds viewport input state to `EditorContext`.
+- Adds reusable editor free camera control for mouse look, WASD, Q/E, and Shift speed.
+- Adds Platform window APIs for cursor visibility, relative mouse mode, and focus state.
+- Adds `ViewportPanel` with hover/focus tracking, capture hints, and camera capture entry.
+- Releases camera capture on Esc, focus loss, or disabling Editor Camera.
+- Adds a screen-space viewport axis gizmo for +X Forward, +Y Right, +Z Up.
+- Keeps Sandbox on Scene primary CameraComponent and out of Editor/ImGui.
+- Does not implement SceneHierarchyPanel, InspectorPanel, RendererDebugPanel, Viewport render target, DebugDraw, shadows, CSM, picking, manipulation gizmos, asset browser, undo/redo, prefab, project system, or native file dialogs.
+
+## Stage 8E-3 - Editor Panels, Scene Load/Save UI, and Renderer Debug Settings
+
+```text
+COMPLETE
+```
+
+- Adds editor-private `MainMenuBar`, `SceneHierarchyPanel`, `InspectorPanel`, and `RendererDebugPanel`.
+- Adds fixed-path New/Open/Save/Save As scene workflows through Runtime `SceneSerializer`.
+- Tracks selection, panel visibility, and scene dirty state in `EditorContext`.
+- Adds `Scene::Clear()` and keeps hierarchy traversal behind Scene query APIs.
+- Inspector edits local transform, light, camera, and mesh renderer state without touching editor camera data.
+- Adds runtime `RendererDebugSettings` and exposes it through `RenderSystem`.
+- Adds a main editor dockspace without layout persistence or multi-viewport platform windows.
+- Keeps Sandbox runtime-only: load `.xscene`, use Scene primary camera, no Editor/ImGui link, no save path.
+- Does not implement CSM, shadow maps, DebugDraw, picking, manipulation gizmos, asset browser, material editor, undo/redo, prefab, project system, or native file dialogs.
 
 ## Status
 

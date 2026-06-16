@@ -377,6 +377,53 @@ Material textures remain in set 1, while object data stays in push constants. Sh
 into reusable Common, Lighting, BRDF, Material, and Pass files. Stage 8C evaluates directional
 lights first and deliberately leaves shadows, IBL, HDR, bloom, and clustered lighting for later.
 
+Stage 8D adds runtime JSON serialization and migrates validation scene setup into scene assets.
+
+- `ThirdParty_json` exposes the cleaned nlohmann/json header-only dependency.
+- `XEngineSerialization` wraps JSON load/save helpers and version metadata.
+- `SceneSerializer` lives in Scene because it knows Scene entities, components, and hierarchy.
+- Sandbox loads `Assets/Scenes/Default.xscene` at startup.
+- RenderSystem no longer creates validation cameras, lights, meshes, or materials.
+- Validation scenes are stored under `Assets/Scenes` for later editor and shadow work.
+
+Stage 8D does not implement ImGui, editor panels, save workflows, shadows, or CSM.
+
+Stage 8E-1 adds the editor-only Dear ImGui foundation.
+
+- `ThirdParty_imgui` builds cleaned Dear ImGui core, SDL3 backend, Vulkan backend, and stdlib helper.
+- Editor private code owns `ImGuiLayer` and `ImGuiVulkanBackend`.
+- Runtime public APIs expose no ImGui types.
+- RenderSystem exposes a generic overlay callback, rendered after scene rendering and before present.
+- RHI exposes a Vulkan-native bridge for editor integration without depending on ImGui.
+- EditorApp now runs through `EditorApplication` and registers `EditorSystem` through `EngineConfig`.
+- A temporary `XEngine Editor Debug` window validates frame time, scene state, capture state, and editor camera toggle.
+
+Stage 8E-1 does not implement editor panels, viewport, gizmos, DebugDraw, shadows, CSM, asset browser, undo/redo, prefab, or native file dialogs.
+
+Stage 8E-2 adds the editor viewport foundation.
+
+- `EditorCamera` is an editor-only tool camera and is not serialized into `.xscene`.
+- `RenderView` lets Renderer consume camera matrices without owning camera concepts.
+- Editor can switch between Editor Camera and Scene primary CameraComponent rendering.
+- ViewportPanel tracks hover/focus and enters camera capture on viewport click.
+- Free camera capture supports mouse look, WASD, Q/E, Shift speed, Esc release, and focus-loss release.
+- Platform windows expose cursor visibility, relative mouse mode, and focus state.
+- A screen-space viewport axis gizmo shows +X Forward, +Y Right, +Z Up.
+
+Stage 8E-2 does not implement scene hierarchy, inspector, picking, manipulation gizmos, DebugDraw, shadows, CSM, asset browser, undo/redo, prefab, or native file dialogs.
+
+Stage 8E-3 adds practical editor scene/debug panels.
+
+- MainMenuBar supports New Scene, fixed-path scene open, save, and save-as ShadowValidation.
+- SceneHierarchyPanel displays root entities and child hierarchy using Scene query APIs.
+- InspectorPanel edits entity name, local transform, light, camera, and mesh renderer state.
+- Scene dirty state lives in EditorContext and is shown with `*` in the menu bar scene title.
+- RendererDebugSettings is a runtime renderer structure, edited through RendererDebugPanel.
+- Docking uses a main editor dockspace without layout persistence or multi-viewport windows.
+- Sandbox remains runtime-only and continues to load `.xscene` without Editor or ImGui.
+
+Stage 8E-3 does not implement CSM, shadow maps, DebugDraw, picking, gizmos, asset browser, undo/redo, prefab, material editor, project system, or native file dialogs.
+
 Stage 2B-2 adds:
 - Vulkan swapchain creation
 - Swapchain image views

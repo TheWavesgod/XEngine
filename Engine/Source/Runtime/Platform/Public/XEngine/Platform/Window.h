@@ -21,6 +21,9 @@ namespace XEngine
 
         virtual u32 GetWidth() const = 0;
         virtual u32 GetHeight() const = 0;
+        virtual void SetCursorVisible(bool visible) = 0;
+        virtual void SetRelativeMouseMode(bool enabled) = 0;
+        virtual bool IsFocused() const = 0;
 
         virtual std::string_view GetTitle() const = 0;
 

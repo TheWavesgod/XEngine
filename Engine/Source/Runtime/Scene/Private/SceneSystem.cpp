@@ -112,26 +112,38 @@ namespace XEngine
 
     Entity SceneSystem::GetPrimaryCameraEntity() const
     {
+        if (m_ActiveScene)
+        {
+            for (Entity entity : m_ActiveScene->GetEntities())
+            {
+                const CameraComponent* camera = m_ActiveScene->GetCamera(entity);
+                if (camera != nullptr && camera->Primary)
+                {
+                    return entity;
+                }
+            }
+        }
+
         return m_DebugCameraEntity;
     }
 
     CameraComponent* SceneSystem::GetPrimaryCamera()
     {
-        return m_ActiveScene ? m_ActiveScene->GetCamera(m_DebugCameraEntity) : nullptr;
+        return m_ActiveScene ? m_ActiveScene->GetCamera(GetPrimaryCameraEntity()) : nullptr;
     }
 
     const CameraComponent* SceneSystem::GetPrimaryCamera() const
     {
-        return m_ActiveScene ? m_ActiveScene->GetCamera(m_DebugCameraEntity) : nullptr;
+        return m_ActiveScene ? m_ActiveScene->GetCamera(GetPrimaryCameraEntity()) : nullptr;
     }
 
     TransformComponent* SceneSystem::GetPrimaryCameraTransform()
     {
-        return m_ActiveScene ? m_ActiveScene->GetTransform(m_DebugCameraEntity) : nullptr;
+        return m_ActiveScene ? m_ActiveScene->GetTransform(GetPrimaryCameraEntity()) : nullptr;
     }
 
     const TransformComponent* SceneSystem::GetPrimaryCameraTransform() const
     {
-        return m_ActiveScene ? m_ActiveScene->GetTransform(m_DebugCameraEntity) : nullptr;
+        return m_ActiveScene ? m_ActiveScene->GetTransform(GetPrimaryCameraEntity()) : nullptr;
     }
 }

@@ -23,6 +23,9 @@ namespace XEngine
 
         u32 GetWidth() const override;
         u32 GetHeight() const override;
+        void SetCursorVisible(bool visible) override;
+        void SetRelativeMouseMode(bool enabled) override;
+        bool IsFocused() const override;
 
         std::string_view GetTitle() const override;
 
@@ -37,5 +40,6 @@ namespace XEngine
         u32 m_Width = 0;
         u32 m_Height = 0;
         bool m_ShouldClose = false;
+        bool m_Focused = true;
     };
 }

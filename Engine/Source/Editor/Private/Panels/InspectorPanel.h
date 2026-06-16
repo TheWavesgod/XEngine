@@ -1,11 +1,12 @@
-﻿#pragma once
+#pragma once
+
+#include <XEngine/Editor/EditorContext.h>
 
 namespace XEngine
 {
     class InspectorPanel
     {
     public:
-        void Draw();
+        void Draw(EditorContext& context);
     };
 }
-

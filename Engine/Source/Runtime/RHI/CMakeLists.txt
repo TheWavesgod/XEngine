@@ -30,21 +30,22 @@ if(XENGINE_ENABLE_VULKAN)
     find_package(Vulkan REQUIRED)
 
     target_compile_definitions(XEngineRHI
-        PRIVATE
+        PUBLIC
             XENGINE_ENABLE_VULKAN
             VK_NO_PROTOTYPES
     )
 
     target_include_directories(XEngineRHI
-        PRIVATE
+        PUBLIC
             ${Vulkan_INCLUDE_DIRS}
+        PRIVATE
             ${CMAKE_SOURCE_DIR}/ThirdParty/VulkanMemoryAllocator/include
     )
 
     if(TARGET volk::volk)
-        target_link_libraries(XEngineRHI PRIVATE volk::volk)
+        target_link_libraries(XEngineRHI PUBLIC volk::volk)
     elseif(TARGET volk)
-        target_link_libraries(XEngineRHI PRIVATE volk)
+        target_link_libraries(XEngineRHI PUBLIC volk)
     else()
         message(FATAL_ERROR "volk target not found.")
     endif()

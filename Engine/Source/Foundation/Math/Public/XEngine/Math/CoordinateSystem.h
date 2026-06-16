@@ -43,3 +43,12 @@ namespace XEngine::Math
         return CoordinateSystem::GetUpVector(rotation);
     }
 }
+
+namespace XEngine::Units
+{
+    inline constexpr float MetersPerUnit = 1.0f;
+    inline constexpr float UnitsPerMeter = 1.0f;
+
+    inline constexpr float CentimetersPerUnit = 100.0f;
+    inline constexpr float UnitsPerCentimeter = 0.01f;
+}

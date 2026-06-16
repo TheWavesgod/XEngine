@@ -63,6 +63,8 @@ namespace XEngine
             const RHIBindGroupDesc& desc) override;
         std::shared_ptr<RHIPipeline> CreateGraphicsPipeline(const RHIGraphicsPipelineDesc& desc) override;
         RHIFormat GetSwapchainFormat() const override;
+        bool GetVulkanNativeContext(VulkanNativeContext& outContext) const override;
+        void RenderVulkanOverlay(const std::function<void(VkCommandBuffer)>& callback) override;
         void WaitIdle() override;
 
     private:

@@ -20,10 +20,13 @@ namespace XEngine
         Scene();
         ~Scene();
 
+        void Clear();
         Entity CreateEntity(const std::string& name = {});
         void DestroyEntity(Entity entity);
 
         bool IsValid(Entity entity) const;
+        void SetEntityName(Entity entity, const std::string& name);
+        const std::string& GetEntityName(Entity entity) const;
 
         TransformComponent& AddTransform(Entity entity);
         MeshRendererComponent& AddMeshRenderer(Entity entity);

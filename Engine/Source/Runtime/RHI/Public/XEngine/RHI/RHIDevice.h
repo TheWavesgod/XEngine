@@ -3,6 +3,7 @@
 #include <XEngine/Core/Types.h>
 #include <XEngine/RHI/RHITypes.h>
 #include <XEngine/RHI/RHIClipSpace.h>
+#include <XEngine/RHI/Native/VulkanNativeContext.h>
 #include <XEngine/RHI/Resources/RHIBindGroup.h>
 #include <XEngine/RHI/Resources/RHIBuffer.h>
 #include <XEngine/RHI/Resources/RHIPipeline.h>
@@ -11,6 +12,7 @@
 #include <XEngine/RHI/Resources/RHITexture.h>
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 
 namespace XEngine
@@ -59,6 +61,17 @@ namespace XEngine
             const RHIGraphicsPipelineDesc& desc) = 0;
 
         virtual RHIFormat GetSwapchainFormat() const = 0;
+
+        virtual bool GetVulkanNativeContext(VulkanNativeContext& outContext) const
+        {
+            (void)outContext;
+            return false;
+        }
+
+        virtual void RenderVulkanOverlay(const std::function<void(VkCommandBuffer)>& callback)
+        {
+            (void)callback;
+        }
 
         virtual void WaitIdle() = 0;
     };

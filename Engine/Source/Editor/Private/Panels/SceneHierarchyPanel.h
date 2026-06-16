@@ -1,11 +1,15 @@
-﻿#pragma once
+#pragma once
+
+#include <XEngine/Editor/EditorContext.h>
 
 namespace XEngine
 {
     class SceneHierarchyPanel
     {
     public:
-        void Draw();
+        void Draw(EditorContext& context);
+
+    private:
+        void DrawEntityNode(EditorContext& context, Entity entity);
     };
 }
-

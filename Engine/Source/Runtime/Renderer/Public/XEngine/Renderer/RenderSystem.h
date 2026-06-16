@@ -1,7 +1,10 @@
 #pragma once
 
 #include <XEngine/Engine/Subsystem.h>
+#include <XEngine/Renderer/RendererDebugSettings.h>
+#include <XEngine/Renderer/RenderView.h>
 
+#include <functional>
 #include <memory>
 
 namespace XEngine
@@ -15,6 +18,11 @@ namespace XEngine
         void OnCreate(const SubsystemContext& context) override;
         void OnDestroy() override;
         void OnUpdate(float deltaTime) override;
+
+        void SetOverlayCallback(std::function<void()> callback);
+        void SetViewProvider(std::function<bool(RenderView&)> provider);
+        RendererDebugSettings& GetDebugSettings();
+        const RendererDebugSettings& GetDebugSettings() const;
 
     private:
         struct Impl;

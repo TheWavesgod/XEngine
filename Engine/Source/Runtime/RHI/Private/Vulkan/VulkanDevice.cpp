@@ -684,6 +684,94 @@ namespace XEngine
         return VulkanFormatToRHIFormat(m_Swapchain.GetImageFormat());
     }
 
+    bool VulkanDevice::GetVulkanNativeContext(VulkanNativeContext& outContext) const
+    {
+        if (!IsValid())
+        {
+            return false;
+        }
+
+        outContext.Instance = m_Instance.GetHandle();
+        outContext.PhysicalDevice = m_PhysicalDevice;
+        outContext.Device = m_Device;
+        outContext.GraphicsQueue = m_GraphicsQueue.GetHandle();
+        outContext.GraphicsQueueFamilyIndex = m_GraphicsQueue.GetFamilyIndex();
+        outContext.MinImageCount = m_Swapchain.GetImageCount();
+        outContext.ImageCount = m_Swapchain.GetImageCount();
+        outContext.ColorFormat = m_Swapchain.GetImageFormat();
+        outContext.DepthFormat = VK_FORMAT_D32_SFLOAT;
+        return true;
+    }
+
+    void VulkanDevice::RenderVulkanOverlay(const std::function<void(VkCommandBuffer)>& callback)
+    {
+        if (!m_FrameActive || !callback)
+        {
+            return;
+        }
+
+        VkCommandBuffer commandBuffer = m_FrameResources.GetCommandBuffer();
+        m_CommandList.EndRenderingIfActive();
+
+        if (m_CurrentSwapchainImageLayout != VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+        {
+            VkImageSubresourceRange range {};
+            range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            range.baseMipLevel = 0;
+            range.levelCount = 1;
+            range.baseArrayLayer = 0;
+            range.layerCount = 1;
+
+            VkImageMemoryBarrier barrier {};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.srcAccessMask = m_CurrentSwapchainImageLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL ?
+                VK_ACCESS_TRANSFER_WRITE_BIT :
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            barrier.oldLayout = m_CurrentSwapchainImageLayout;
+            barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = m_Swapchain.GetImage(m_CurrentImageIndex);
+            barrier.subresourceRange = range;
+
+            vkCmdPipelineBarrier(
+                commandBuffer,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                0,
+                0,
+                nullptr,
+                0,
+                nullptr,
+                1,
+                &barrier);
+
+            m_CurrentSwapchainImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        }
+
+        VkRenderingAttachmentInfo colorAttachment {};
+        colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        colorAttachment.imageView = m_Swapchain.GetImageView(m_CurrentImageIndex);
+        colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+        VkRenderingInfo renderingInfo {};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        renderingInfo.renderArea.offset = { 0, 0 };
+        renderingInfo.renderArea.extent = m_Swapchain.GetExtent();
+        renderingInfo.layerCount = 1;
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachments = &colorAttachment;
+
+        // Editor UI is rendered after the scene and before present so it overlays
+        // the final swapchain image without becoming part of runtime scene rendering.
+        vkCmdBeginRendering(commandBuffer, &renderingInfo);
+        callback(commandBuffer);
+        vkCmdEndRendering(commandBuffer);
+    }
+
     void VulkanDevice::WaitIdle()
     {
         if (m_Device == VK_NULL_HANDLE)

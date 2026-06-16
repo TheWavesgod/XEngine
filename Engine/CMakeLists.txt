@@ -1,5 +1,6 @@
 add_subdirectory(Source/Foundation)
 add_subdirectory(Source/Runtime/Engine)
+add_subdirectory(Source/Runtime/Serialization)
 add_subdirectory(Source/Runtime/Asset)
 add_subdirectory(Source/Runtime/Input)
 add_subdirectory(Source/Runtime/Scene)
@@ -13,6 +14,7 @@ target_link_libraries(XEngineRuntime
     INTERFACE
         XEngineFoundation
         XEngineCoreRuntime
+        XEngineSerialization
         XEngineAsset
         XEngineInput
         XEngineScene
@@ -36,7 +38,12 @@ if(XENGINE_ENABLE_EDITOR)
             PRIVATE
                 Source/Editor/Private
         )
-        target_link_libraries(XEngineEditor PUBLIC XEngineRuntime)
+        target_link_libraries(XEngineEditor
+            PUBLIC
+                XEngineRuntime
+            PRIVATE
+                ThirdParty_imgui
+        )
         target_compile_features(XEngineEditor PUBLIC cxx_std_20)
     endif()
 endif()

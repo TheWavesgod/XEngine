@@ -141,6 +141,22 @@ namespace XEngine
                 platformEvent.Height = m_Height;
                 events.push_back(platformEvent);
             }
+            else if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED)
+            {
+                m_Focused = true;
+
+                PlatformEvent platformEvent;
+                platformEvent.Type = PlatformEventType::WindowFocusGained;
+                events.push_back(platformEvent);
+            }
+            else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST)
+            {
+                m_Focused = false;
+
+                PlatformEvent platformEvent;
+                platformEvent.Type = PlatformEventType::WindowFocusLost;
+                events.push_back(platformEvent);
+            }
             else if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP)
             {
                 PlatformEvent platformEvent;
@@ -197,6 +213,41 @@ namespace XEngine
     u32 SDLWindow::GetHeight() const
     {
         return m_Height;
+    }
+
+    void SDLWindow::SetCursorVisible(bool visible)
+    {
+#if defined(XENGINE_ENABLE_SDL)
+        if (visible)
+        {
+            SDL_ShowCursor();
+        }
+        else
+        {
+            SDL_HideCursor();
+        }
+#else
+        (void)visible;
+#endif
+    }
+
+    void SDLWindow::SetRelativeMouseMode(bool enabled)
+    {
+#if defined(XENGINE_ENABLE_SDL)
+        if (m_Window != nullptr)
+        {
+            // Relative mouse mode is used only while the editor viewport has
+            // explicitly captured camera input.
+            SDL_SetWindowRelativeMouseMode(m_Window, enabled);
+        }
+#else
+        (void)enabled;
+#endif
+    }
+
+    bool SDLWindow::IsFocused() const
+    {
+        return m_Focused;
     }
 
     std::string_view SDLWindow::GetTitle() const

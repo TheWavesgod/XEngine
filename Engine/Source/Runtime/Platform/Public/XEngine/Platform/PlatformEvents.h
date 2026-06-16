@@ -12,6 +12,8 @@ namespace XEngine
         WindowResize,
         WindowMinimized,
         WindowRestored,
+        WindowFocusGained,
+        WindowFocusLost,
         KeyDown,
         KeyUp,
         MouseButtonDown,

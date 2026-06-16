@@ -2,10 +2,13 @@
 
 #include <XEngine/Core/Types.h>
 
+#include <functional>
 #include <string>
 
 namespace XEngine
 {
+    class SubsystemManager;
+
     enum class GraphicsBackend
     {
         None,
@@ -33,5 +36,7 @@ namespace XEngine
         bool EnableShaderCompiler = true;
         bool EnableVSync = true;
         GraphicsBackend Backend = GraphicsBackend::Vulkan;
+
+        std::function<void(SubsystemManager&)> ConfigureSubsystems;
     };
 }
