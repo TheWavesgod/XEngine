@@ -6,6 +6,7 @@
 
 #include <XEngine/Core/Types.h>
 #include <XEngine/Math/MathTypes.h>
+#include <XEngine/RHI/RHITypes.h>
 
 namespace XEngine
 {
@@ -16,6 +17,7 @@ namespace XEngine
     {
         RHIDevice* Device = nullptr;
         RHICommandList* CommandList = nullptr;
+        RHIRenderOutputDesc Output {};
 
         u32 FrameIndex = 0;
 

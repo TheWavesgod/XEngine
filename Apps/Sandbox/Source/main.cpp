@@ -31,9 +31,9 @@ int main()
         // Sandbox validation: this path remains runtime-only, loads scene assets,
         // and must not depend on Editor or ImGui save workflows.
         XEngine::SceneSerializer serializer(serializationContext);
-        if (!serializer.LoadFromFile(*scene, "Assets/Scenes/Default.xscene"))
+        if (!serializer.LoadFromFile(*scene, "asset://Scenes/Default.xscene"))
         {
-            XENGINE_LOG_ERROR("Failed to load Assets/Scenes/Default.xscene");
+            XENGINE_LOG_ERROR("Failed to load asset://Scenes/Default.xscene");
         }
     }
 

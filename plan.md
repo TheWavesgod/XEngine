@@ -1886,3 +1886,19 @@ Graphics pipeline
 TrianglePass
 Draw triangle
 ```
+
+---
+
+## Stage 8F Complete
+
+Implemented:
+
+- CMake-generated development path fallback header.
+- `ProjectPaths` runtime path resolution and root logging.
+- Config/Saved folder convention with editor/renderer default config files.
+- ImGui docking default/user layout loading and Saved layout persistence.
+- Scene explicit root entity list for the implicit SceneRoot.
+- Parent/clear-parent cycle-safe hierarchy operations with keep-world conversion.
+- TransformSystem traversal from root entities.
+- Inspector World/Local transform editing behavior.
+- Scene serialization using virtual asset paths and parent ids.

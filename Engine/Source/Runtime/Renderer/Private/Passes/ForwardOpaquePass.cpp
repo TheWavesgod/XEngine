@@ -83,7 +83,7 @@ namespace XEngine
                     pipelineKey.ShadingModel = materialDesc->ShadingModel;
                     pipelineKey.AlphaMode = materialDesc->AlphaMode;
                     pipelineKey.VertexLayout = VertexLayoutKind::MeshVertex;
-                    pipelineKey.ColorFormat = frameContext.Device->GetSwapchainFormat();
+                    pipelineKey.ColorFormat = frameContext.Output.ColorFormat;
                     pipelineKey.DepthFormat = RHIFormat::D32Float;
                     pipelineKey.DepthTestEnabled = true;
                     pipelineKey.DepthWriteEnabled = materialDesc->AlphaMode != MaterialAlphaMode::Blend;

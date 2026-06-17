@@ -3,7 +3,6 @@
 #include <XEngine/Core/Types.h>
 #include <XEngine/RHI/RHITypes.h>
 #include <XEngine/RHI/RHIClipSpace.h>
-#include <XEngine/RHI/Native/VulkanNativeContext.h>
 #include <XEngine/RHI/Resources/RHIBindGroup.h>
 #include <XEngine/RHI/Resources/RHIBuffer.h>
 #include <XEngine/RHI/Resources/RHIPipeline.h>
@@ -18,6 +17,8 @@
 namespace XEngine
 {
     class RHICommandList;
+    struct VulkanNativeContext;
+    using RHINativeCommandBuffer = void*;
 
     class RHIDevice
     {
@@ -68,7 +69,7 @@ namespace XEngine
             return false;
         }
 
-        virtual void RenderVulkanOverlay(const std::function<void(VkCommandBuffer)>& callback)
+        virtual void RenderVulkanOverlay(const std::function<void(RHINativeCommandBuffer)>& callback)
         {
             (void)callback;
         }

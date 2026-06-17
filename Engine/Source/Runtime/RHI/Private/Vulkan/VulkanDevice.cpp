@@ -8,6 +8,7 @@
 #include "VulkanUtils.h"
 
 #include <XEngine/Logging/Log.h>
+#include <XEngine/RHI/Native/VulkanNativeContext.h>
 
 #include <algorithm>
 #include <cstring>
@@ -703,7 +704,7 @@ namespace XEngine
         return true;
     }
 
-    void VulkanDevice::RenderVulkanOverlay(const std::function<void(VkCommandBuffer)>& callback)
+    void VulkanDevice::RenderVulkanOverlay(const std::function<void(RHINativeCommandBuffer)>& callback)
     {
         if (!m_FrameActive || !callback)
         {
@@ -713,6 +714,7 @@ namespace XEngine
         VkCommandBuffer commandBuffer = m_FrameResources.GetCommandBuffer();
         m_CommandList.EndRenderingIfActive();
 
+        const bool swapchainWasUndefined = m_CurrentSwapchainImageLayout == VK_IMAGE_LAYOUT_UNDEFINED;
         if (m_CurrentSwapchainImageLayout != VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
         {
             VkImageSubresourceRange range {};
@@ -726,7 +728,7 @@ namespace XEngine
             barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             barrier.srcAccessMask = m_CurrentSwapchainImageLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL ?
                 VK_ACCESS_TRANSFER_WRITE_BIT :
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                (swapchainWasUndefined ? 0 : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
             barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
             barrier.oldLayout = m_CurrentSwapchainImageLayout;
             barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -754,8 +756,9 @@ namespace XEngine
         colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         colorAttachment.imageView = m_Swapchain.GetImageView(m_CurrentImageIndex);
         colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        colorAttachment.loadOp = swapchainWasUndefined ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
         colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAttachment.clearValue.color = { { 0.08f, 0.08f, 0.1f, 1.0f } };
 
         VkRenderingInfo renderingInfo {};
         renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
@@ -768,7 +771,7 @@ namespace XEngine
         // Editor UI is rendered after the scene and before present so it overlays
         // the final swapchain image without becoming part of runtime scene rendering.
         vkCmdBeginRendering(commandBuffer, &renderingInfo);
-        callback(commandBuffer);
+        callback(static_cast<RHINativeCommandBuffer>(commandBuffer));
         vkCmdEndRendering(commandBuffer);
     }
 

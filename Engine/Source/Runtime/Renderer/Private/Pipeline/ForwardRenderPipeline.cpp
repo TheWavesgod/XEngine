@@ -54,10 +54,18 @@ namespace XEngine
         clearColor.B = 0.15f;
         clearColor.A = 1.0f;
 
-        AddClearPass(m_Graph, clearColor);
+        if (frame.Output.RenderToSwapchain)
+        {
+            // Sandbox renders scene directly to the swapchain, so the scene
+            // graph clears the backbuffer before drawing.
+            AddClearPass(m_Graph, clearColor);
+        }
         AddForwardOpaquePass(m_Graph, frame, scene, resources);
         // TODO Stage 8B/8C/8D: add lighting and shadow passes to this same graph.
-        AddPresentPass(m_Graph);
+        if (frame.Output.RenderToSwapchain)
+        {
+            AddPresentPass(m_Graph);
+        }
 
         m_Graph.Compile();
         RenderGraphContext graphContext(*frame.Device, frame.CommandList);

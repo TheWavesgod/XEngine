@@ -17,9 +17,9 @@ namespace XEngine
 {
     namespace
     {
-        constexpr const char* DefaultScenePath = "Assets/Scenes/Default.xscene";
-        constexpr const char* ValidationScenePath = "Assets/Scenes/ValidationScene.xscene";
-        constexpr const char* ShadowValidationScenePath = "Assets/Scenes/ShadowValidation.xscene";
+        constexpr const char* DefaultScenePath = "asset://Scenes/Default.xscene";
+        constexpr const char* ValidationScenePath = "asset://Scenes/ValidationScene.xscene";
+        constexpr const char* ShadowValidationScenePath = "asset://Scenes/ShadowValidation.xscene";
 
         const char* SceneDisplayName(const EditorContext& context)
         {
@@ -80,6 +80,15 @@ namespace XEngine
             ImGui::MenuItem("Inspector", nullptr, &context.ShowInspector);
             ImGui::MenuItem("Renderer Debug", nullptr, &context.ShowRendererDebug);
             ImGui::MenuItem("Viewport", nullptr, &context.ShowViewport);
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Window"))
+        {
+            if (ImGui::MenuItem("Reset Layout"))
+            {
+                context.ResetDockingLayoutRequested = true;
+            }
             ImGui::EndMenu();
         }
 

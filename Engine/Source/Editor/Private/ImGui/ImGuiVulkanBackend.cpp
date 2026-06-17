@@ -2,6 +2,8 @@
 
 #include <XEngine/Logging/Log.h>
 #include <XEngine/RHI/RHIDevice.h>
+#include <XEngine/RHI/Resources/RHISampler.h>
+#include <XEngine/RHI/Resources/RHITexture.h>
 
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
@@ -37,13 +39,14 @@ namespace XEngine
 
         VkDescriptorPoolSize poolSizes[] = {
             { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 64 },
+            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 64 },
             { VK_DESCRIPTOR_TYPE_SAMPLER, 16 }
         };
 
         VkDescriptorPoolCreateInfo poolInfo {};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-        poolInfo.maxSets = 80;
+        poolInfo.maxSets = 144;
         poolInfo.poolSizeCount = static_cast<u32>(std::size(poolSizes));
         poolInfo.pPoolSizes = poolSizes;
 
@@ -118,9 +121,39 @@ namespace XEngine
 
         ImDrawData* drawData = ImGui::GetDrawData();
         m_RHIDevice->RenderVulkanOverlay(
-            [drawData](VkCommandBuffer commandBuffer)
+            [drawData](RHINativeCommandBuffer commandBuffer)
             {
-                ImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer);
+                ImGui_ImplVulkan_RenderDrawData(drawData, static_cast<VkCommandBuffer>(commandBuffer));
             });
+    }
+
+    ImTextureID ImGuiVulkanBackend::RegisterTexture(RHISampler& sampler, RHITexture& texture)
+    {
+        VkSampler vkSampler = static_cast<VkSampler>(sampler.GetNativeSampler(RHIBackend::Vulkan));
+        VkImageView imageView = static_cast<VkImageView>(texture.GetNativeImageView(RHIBackend::Vulkan));
+        if (!m_Initialized ||
+            vkSampler == VK_NULL_HANDLE ||
+            imageView == VK_NULL_HANDLE)
+        {
+            return ImTextureID_Invalid;
+        }
+
+        // Editor-private bridge from RHI resources to ImGui's Vulkan texture
+        // descriptor. Runtime renderer never includes ImGui headers.
+        VkDescriptorSet descriptorSet = ImGui_ImplVulkan_AddTexture(
+            vkSampler,
+            imageView,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        return reinterpret_cast<ImTextureID>(descriptorSet);
+    }
+
+    void ImGuiVulkanBackend::UnregisterTexture(ImTextureID textureId)
+    {
+        if (!m_Initialized || textureId == ImTextureID_Invalid)
+        {
+            return;
+        }
+
+        ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(textureId));
     }
 }

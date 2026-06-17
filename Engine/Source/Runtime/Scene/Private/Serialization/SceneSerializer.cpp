@@ -3,6 +3,7 @@
 #include <XEngine/Asset/AssetSystem.h>
 #include <XEngine/Asset/Assets/MaterialAsset.h>
 #include <XEngine/Asset/Assets/MeshAsset.h>
+#include <XEngine/Core/ProjectPaths.h>
 #include <XEngine/Logging/Log.h>
 #include <XEngine/Math/MathFunctions.h>
 #include <XEngine/Scene/Components/CameraComponent.h>
@@ -190,6 +191,33 @@ namespace XEngine
             return assetSystem->CreateTestMaterialAsset("SceneDefaultMaterial", {});
         }
 
+        std::string ToAssetVirtualPath(const std::filesystem::path& path)
+        {
+            const std::filesystem::path normalizedPath = path.lexically_normal();
+            const std::filesystem::path assetRoot = ProjectPaths::GetAssetRoot().lexically_normal();
+            auto pathIt = normalizedPath.begin();
+            auto rootIt = assetRoot.begin();
+            for (; rootIt != assetRoot.end() && pathIt != normalizedPath.end(); ++rootIt, ++pathIt)
+            {
+                if (*rootIt != *pathIt)
+                {
+                    return normalizedPath.generic_string();
+                }
+            }
+
+            if (rootIt != assetRoot.end())
+            {
+                return normalizedPath.generic_string();
+            }
+
+            std::filesystem::path relative;
+            for (; pathIt != normalizedPath.end(); ++pathIt)
+            {
+                relative /= *pathIt;
+            }
+            return "asset://" + relative.generic_string();
+        }
+
         std::string ResolveAssetPath(const AssetSystem* assetSystem, AssetHandle handle)
         {
             if (assetSystem == nullptr || !handle.IsValid())
@@ -199,7 +227,27 @@ namespace XEngine
 
             if (const AssetMetadata* metadata = assetSystem->GetMetadata(handle))
             {
-                return metadata->SourcePath.generic_string();
+                const std::string sourcePath = metadata->SourcePath.generic_string();
+                if (sourcePath.starts_with("asset://"))
+                {
+                    return sourcePath;
+                }
+                if (sourcePath.starts_with("procedural/"))
+                {
+                    if (metadata->Type == AssetType::Mesh)
+                    {
+                        return "procedural:cube";
+                    }
+                    if (metadata->Type == AssetType::Material)
+                    {
+                        return "procedural:test-material";
+                    }
+                    return sourcePath;
+                }
+
+                // Scene files persist portable virtual asset paths, never local
+                // absolute development paths.
+                return ToAssetVirtualPath(ProjectPaths::Resolve(sourcePath));
             }
             return {};
         }
@@ -213,7 +261,8 @@ namespace XEngine
     bool SceneSerializer::LoadFromFile(Scene& scene, const std::filesystem::path& path)
     {
         Json root;
-        if (!JsonSerialization::LoadJsonFile(path, root))
+        const std::filesystem::path resolvedPath = ProjectPaths::Resolve(path.generic_string());
+        if (!JsonSerialization::LoadJsonFile(resolvedPath, root))
         {
             return false;
         }
@@ -227,6 +276,7 @@ namespace XEngine
         }
 
         std::unordered_map<std::string, Entity> entitiesByName;
+        std::unordered_map<std::string, Entity> entitiesById;
         std::vector<std::pair<Entity, std::string>> deferredParents;
 
         for (const Json& entityJson : root["entities"])
@@ -234,6 +284,7 @@ namespace XEngine
             const std::string name = entityJson.value("name", "Entity");
             Entity entity = scene.CreateEntity(name);
             entitiesByName[name] = entity;
+            entitiesById[entityJson.value("id", name)] = entity;
 
             if (entityJson.contains("Transform"))
             {
@@ -302,7 +353,7 @@ namespace XEngine
                 }
             }
 
-            if (entityJson.contains("parent"))
+            if (entityJson.contains("parent") && !entityJson["parent"].is_null())
             {
                 deferredParents.push_back({ entity, entityJson.value("parent", "") });
             }
@@ -310,13 +361,20 @@ namespace XEngine
 
         for (const auto& [child, parentName] : deferredParents)
         {
-            const auto parentIt = entitiesByName.find(parentName);
-            if (parentIt == entitiesByName.end())
+            auto parentIt = entitiesById.find(parentName);
+            if (parentIt == entitiesById.end())
+            {
+                parentIt = entitiesByName.find(parentName);
+            }
+            if (parentIt == entitiesById.end() && parentIt == entitiesByName.end())
             {
                 XENGINE_LOG_WARN(std::string("Missing parent reference: ") + parentName);
                 continue;
             }
-            scene.SetParent(child, parentIt->second, false);
+            if (!scene.SetParent(child, parentIt->second, false))
+            {
+                XENGINE_LOG_WARN(std::string("Rejected invalid or cyclic parent reference: ") + parentName);
+            }
         }
 
         scene.UpdateTransforms();
@@ -332,15 +390,27 @@ namespace XEngine
         Json root;
         root["version"] = XSceneSerializationVersion;
         root["entities"] = Json::array();
+        std::unordered_map<u32, std::string> serializedIds;
+        for (Entity entity : scene.GetEntities())
+        {
+            serializedIds[entity.Index] = "entity_" + std::to_string(serializedIds.size());
+        }
 
         for (Entity entity : scene.GetEntities())
         {
             Json entityJson;
+            entityJson["id"] = serializedIds[entity.Index];
             entityJson["name"] = scene.GetEntityName(entity);
 
+            // Root entities are children of the implicit SceneRoot and serialize
+            // with parent=null; the UI-only root itself is never serialized.
             if (scene.HasParent(entity))
             {
-                entityJson["parent"] = scene.GetEntityName(scene.GetParent(entity));
+                entityJson["parent"] = serializedIds[scene.GetParent(entity).Index];
+            }
+            else
+            {
+                entityJson["parent"] = nullptr;
             }
 
             if (const TransformComponent* transform = scene.GetTransform(entity))
@@ -392,6 +462,6 @@ namespace XEngine
             root["entities"].push_back(entityJson);
         }
 
-        return JsonSerialization::SaveJsonFile(path, root);
+        return JsonSerialization::SaveJsonFile(ProjectPaths::Resolve(path.generic_string()), root);
     }
 }

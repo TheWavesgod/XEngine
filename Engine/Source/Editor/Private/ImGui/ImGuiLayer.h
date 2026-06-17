@@ -7,6 +7,8 @@
 namespace XEngine
 {
     class RHIDevice;
+    class RHISampler;
+    class RHITexture;
     class InspectorPanel;
     class MainMenuBar;
     class RendererDebugPanel;
@@ -34,12 +36,16 @@ namespace XEngine
 
         bool WantCaptureMouse() const;
         bool WantCaptureKeyboard() const;
+        ImTextureID RegisterTexture(RHISampler& sampler, RHITexture& texture);
+        void UnregisterTexture(ImTextureID textureId);
         bool IsInitialized() const { return m_Initialized; }
 
     private:
         void BeginFrame();
         void EndFrame();
         void DrawDockspace();
+        void LoadDockingLayout(bool forceDefault);
+        void SaveDockingLayout();
         void RenderDebugWindow(EditorContext& context, const Time& time);
 
         ImGuiVulkanBackend m_VulkanBackend;

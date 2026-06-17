@@ -27,7 +27,10 @@ namespace XEngine
         void Reset();
         void EndRenderingIfActive();
 
+        void SetRenderOutput(const RHIRenderOutputDesc& output) override;
         void SetGraphicsPipeline(RHIPipeline* pipeline) override;
+        void SetRenderViewport(const RHIRect2D& viewport) override;
+        void TransitionTextureToShaderRead(RHITexture* texture) override;
         void SetBindGroup(u32 setIndex, RHIBindGroup* bindGroup) override;
         void SetVertexBuffer(RHIBuffer* buffer, u64 offset = 0) override;
         void SetIndexBuffer(RHIBuffer* buffer, RHIIndexFormat format, u64 offset = 0) override;
@@ -52,12 +55,15 @@ namespace XEngine
     private:
         void BeginRenderingIfNeeded();
         void TransitionSwapchainImage(VkImageLayout newLayout);
+        void TransitionColorImage(VulkanTexture& texture, VkImageLayout newLayout);
         void TransitionDepthImage(VulkanTexture& texture, VkImageLayout newLayout);
 
         VkCommandBuffer m_CommandBuffer = VK_NULL_HANDLE;
         VkImage m_SwapchainImage = VK_NULL_HANDLE;
         VkImageView m_SwapchainImageView = VK_NULL_HANDLE;
         VkExtent2D m_SwapchainExtent {};
+        RHIRect2D m_RenderViewport {};
+        RHIRenderOutputDesc m_RenderOutput {};
         VkImageLayout* m_SwapchainImageLayout = nullptr;
         VulkanTexture* m_DepthTexture = nullptr;
         VulkanPipeline* m_BoundGraphicsPipeline = nullptr;

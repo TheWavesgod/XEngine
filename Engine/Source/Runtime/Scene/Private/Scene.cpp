@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <span>
 #include <utility>
 
 namespace XEngine
@@ -15,6 +16,11 @@ namespace XEngine
     {
         const std::vector<Entity> EmptyChildren;
         const std::string EmptyName;
+
+        void EraseEntity(std::vector<Entity>& entities, Entity entity)
+        {
+            entities.erase(std::remove(entities.begin(), entities.end(), entity), entities.end());
+        }
 
         Vec3 SafeComponentDivide(const Vec3& value, const Vec3& divisor)
         {
@@ -27,6 +33,18 @@ namespace XEngine
                 }
             }
             return result;
+        }
+
+        const TransformComponent* FindInheritedParentTransform(const Scene& scene, Entity entity)
+        {
+            for (Entity parent = scene.GetParent(entity); parent.IsValid(); parent = scene.GetParent(parent))
+            {
+                if (const TransformComponent* transform = scene.GetTransform(parent))
+                {
+                    return transform;
+                }
+            }
+            return nullptr;
         }
     }
 
@@ -43,14 +61,15 @@ namespace XEngine
         m_Lights.clear();
         m_Parents.clear();
         m_Children.clear();
+        m_RootEntities.clear();
     }
 
-    Entity Scene::CreateEntity(const std::string& name)
+    Entity Scene::CreateEntity(std::string_view name)
     {
         EntityRecord record;
         record.Generation = 1;
         record.Alive = true;
-        record.Name = name;
+        record.Name = std::string(name);
 
         Entity entity;
         entity.Index = static_cast<u32>(m_EntityRecords.size());
@@ -58,6 +77,7 @@ namespace XEngine
 
         m_EntityRecords.push_back(std::move(record));
         m_Entities.push_back(entity);
+        m_RootEntities.push_back(entity);
         return entity;
     }
 
@@ -68,12 +88,20 @@ namespace XEngine
             return;
         }
 
-        const std::vector<Entity> children = GetChildren(entity);
+        const std::vector<Entity> children(GetChildren(entity).begin(), GetChildren(entity).end());
         for (Entity child : children)
         {
-            ClearParent(child, true);
+            DestroyEntity(child);
         }
-        ClearParent(entity, false);
+
+        if (HasParent(entity))
+        {
+            ClearParent(entity, false);
+        }
+        else
+        {
+            EraseEntity(m_RootEntities, entity);
+        }
         m_Children.erase(entity.Index);
 
         EntityRecord& record = m_EntityRecords[entity.Index];
@@ -86,9 +114,7 @@ namespace XEngine
         m_Cameras.erase(entity.Index);
         m_Lights.erase(entity.Index);
 
-        m_Entities.erase(
-            std::remove(m_Entities.begin(), m_Entities.end(), entity),
-            m_Entities.end());
+        EraseEntity(m_Entities, entity);
     }
 
     bool Scene::IsValid(Entity entity) const
@@ -208,19 +234,18 @@ namespace XEngine
         return it != m_Lights.end() ? &it->second : nullptr;
     }
 
-    void Scene::SetParent(Entity child, Entity parent, bool keepWorldTransform)
+    bool Scene::SetParent(Entity child, Entity parent, bool keepWorldTransform)
     {
         if (!IsValid(child) || !IsValid(parent) || child == parent)
         {
-            return;
+            return false;
         }
 
-        for (Entity ancestor = parent; ancestor.IsValid(); ancestor = GetParent(ancestor))
+        // Prevent cycles before touching storage; a child cannot be reparented
+        // under itself or any of its descendants.
+        if (IsDescendantOf(parent, child))
         {
-            if (ancestor == child)
-            {
-                return;
-            }
+            return false;
         }
 
         UpdateTransforms();
@@ -234,12 +259,23 @@ namespace XEngine
             worldScale = transform->GetWorldScale();
         }
 
-        ClearParent(child, false);
+        if (HasParent(child))
+        {
+            ClearParent(child, false);
+        }
+        else
+        {
+            EraseEntity(m_RootEntities, child);
+        }
+
         m_Parents[child.Index] = parent;
+        EraseEntity(m_Children[parent.Index], child);
         m_Children[parent.Index].push_back(child);
 
         if (keepWorldTransform)
         {
+            // keepWorldTransform preserves the visual world transform by
+            // recomputing local values relative to the new parent.
             SetWorldPosition(child, worldPosition);
             SetWorldRotation(child, worldRotation);
             SetWorldScale(child, worldScale);
@@ -248,19 +284,24 @@ namespace XEngine
         {
             transform->MarkDirty();
         }
+        return true;
     }
 
-    void Scene::ClearParent(Entity child, bool keepWorldTransform)
+    bool Scene::ClearParent(Entity child, bool keepWorldTransform)
     {
         if (!IsValid(child))
         {
-            return;
+            return false;
         }
 
         const auto parentIt = m_Parents.find(child.Index);
         if (parentIt == m_Parents.end())
         {
-            return;
+            if (std::find(m_RootEntities.begin(), m_RootEntities.end(), child) == m_RootEntities.end())
+            {
+                m_RootEntities.push_back(child);
+            }
+            return true;
         }
 
         UpdateTransforms();
@@ -280,11 +321,15 @@ namespace XEngine
         if (childrenIt != m_Children.end())
         {
             auto& siblings = childrenIt->second;
-            siblings.erase(std::remove(siblings.begin(), siblings.end(), child), siblings.end());
+            EraseEntity(siblings, child);
             if (siblings.empty())
             {
                 m_Children.erase(childrenIt);
             }
+        }
+        if (std::find(m_RootEntities.begin(), m_RootEntities.end(), child) == m_RootEntities.end())
+        {
+            m_RootEntities.push_back(child);
         }
 
         if (keepWorldTransform)
@@ -300,6 +345,7 @@ namespace XEngine
         {
             transform->MarkDirty();
         }
+        return true;
     }
 
     bool Scene::HasParent(Entity entity) const
@@ -317,28 +363,36 @@ namespace XEngine
         return it != m_Parents.end() ? it->second : Entity {};
     }
 
-    const std::vector<Entity>& Scene::GetChildren(Entity entity) const
+    std::span<const Entity> Scene::GetChildren(Entity entity) const
     {
         if (!IsValid(entity))
         {
-            return EmptyChildren;
+            return std::span<const Entity>(EmptyChildren);
         }
         const auto it = m_Children.find(entity.Index);
-        return it != m_Children.end() ? it->second : EmptyChildren;
+        return it != m_Children.end() ? std::span<const Entity>(it->second) : std::span<const Entity>(EmptyChildren);
     }
 
-    std::vector<Entity> Scene::GetRootEntities() const
+    std::span<const Entity> Scene::GetRootEntities() const
     {
-        std::vector<Entity> roots;
-        roots.reserve(m_Entities.size());
-        for (Entity entity : m_Entities)
+        return m_RootEntities;
+    }
+
+    bool Scene::IsDescendantOf(Entity entity, Entity possibleAncestor) const
+    {
+        if (!IsValid(entity) || !IsValid(possibleAncestor))
         {
-            if (!HasParent(entity))
+            return false;
+        }
+
+        for (Entity parent = GetParent(entity); parent.IsValid(); parent = GetParent(parent))
+        {
+            if (parent == possibleAncestor)
             {
-                roots.push_back(entity);
+                return true;
             }
         }
-        return roots;
+        return false;
     }
 
     void Scene::SetWorldPosition(Entity entity, const Vec3& position)
@@ -350,7 +404,7 @@ namespace XEngine
         }
 
         UpdateTransforms();
-        if (const TransformComponent* parent = GetTransform(GetParent(entity)))
+        if (const TransformComponent* parent = FindInheritedParentTransform(*this, entity))
         {
             transform->SetLocalPosition(
                 Math::TransformPoint(Math::Inverse(parent->GetWorldMatrix()), position));
@@ -370,7 +424,7 @@ namespace XEngine
         }
 
         UpdateTransforms();
-        if (const TransformComponent* parent = GetTransform(GetParent(entity)))
+        if (const TransformComponent* parent = FindInheritedParentTransform(*this, entity))
         {
             transform->SetLocalRotation(Math::Normalize(
                 Math::Inverse(parent->GetWorldRotation()) * rotation));
@@ -395,12 +449,41 @@ namespace XEngine
         }
 
         UpdateTransforms();
-        if (const TransformComponent* parent = GetTransform(GetParent(entity)))
+        if (const TransformComponent* parent = FindInheritedParentTransform(*this, entity))
         {
             // Ordinary TRS only; rotated non-uniform scale with shear is intentionally deferred.
             transform->SetLocalScale(SafeComponentDivide(scale, parent->GetWorldScale()));
         }
         else
+        {
+            transform->SetLocalScale(scale);
+        }
+    }
+
+    void Scene::SetLocalPosition(Entity entity, const Vec3& position)
+    {
+        if (TransformComponent* transform = GetTransform(entity))
+        {
+            transform->SetLocalPosition(position);
+        }
+    }
+
+    void Scene::SetLocalRotation(Entity entity, const Quat& rotation)
+    {
+        if (TransformComponent* transform = GetTransform(entity))
+        {
+            transform->SetLocalRotation(rotation);
+        }
+    }
+
+    void Scene::SetLocalRotationDegrees(Entity entity, const Math::Rotator& rotation)
+    {
+        SetLocalRotation(entity, Math::ToQuat(rotation));
+    }
+
+    void Scene::SetLocalScale(Entity entity, const Vec3& scale)
+    {
+        if (TransformComponent* transform = GetTransform(entity))
         {
             transform->SetLocalScale(scale);
         }

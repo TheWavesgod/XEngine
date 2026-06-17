@@ -77,21 +77,44 @@ namespace XEngine
         {
             if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
             {
-                Vec3 localPosition = transform->GetLocalPosition();
-                Math::Rotator localRotation = transform->GetLocalRotationDegrees();
-                Vec3 localScale = transform->GetLocalScale();
+                const bool hasParent = scene->HasParent(entity);
+                if (!hasParent)
+                {
+                    context.TransformSpace = TransformEditSpace::World;
+                }
+
+                if (hasParent)
+                {
+                    int editSpace = context.TransformSpace == TransformEditSpace::World ? 0 : 1;
+                    const char* spaces[] = { "World", "Local" };
+                    if (ImGui::Combo("Space", &editSpace, spaces, 2))
+                    {
+                        context.TransformSpace = editSpace == 0 ? TransformEditSpace::World : TransformEditSpace::Local;
+                    }
+                }
+                else
+                {
+                    ImGui::TextUnformatted("Space: World");
+                }
+
+                const bool editingWorld = context.TransformSpace == TransformEditSpace::World;
+                Vec3 position = editingWorld ? transform->GetWorldPosition() : transform->GetLocalPosition();
+                Math::Rotator rotation = editingWorld ?
+                    transform->GetWorldRotationDegrees() :
+                    transform->GetLocalRotationDegrees();
+                Vec3 scale = editingWorld ? transform->GetWorldScale() : transform->GetLocalScale();
 
                 bool changed = false;
-                changed |= DragVec3("Local Position", localPosition);
+                changed |= DragVec3("Position", position);
 
                 float rotationDegrees[3] = {
-                    localRotation.Roll,
-                    localRotation.Pitch,
-                    localRotation.Yaw
+                    rotation.Roll,
+                    rotation.Pitch,
+                    rotation.Yaw
                 };
-                if (ImGui::DragFloat3("Local Rotation", rotationDegrees, 0.25f))
+                if (ImGui::DragFloat3("Rotation", rotationDegrees, 0.25f))
                 {
-                    localRotation = Math::Rotator {
+                    rotation = Math::Rotator {
                         rotationDegrees[0],
                         rotationDegrees[1],
                         rotationDegrees[2]
@@ -99,26 +122,45 @@ namespace XEngine
                     changed = true;
                 }
 
-                changed |= DragVec3("Local Scale", localScale);
+                changed |= DragVec3("Scale", scale);
 
                 if (changed)
                 {
-                    // Inspector edits local transform only; TransformSystem derives
-                    // world transform during the scene update.
-                    transform->SetLocalPosition(localPosition);
-                    transform->SetLocalRotationDegrees(localRotation);
-                    transform->SetLocalScale(localScale);
+                    // Editor transform editing defaults to World. Local editing
+                    // is editor state only and is available for child entities.
+                    if (editingWorld)
+                    {
+                        scene->SetWorldPosition(entity, position);
+                        scene->SetWorldRotationDegrees(entity, rotation);
+                        scene->SetWorldScale(entity, scale);
+                    }
+                    else
+                    {
+                        scene->SetLocalPosition(entity, position);
+                        scene->SetLocalRotationDegrees(entity, rotation);
+                        scene->SetLocalScale(entity, scale);
+                    }
                     scene->UpdateTransforms();
                     context.SceneDirty = true;
                 }
 
+                const Vec3& localPosition = transform->GetLocalPosition();
                 const Vec3& worldPosition = transform->GetWorldPosition();
+                ImGui::Text(
+                    "Local Position: %.3f, %.3f, %.3f",
+                    localPosition.x,
+                    localPosition.y,
+                    localPosition.z);
                 ImGui::Text(
                     "World Position: %.3f, %.3f, %.3f",
                     worldPosition.x,
                     worldPosition.y,
                     worldPosition.z);
             }
+        }
+        else
+        {
+            ImGui::TextUnformatted("Selected entity has no TransformComponent");
         }
 
         if (LightComponent* light = scene->GetLight(entity))

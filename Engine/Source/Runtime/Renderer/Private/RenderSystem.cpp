@@ -21,6 +21,7 @@
 #include <XEngine/Math/CameraMatrices.h>
 #include <XEngine/Math/CoordinateSystem.h>
 #include <XEngine/Math/MathFunctions.h>
+#include <XEngine/RHI/RHICommandList.h>
 #include <XEngine/RHI/RHIDevice.h>
 #include <XEngine/RHI/RHISystem.h>
 #include <XEngine/Scene/Scene.h>
@@ -53,6 +54,7 @@ namespace XEngine
         RendererDebugSettings DebugSettings;
         std::function<void()> OverlayCallback;
         std::function<bool(RenderView&)> ViewProvider;
+        std::function<bool(RHIRenderOutputDesc&)> OutputProvider;
 
         Mat4 FallbackViewProjection { 1.0f };
         u32 SwapchainWidth = 1280;
@@ -148,8 +150,26 @@ namespace XEngine
             RenderFrameContext frame;
             frame.Device = device;
             frame.CommandList = commandList;
-            frame.SwapchainWidth = SwapchainWidth;
-            frame.SwapchainHeight = SwapchainHeight;
+            RHIRenderOutputDesc output;
+            output.Viewport = RHIRect2D { 0, 0, SwapchainWidth, SwapchainHeight };
+            output.ColorFormat = device->GetSwapchainFormat();
+            output.DepthFormat = RHIFormat::D32Float;
+            output.RenderToSwapchain = true;
+            if (OutputProvider)
+            {
+                RHIRenderOutputDesc providedOutput;
+                if (OutputProvider(providedOutput) &&
+                    providedOutput.Viewport.Width > 0 &&
+                    providedOutput.Viewport.Height > 0)
+                {
+                    output = providedOutput;
+                }
+            }
+
+            commandList->SetRenderOutput(output);
+            frame.Output = output;
+            frame.SwapchainWidth = output.Viewport.Width;
+            frame.SwapchainHeight = output.Viewport.Height;
             frame.DeltaTime = deltaTime;
 
             if (EngineInstance != nullptr)
@@ -159,8 +179,8 @@ namespace XEngine
                 frame.TimeSeconds = time.GetTotalTime();
             }
 
-            const float aspect = SwapchainHeight > 0 ?
-                static_cast<float>(SwapchainWidth) / static_cast<float>(SwapchainHeight) :
+            const float aspect = frame.SwapchainHeight > 0 ?
+                static_cast<float>(frame.SwapchainWidth) / static_cast<float>(frame.SwapchainHeight) :
                 1.0f;
 
             RenderView renderView;
@@ -227,6 +247,10 @@ namespace XEngine
             Resources.FrameResources->Update(frame, SceneData);
 
             ActivePipeline->Render(frame, SceneData, Resources);
+            if (!output.RenderToSwapchain && output.ColorTarget != nullptr)
+            {
+                commandList->TransitionTextureToShaderRead(output.ColorTarget);
+            }
             if (OverlayCallback)
             {
                 OverlayCallback();
@@ -370,6 +394,14 @@ namespace XEngine
         if (m_Impl)
         {
             m_Impl->ViewProvider = std::move(provider);
+        }
+    }
+
+    void RenderSystem::SetOutputProvider(std::function<bool(RHIRenderOutputDesc&)> provider)
+    {
+        if (m_Impl)
+        {
+            m_Impl->OutputProvider = std::move(provider);
         }
     }
 

@@ -24,5 +24,10 @@ namespace XEngine
         virtual ~RHISampler() = default;
 
         virtual const RHISamplerDesc& GetDesc() const = 0;
+        virtual void* GetNativeSampler(RHIBackend backend) const
+        {
+            (void)backend;
+            return nullptr;
+        }
     };
 }

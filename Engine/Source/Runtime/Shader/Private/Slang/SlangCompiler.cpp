@@ -1,5 +1,6 @@
 #include "SlangCompiler.h"
 
+#include <XEngine/Core/ProjectPaths.h>
 #include <XEngine/Logging/Log.h>
 
 #include <filesystem>
@@ -18,22 +19,6 @@ namespace XEngine
 #else
         constexpr const char* SlangcExecutable = "";
 #endif
-
-#if defined(XENGINE_SOURCE_DIR)
-        constexpr const char* SourceDirectory = XENGINE_SOURCE_DIR;
-#else
-        constexpr const char* SourceDirectory = "";
-#endif
-
-        std::filesystem::path GetSourceRoot()
-        {
-            if (std::string(SourceDirectory).empty())
-            {
-                return std::filesystem::current_path();
-            }
-
-            return std::filesystem::path(SourceDirectory);
-        }
 
         const char* GetStageName(ShaderStage stage)
         {
@@ -121,12 +106,7 @@ namespace XEngine
             return shader;
         }
 
-        std::filesystem::path inputPath(desc.Path);
-        if (!inputPath.is_absolute())
-        {
-            inputPath = GetSourceRoot() / inputPath;
-        }
-        inputPath = std::filesystem::weakly_canonical(inputPath);
+        std::filesystem::path inputPath = ProjectPaths::Resolve(desc.Path);
 
         if (!std::filesystem::exists(inputPath))
         {
@@ -135,7 +115,7 @@ namespace XEngine
             return shader;
         }
 
-        std::filesystem::path outputDirectory = GetSourceRoot() / "Build/Generated/Shaders/Vulkan";
+        std::filesystem::path outputDirectory = ProjectPaths::Resolve("cache://Shaders/Vulkan");
         std::filesystem::create_directories(outputDirectory);
 
         std::filesystem::path outputPath = outputDirectory /
@@ -170,7 +150,7 @@ namespace XEngine
         }
 
         std::vector<std::filesystem::path> includeDirectories;
-        const std::filesystem::path shaderRoot = GetSourceRoot() / "Engine/Shaders";
+        const std::filesystem::path shaderRoot = ProjectPaths::GetShaderRoot();
 
         // Stage 8C:
         // Register shader include roots so pass shaders can share Common, Lighting,
@@ -182,7 +162,7 @@ namespace XEngine
         includeDirectories.push_back(shaderRoot / "Passes");
         for (const std::string& includeDirectory : desc.IncludeDirectories)
         {
-            includeDirectories.push_back(includeDirectory);
+            includeDirectories.push_back(ProjectPaths::Resolve(includeDirectory));
         }
 
         for (const std::filesystem::path& includeDirectory : includeDirectories)

@@ -1,0 +1,8 @@
+{
+  "startupScene": "asset://Scenes/ShadowValidation.xscene",
+  "useEditorCamera": true,
+  "showSceneHierarchy": true,
+  "showInspector": true,
+  "showRendererDebug": true,
+  "showViewportStats": true
+}

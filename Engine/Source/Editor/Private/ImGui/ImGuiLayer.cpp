@@ -1,5 +1,6 @@
 #include "ImGuiLayer.h"
 
+#include <XEngine/Core/ProjectPaths.h>
 #include <XEngine/Engine/Time.h>
 #include <XEngine/Input/InputTypes.h>
 #include <XEngine/Logging/Log.h>
@@ -19,6 +20,7 @@
 #include <imgui_impl_vulkan.h>
 
 #include <string>
+#include <filesystem>
 
 namespace XEngine
 {
@@ -80,8 +82,10 @@ namespace XEngine
         ImGuiIO& io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.IniFilename = nullptr;
 
         ImGui::StyleColorsDark();
+        LoadDockingLayout(false);
 
         SDL_Window* sdlWindow = static_cast<SDL_Window*>(window.GetNativeHandle().Window);
         if (sdlWindow == nullptr || !ImGui_ImplSDL3_InitForVulkan(sdlWindow))
@@ -112,6 +116,7 @@ namespace XEngine
             return;
         }
 
+        SaveDockingLayout();
         m_VulkanBackend.Shutdown();
         ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
@@ -170,6 +175,11 @@ namespace XEngine
         }
 
         BeginFrame();
+        if (context.ResetDockingLayoutRequested)
+        {
+            LoadDockingLayout(true);
+            context.ResetDockingLayoutRequested = false;
+        }
         mainMenuBar.Draw(context);
         DrawDockspace();
         sceneHierarchyPanel.Draw(context);
@@ -207,6 +217,44 @@ namespace XEngine
         ImGui::End();
     }
 
+    void ImGuiLayer::LoadDockingLayout(bool forceDefault)
+    {
+        const std::filesystem::path defaultLayoutPath =
+            ProjectPaths::Resolve("config://Editor/DefaultDocking.ini");
+        const std::filesystem::path userLayoutPath =
+            ProjectPaths::Resolve("saved://Config/Editor/Docking.ini");
+
+        // Config contains committed defaults; Saved contains local user state.
+        // ImGui loads the user docking ini when present and otherwise falls
+        // back to the default project layout.
+        if (forceDefault)
+        {
+            std::error_code error;
+            std::filesystem::remove(userLayoutPath, error);
+            ImGui::LoadIniSettingsFromDisk(defaultLayoutPath.string().c_str());
+            std::filesystem::create_directories(userLayoutPath.parent_path());
+            ImGui::SaveIniSettingsToDisk(userLayoutPath.string().c_str());
+            return;
+        }
+
+        const bool hasUserLayout = std::filesystem::exists(userLayoutPath);
+        const std::filesystem::path& layoutPath = hasUserLayout ? userLayoutPath : defaultLayoutPath;
+        ImGui::LoadIniSettingsFromDisk(layoutPath.string().c_str());
+        if (!hasUserLayout)
+        {
+            std::filesystem::create_directories(userLayoutPath.parent_path());
+            ImGui::SaveIniSettingsToDisk(userLayoutPath.string().c_str());
+        }
+    }
+
+    void ImGuiLayer::SaveDockingLayout()
+    {
+        const std::filesystem::path userLayoutPath =
+            ProjectPaths::Resolve("saved://Config/Editor/Docking.ini");
+        std::filesystem::create_directories(userLayoutPath.parent_path());
+        ImGui::SaveIniSettingsToDisk(userLayoutPath.string().c_str());
+    }
+
     void ImGuiLayer::RenderDebugWindow(EditorContext& context, const Time& time)
     {
         if (!m_Initialized)
@@ -242,6 +290,16 @@ namespace XEngine
     bool ImGuiLayer::WantCaptureKeyboard() const
     {
         return m_Initialized && ImGui::GetIO().WantCaptureKeyboard;
+    }
+
+    ImTextureID ImGuiLayer::RegisterTexture(RHISampler& sampler, RHITexture& texture)
+    {
+        return m_VulkanBackend.RegisterTexture(sampler, texture);
+    }
+
+    void ImGuiLayer::UnregisterTexture(ImTextureID textureId)
+    {
+        m_VulkanBackend.UnregisterTexture(textureId);
     }
 
     void ImGuiLayer::BeginFrame()

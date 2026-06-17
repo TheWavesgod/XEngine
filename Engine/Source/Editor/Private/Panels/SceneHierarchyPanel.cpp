@@ -29,15 +29,31 @@ namespace XEngine
             context.SelectedEntity = {};
         }
 
-        const std::vector<Entity> roots = scene->GetRootEntities();
+        const std::span<const Entity> roots = scene->GetRootEntities();
         if (roots.empty())
         {
             ImGui::TextUnformatted("No root entities");
         }
 
-        for (Entity entity : roots)
+        const bool rootOpen = ImGui::TreeNodeEx(
+            "SceneRoot",
+            ImGuiTreeNodeFlags_DefaultOpen |
+                ImGuiTreeNodeFlags_OpenOnArrow |
+                ImGuiTreeNodeFlags_OpenOnDoubleClick |
+                ImGuiTreeNodeFlags_SpanAvailWidth,
+            "Scene");
+        if (ImGui::IsItemClicked())
         {
-            DrawEntityNode(context, entity);
+            context.SelectedEntity = {};
+        }
+
+        if (rootOpen)
+        {
+            for (Entity entity : roots)
+            {
+                DrawEntityNode(context, entity);
+            }
+            ImGui::TreePop();
         }
 
         ImGui::End();
@@ -51,7 +67,7 @@ namespace XEngine
             return;
         }
 
-        const std::vector<Entity>& children = scene->GetChildren(entity);
+        const std::span<const Entity> children = scene->GetChildren(entity);
         ImGuiTreeNodeFlags flags =
             ImGuiTreeNodeFlags_OpenOnArrow |
             ImGuiTreeNodeFlags_OpenOnDoubleClick |

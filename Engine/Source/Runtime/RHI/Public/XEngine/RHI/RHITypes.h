@@ -129,6 +129,26 @@ namespace XEngine
         f32 A = 1.0f;
     };
 
+    struct RHIRect2D
+    {
+        u32 X = 0;
+        u32 Y = 0;
+        u32 Width = 0;
+        u32 Height = 0;
+    };
+
+    class RHITexture;
+
+    struct RHIRenderOutputDesc
+    {
+        RHITexture* ColorTarget = nullptr;
+        RHITexture* DepthTarget = nullptr;
+        RHIRect2D Viewport {};
+        RHIFormat ColorFormat = RHIFormat::BGRA8Unorm;
+        RHIFormat DepthFormat = RHIFormat::D32Float;
+        bool RenderToSwapchain = true;
+    };
+
     struct RHIPhysicalDeviceInfo
     {
         const char* Name = "";

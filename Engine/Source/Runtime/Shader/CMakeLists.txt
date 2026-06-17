@@ -20,11 +20,6 @@ target_link_libraries(XEngineShader
         XEngineCoreRuntime
 )
 
-target_compile_definitions(XEngineShader
-    PRIVATE
-        XENGINE_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
-)
-
 if(XENGINE_ENABLE_SHADER_COMPILER)
     target_compile_definitions(XEngineShader PRIVATE XENGINE_ENABLE_SHADER_COMPILER)
     target_include_directories(XEngineShader PRIVATE ${CMAKE_SOURCE_DIR}/ThirdParty/slang/include)

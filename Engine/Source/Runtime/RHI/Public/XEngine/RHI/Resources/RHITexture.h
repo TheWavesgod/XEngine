@@ -26,5 +26,10 @@ namespace XEngine
         virtual ~RHITexture() = default;
 
         virtual const RHITextureDesc& GetDesc() const = 0;
+        virtual void* GetNativeImageView(RHIBackend backend) const
+        {
+            (void)backend;
+            return nullptr;
+        }
     };
 }

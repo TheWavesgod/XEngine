@@ -59,6 +59,9 @@ Makefile
 *.swp
 *.swo
 
+# Local user state and generated runtime cache
+Saved/
+
 # IDE/editor state
 .idea/
 .vscode/

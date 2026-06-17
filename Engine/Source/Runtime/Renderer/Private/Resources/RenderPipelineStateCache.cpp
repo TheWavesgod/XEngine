@@ -79,7 +79,7 @@ namespace XEngine
         }
 
         RenderShaderKey vertexKey;
-        vertexKey.Path = "Engine/Shaders/Passes/ForwardPBR.slang";
+        vertexKey.Path = "shader://Passes/ForwardPBR.slang";
         vertexKey.EntryPoint = "vertexMain";
         vertexKey.Stage = ShaderStage::Vertex;
         vertexKey.Target = ShaderTarget::VulkanSPIRV;

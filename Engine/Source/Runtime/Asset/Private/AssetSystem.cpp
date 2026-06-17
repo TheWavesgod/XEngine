@@ -8,6 +8,7 @@
 #include <XEngine/Asset/Assets/MaterialAsset.h>
 #include <XEngine/Asset/Assets/MeshAsset.h>
 #include <XEngine/Asset/Assets/TextureAsset.h>
+#include <XEngine/Core/ProjectPaths.h>
 #include <XEngine/Logging/Log.h>
 
 #include <algorithm>
@@ -142,7 +143,8 @@ namespace XEngine
     AssetImportResult AssetSystem::ImportAsset(const std::filesystem::path& sourcePath)
     {
         AssetImportResult result;
-        if (!std::filesystem::exists(sourcePath))
+        const std::filesystem::path resolvedSourcePath = ProjectPaths::Resolve(sourcePath.generic_string());
+        if (!std::filesystem::exists(resolvedSourcePath))
         {
             result.Code = AssetImportResultCode::FileNotFound;
             result.Diagnostics = "Asset source file was not found.";
@@ -150,7 +152,7 @@ namespace XEngine
         }
 
         AssetImportContext context;
-        context.SourcePath = sourcePath.lexically_normal();
+        context.SourcePath = resolvedSourcePath.lexically_normal();
         context.RequestedType = GuessAssetTypeFromPath(context.SourcePath);
 
         if (!m_Impl->ImporterRegistry)
@@ -448,7 +450,7 @@ namespace XEngine
 
     void AssetSystem::RegisterValidationAssetMetadata()
     {
-        const std::filesystem::path validationRoot = "Assets/models/gltf";
+        const std::filesystem::path validationRoot = ProjectPaths::GetAssetRoot() / "Models/gltf";
         if (!std::filesystem::exists(validationRoot))
         {
             return;

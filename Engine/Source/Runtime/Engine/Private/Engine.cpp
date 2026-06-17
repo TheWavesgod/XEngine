@@ -2,6 +2,7 @@
 
 #include <XEngine/Asset/AssetSystem.h>
 #include <XEngine/Core/Assert.h>
+#include <XEngine/Core/ProjectPaths.h>
 #include <XEngine/Engine/SubsystemContext.h>
 #include <XEngine/Input/InputSystem.h>
 #include <XEngine/Logging/Log.h>
@@ -36,6 +37,7 @@ namespace XEngine
         m_Config = config;
 
         Log::Initialize();
+        ProjectPaths::Initialize();
 
         std::string message = "Initializing engine: ";
         message += m_Config.ApplicationName;

@@ -3,6 +3,7 @@
 #include <XEngine/Engine/Subsystem.h>
 #include <XEngine/Renderer/RendererDebugSettings.h>
 #include <XEngine/Renderer/RenderView.h>
+#include <XEngine/RHI/RHITypes.h>
 
 #include <functional>
 #include <memory>
@@ -21,6 +22,7 @@ namespace XEngine
 
         void SetOverlayCallback(std::function<void()> callback);
         void SetViewProvider(std::function<bool(RenderView&)> provider);
+        void SetOutputProvider(std::function<bool(RHIRenderOutputDesc&)> provider);
         RendererDebugSettings& GetDebugSettings();
         const RendererDebugSettings& GetDebugSettings() const;
 

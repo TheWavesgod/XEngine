@@ -22,6 +22,7 @@ namespace XEngine
 
         VkImage GetImage() const;
         VkImageView GetImageView() const;
+        void* GetNativeImageView(RHIBackend backend) const override;
         VkImageLayout* GetLayoutPtr();
 
     private:

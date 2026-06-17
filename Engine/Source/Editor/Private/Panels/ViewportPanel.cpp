@@ -4,6 +4,9 @@
 
 #include <imgui.h>
 
+#include <algorithm>
+#include <cmath>
+
 namespace XEngine
 {
     void ViewportPanel::Draw(EditorContext& context)
@@ -15,7 +18,11 @@ namespace XEngine
             return;
         }
 
-        ImGui::Begin("Viewport", &context.ShowViewport, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        ImGui::Begin(
+            "Viewport",
+            &context.ShowViewport,
+            ImGuiWindowFlags_NoScrollbar |
+                ImGuiWindowFlags_NoScrollWithMouse);
 
         context.ViewportHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
         context.ViewportFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
@@ -26,12 +33,24 @@ namespace XEngine
             available.x > 1.0f ? available.x : 1.0f,
             available.y > 1.0f ? available.y : 1.0f);
         const ImVec2 contentMax(contentMin.x + viewportSize.x, contentMin.y + viewportSize.y);
+        // The panel only requests a resize when its content size changes; the
+        // render target is recreated by EditorSystem on the following frame.
+        context.ViewportWidth = static_cast<u32>(std::max(1.0f, std::round(viewportSize.x)));
+        context.ViewportHeight = static_cast<u32>(std::max(1.0f, std::round(viewportSize.y)));
 
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
-        drawList->AddRectFilled(contentMin, contentMax, IM_COL32(28, 30, 34, 255));
-        drawList->AddRect(contentMin, contentMax, IM_COL32(80, 86, 96, 255));
+        if (context.ViewportTextureId != 0)
+        {
+            ImGui::Image(static_cast<ImTextureID>(context.ViewportTextureId), viewportSize);
+        }
+        else
+        {
+            ImGui::InvisibleButton("ViewportImageFallback", viewportSize);
+        }
 
+        ImGui::SetCursorScreenPos(contentMin);
         ImGui::InvisibleButton("ViewportRegion", viewportSize);
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        drawList->AddRect(contentMin, contentMax, IM_COL32(80, 86, 96, 255));
 
         const bool canCapture =
             context.UseEditorCamera &&

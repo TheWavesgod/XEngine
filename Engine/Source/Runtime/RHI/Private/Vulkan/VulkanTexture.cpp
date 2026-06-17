@@ -147,6 +147,11 @@ namespace XEngine
         return m_ImageView;
     }
 
+    void* VulkanTexture::GetNativeImageView(RHIBackend backend) const
+    {
+        return backend == RHIBackend::Vulkan ? m_ImageView : nullptr;
+    }
+
     VkImageLayout* VulkanTexture::GetLayoutPtr()
     {
         return &m_Layout;

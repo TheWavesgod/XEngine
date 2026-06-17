@@ -7,8 +7,10 @@
 #include "Panels/RendererDebugPanel.h"
 #include "Panels/SceneHierarchyPanel.h"
 #include "Panels/ViewportPanel.h"
+#include "Viewport/EditorViewportRenderTarget.h"
 
 #include <XEngine/Asset/AssetSystem.h>
+#include <XEngine/Core/ProjectPaths.h>
 #include <XEngine/Engine/Engine.h>
 #include <XEngine/Engine/SubsystemManager.h>
 #include <XEngine/Logging/Log.h>
@@ -18,10 +20,37 @@
 #include <XEngine/Renderer/RenderSystem.h>
 #include <XEngine/RHI/RHIDevice.h>
 #include <XEngine/RHI/RHISystem.h>
+#include <XEngine/Scene/SceneSerializer.h>
 #include <XEngine/Scene/SceneSystem.h>
+#include <XEngine/Serialization/JsonSerialization.h>
+#include <XEngine/Serialization/SerializationContext.h>
+
+#include <algorithm>
 
 namespace XEngine
 {
+    namespace
+    {
+        void LoadDefaultEditorSettings(EditorContext& context)
+        {
+            JsonSerialization::Json settings;
+            if (!JsonSerialization::LoadJsonFile(
+                    ProjectPaths::Resolve("config://Editor/DefaultEditorSettings.json"),
+                    settings))
+            {
+                return;
+            }
+
+            context.CurrentScenePath = settings.value(
+                "startupScene",
+                context.CurrentScenePath.generic_string());
+            context.UseEditorCamera = settings.value("useEditorCamera", context.UseEditorCamera);
+            context.ShowSceneHierarchy = settings.value("showSceneHierarchy", context.ShowSceneHierarchy);
+            context.ShowInspector = settings.value("showInspector", context.ShowInspector);
+            context.ShowRendererDebug = settings.value("showRendererDebug", context.ShowRendererDebug);
+        }
+    }
+
     EditorSystem::EditorSystem() = default;
 
     EditorSystem::~EditorSystem()
@@ -55,8 +84,33 @@ namespace XEngine
         m_Context.ActiveScene = sceneSystem != nullptr ? sceneSystem->GetActiveScene() : nullptr;
         m_Context.Assets = assetSystem;
         m_Context.RendererDebug = &renderSystem->GetDebugSettings();
-        m_Context.CurrentScenePath = "Assets/Scenes/Default.xscene";
+        m_Context.CurrentScenePath = "asset://Scenes/Default.xscene";
+        LoadDefaultEditorSettings(m_Context);
         m_Window = window;
+
+        if (m_Context.ActiveScene != nullptr)
+        {
+            SerializationContext serializationContext;
+            serializationContext.Assets = m_Context.Assets;
+
+            // Editor startup uses the Runtime SceneSerializer; Editor only
+            // selects the fixed stage default scene path.
+            SceneSerializer serializer(serializationContext);
+            if (serializer.LoadFromFile(*m_Context.ActiveScene, m_Context.CurrentScenePath))
+            {
+                m_Context.SceneDirty = false;
+                m_Context.SelectedEntity = {};
+                XENGINE_LOG_INFO(
+                    std::string("Loaded editor startup scene: ") +
+                    m_Context.CurrentScenePath.generic_string());
+            }
+            else
+            {
+                XENGINE_LOG_ERROR(
+                    std::string("Failed to load editor startup scene: ") +
+                    m_Context.CurrentScenePath.generic_string());
+            }
+        }
 
         m_ImGuiLayer = std::make_unique<ImGuiLayer>();
         if (!m_ImGuiLayer->Initialize(*window, *device))
@@ -69,20 +123,36 @@ namespace XEngine
         m_InspectorPanel = std::make_unique<InspectorPanel>();
         m_RendererDebugPanel = std::make_unique<RendererDebugPanel>();
         m_ViewportPanel = std::make_unique<ViewportPanel>();
+        m_ViewportRenderTarget = std::make_unique<EditorViewportRenderTarget>();
         m_FreeCameraController = std::make_unique<FreeCameraController>();
+        UpdateViewportRenderTarget();
 
         renderSystem->SetViewProvider(
             [this](RenderView& outView)
             {
-                if (!m_Context.UseEditorCamera || m_Window == nullptr)
+                if (!m_Context.UseEditorCamera)
                 {
                     return false;
                 }
 
-                const float aspect = m_Window->GetHeight() > 0 ?
-                    static_cast<float>(m_Window->GetWidth()) / static_cast<float>(m_Window->GetHeight()) :
+                const float aspect = m_Context.ViewportHeight > 0 ?
+                    static_cast<float>(m_Context.ViewportWidth) / static_cast<float>(m_Context.ViewportHeight) :
                     1.0f;
                 outView = m_Context.Camera.BuildRenderView(aspect);
+                return true;
+            });
+
+        renderSystem->SetOutputProvider(
+            [this](RHIRenderOutputDesc& outOutput)
+            {
+                if (m_ViewportRenderTarget == nullptr || !m_ViewportRenderTarget->IsValid())
+                {
+                    return false;
+                }
+
+                // Editor renders the scene offscreen so ImGui owns swapchain
+                // composition and can place the image inside the Viewport panel.
+                outOutput = m_ViewportRenderTarget->BuildRenderOutput();
                 return true;
             });
 
@@ -121,10 +191,18 @@ namespace XEngine
             {
                 renderSystem->SetOverlayCallback({});
                 renderSystem->SetViewProvider({});
+                renderSystem->SetOutputProvider({});
             }
         }
 
         ReleaseViewportCapture();
+        if (m_ImGuiLayer != nullptr && m_ViewportTextureId != 0)
+        {
+            m_ImGuiLayer->UnregisterTexture(static_cast<ImTextureID>(m_ViewportTextureId));
+            m_ViewportTextureId = 0;
+        }
+        m_Context.ViewportTextureId = 0;
+        m_ViewportRenderTarget.reset();
         if (m_ImGuiLayer)
         {
             m_ImGuiLayer->Shutdown();
@@ -201,6 +279,7 @@ namespace XEngine
         {
             m_Context.RendererDebug = &renderSystem->GetDebugSettings();
         }
+        UpdateViewportRenderTarget();
     }
 
     void EditorSystem::ReleaseViewportCapture()
@@ -225,5 +304,56 @@ namespace XEngine
         m_CaptureApplied = shouldCapture;
         m_Window->SetCursorVisible(!shouldCapture);
         m_Window->SetRelativeMouseMode(shouldCapture);
+    }
+
+    void EditorSystem::UpdateViewportRenderTarget()
+    {
+        if (m_Engine == nullptr || m_ImGuiLayer == nullptr || m_ViewportRenderTarget == nullptr)
+        {
+            return;
+        }
+
+        RHISystem* rhiSystem = m_Engine->GetSubsystemManager().GetSubsystem<RHISystem>();
+        RHIDevice* device = rhiSystem != nullptr ? rhiSystem->GetDevice() : nullptr;
+        if (device == nullptr)
+        {
+            return;
+        }
+
+        const u32 width = std::max(1u, m_Context.ViewportWidth);
+        const u32 height = std::max(1u, m_Context.ViewportHeight);
+        const bool changed =
+            m_ViewportRenderTarget->GetWidth() != width ||
+            m_ViewportRenderTarget->GetHeight() != height ||
+            !m_ViewportRenderTarget->IsValid();
+        if (!changed)
+        {
+            return;
+        }
+
+        device->WaitIdle();
+        if (m_ViewportTextureId != 0)
+        {
+            m_ImGuiLayer->UnregisterTexture(static_cast<ImTextureID>(m_ViewportTextureId));
+            m_ViewportTextureId = 0;
+            m_Context.ViewportTextureId = 0;
+        }
+
+        // Recreate only when the ImGui Viewport content size changes. The size
+        // is collected by the panel and applied on the following frame.
+        if (!m_ViewportRenderTarget->Resize(*device, width, height))
+        {
+            return;
+        }
+
+        RHITexture* colorTexture = m_ViewportRenderTarget->GetColorTexture();
+        RHISampler* sampler = m_ViewportRenderTarget->GetSampler();
+        if (colorTexture == nullptr || sampler == nullptr)
+        {
+            return;
+        }
+
+        m_ViewportTextureId = static_cast<u64>(m_ImGuiLayer->RegisterTexture(*sampler, *colorTexture));
+        m_Context.ViewportTextureId = m_ViewportTextureId;
     }
 }

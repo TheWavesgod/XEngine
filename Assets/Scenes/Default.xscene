@@ -80,8 +80,8 @@
                 ]
             },
             "MeshRenderer": {
-                "mesh": "Assets/Models/gltf/DamagedHelmet/DamagedHelmet.gltf",
-                "material": "Assets/Models/gltf/DamagedHelmet/DamagedHelmet.gltf",
+                "mesh": "asset://Models/gltf/DamagedHelmet/DamagedHelmet.gltf",
+                "material": "asset://Models/gltf/DamagedHelmet/DamagedHelmet.gltf",
                 "visible": true,
                 "castShadow": true,
                 "receiveShadow": true

@@ -3,6 +3,7 @@
 #include <XEngine/Editor/EditorCamera.h>
 #include <XEngine/Renderer/RendererDebugSettings.h>
 #include <XEngine/Scene/Entity.h>
+#include <XEngine/Core/Types.h>
 
 #include <filesystem>
 
@@ -15,6 +16,12 @@ namespace XEngine
     {
         UI,
         CameraCapture
+    };
+
+    enum class TransformEditSpace
+    {
+        World,
+        Local
     };
 
     struct EditorContext
@@ -33,12 +40,17 @@ namespace XEngine
         ViewportInputMode ViewportInputMode = ViewportInputMode::UI;
         bool ViewportHovered = false;
         bool ViewportFocused = false;
+        u32 ViewportWidth = 1;
+        u32 ViewportHeight = 1;
+        u64 ViewportTextureId = 0;
         bool UseEditorCamera = true;
         EditorCamera Camera;
+        TransformEditSpace TransformSpace = TransformEditSpace::World;
 
         bool ShowSceneHierarchy = true;
         bool ShowInspector = true;
         bool ShowRendererDebug = true;
         bool ShowViewport = true;
+        bool ResetDockingLayoutRequested = false;
     };
 }

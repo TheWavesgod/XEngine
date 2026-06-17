@@ -8,6 +8,9 @@ namespace XEngine
 {
     void TransformSystem::Update(Scene& scene)
     {
+        // Transform traversal starts at the implicit SceneRoot child list.
+        // Entities without TransformComponent still pass the inherited parent
+        // transform to children, enabling empty grouping entities later.
         for (Entity root : scene.GetRootEntities())
         {
             UpdateRecursive(scene, root, nullptr);

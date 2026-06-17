@@ -8,6 +8,7 @@
 namespace XEngine
 {
     class FreeCameraController;
+    class EditorViewportRenderTarget;
     class ImGuiLayer;
     class InspectorPanel;
     class MainMenuBar;
@@ -30,6 +31,7 @@ namespace XEngine
     private:
         void ReleaseViewportCapture();
         void ApplyViewportCaptureState();
+        void UpdateViewportRenderTarget();
 
         EditorContext m_Context;
         Engine* m_Engine = nullptr;
@@ -40,7 +42,9 @@ namespace XEngine
         std::unique_ptr<InspectorPanel> m_InspectorPanel;
         std::unique_ptr<RendererDebugPanel> m_RendererDebugPanel;
         std::unique_ptr<ViewportPanel> m_ViewportPanel;
+        std::unique_ptr<EditorViewportRenderTarget> m_ViewportRenderTarget;
         std::unique_ptr<FreeCameraController> m_FreeCameraController;
+        u64 m_ViewportTextureId = 0;
         bool m_CaptureApplied = false;
         bool m_Initialized = false;
     };

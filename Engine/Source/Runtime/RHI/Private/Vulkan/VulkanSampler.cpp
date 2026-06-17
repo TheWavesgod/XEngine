@@ -73,4 +73,9 @@ namespace XEngine
     {
         return m_Sampler;
     }
+
+    void* VulkanSampler::GetNativeSampler(RHIBackend backend) const
+    {
+        return backend == RHIBackend::Vulkan ? m_Sampler : nullptr;
+    }
 }

@@ -424,6 +424,17 @@ Stage 8E-3 adds practical editor scene/debug panels.
 
 Stage 8E-3 does not implement CSM, shadow maps, DebugDraw, picking, gizmos, asset browser, undo/redo, prefab, material editor, project system, or native file dialogs.
 
+Stage 8F adds path/config and hierarchy editing foundations.
+
+- CMake generates development fallback roots consumed by `ProjectPaths`.
+- Runtime resolves `project://`, `engine://`, `asset://`, `shader://`, `config://`, `saved://`, and `cache://`.
+- Shader compilation writes to `Saved/Cache/Shaders/Vulkan`.
+- Editor loads default settings and docking layout from `Config/`, and writes user docking state under `Saved/`.
+- Scene hierarchy stores implicit SceneRoot children explicitly and rejects cyclic parenting.
+- Inspector transform editing defaults to World space, with Local editing only for child entities.
+
+Stage 8F does not implement project-root search, CSM, prefabs, undo/redo, drag/drop reparenting, gizmos, or a full config system.
+
 Stage 2B-2 adds:
 - Vulkan swapchain creation
 - Swapchain image views

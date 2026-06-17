@@ -1,0 +1,9 @@
+#pragma once
+
+namespace XEngine::BuildPaths
+{
+    // CMake writes development fallback roots into the build tree so local
+    // editor/debugger runs do not depend on the process working directory.
+    inline constexpr const char* DevEngineRoot = "@XENGINE_DEV_ENGINE_ROOT@";
+    inline constexpr const char* DevProjectRoot = "@XENGINE_DEV_PROJECT_ROOT@";
+}
