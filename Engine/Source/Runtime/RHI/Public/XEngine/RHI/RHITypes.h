@@ -57,6 +57,7 @@ namespace XEngine
     enum class RHITextureDimension
     {
         Texture2D,
+        Texture2DArray,
         TextureCube
     };
 

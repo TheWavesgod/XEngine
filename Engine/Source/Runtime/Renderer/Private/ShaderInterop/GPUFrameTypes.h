@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GPULightingTypes.h"
+#include "GPUShadowTypes.h"
 
 #include <XEngine/Math/MathTypes.h>
 
@@ -26,6 +27,7 @@ namespace XEngine
     {
         GPUCameraData Camera;
         GPULightingData Lighting;
+        GPUShadowData Shadows;
     };
 
     static_assert(sizeof(Mat4) == sizeof(float) * 16);

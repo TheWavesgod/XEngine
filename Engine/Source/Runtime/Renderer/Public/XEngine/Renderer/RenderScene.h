@@ -17,10 +17,14 @@ namespace XEngine
         Mat4 WorldMatrix { 1.0f };
         Mat4 PreviousWorldMatrix { 1.0f };
 
+        AABB WorldBounds {};
+
         MeshHandle Mesh;
         MaterialHandle Material;
 
-        AABB WorldBounds {};
+        bool Visible = true;
+        bool CastShadow = true; 
+        bool ReceiveShadow = true;
 
         u32 ObjectId = 0;
         u32 Flags = 0;

@@ -15,6 +15,8 @@ file(GLOB_RECURSE XENGINE_RENDERER_SOURCES CONFIGURE_DEPENDS
     Private/Scene/*.h
     Private/Scene/*.cpp
     Private/RenderSystem.cpp
+    Private/Shadows/*.h
+    Private/Shadows/*.cpp
 )
 
 add_library(XEngineRenderer ${XENGINE_RENDERER_SOURCES})
