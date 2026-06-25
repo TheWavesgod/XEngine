@@ -1,5 +1,6 @@
 #include "VulkanBuffer.h"
 
+#include "VulkanDevice.h"
 #include "VulkanUtils.h"
 
 #include <XEngine/Logging/Log.h>
@@ -39,11 +40,14 @@ namespace XEngine
     }
 
     VulkanBuffer::VulkanBuffer(
+        VulkanDevice& device,
         VmaAllocator allocator,
         const RHIBufferDesc& desc,
         const void* initialData,
         std::size_t initialDataSize)
-        : m_Allocator(allocator)
+        : RHIBuffer(device)
+        , m_Device(device.GetHandle())
+        , m_Allocator(allocator)
         , m_Size(desc.Size)
     {
         if (m_Allocator == VK_NULL_HANDLE || desc.Size == 0)

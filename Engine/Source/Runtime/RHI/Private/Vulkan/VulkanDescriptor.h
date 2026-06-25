@@ -12,7 +12,7 @@ namespace XEngine
         VulkanBindGroupLayout() = default;
         ~VulkanBindGroupLayout() override;
 
-        bool Create(VkDevice device, const RHIBindGroupLayoutDesc& desc);
+        bool Create(class VulkanDevice& device, const RHIBindGroupLayoutDesc& desc);
         void Destroy();
 
         VkDescriptorSetLayout GetHandle() const;
@@ -31,7 +31,7 @@ namespace XEngine
         ~VulkanBindGroup() override;
 
         bool Create(
-            VkDevice device,
+            class VulkanDevice& device,
             VkDescriptorPool descriptorPool,
             const RHIBindGroupDesc& desc);
 

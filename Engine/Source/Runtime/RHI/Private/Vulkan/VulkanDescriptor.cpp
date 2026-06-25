@@ -1,6 +1,8 @@
 #include "VulkanDescriptor.h"
 
 #include "VulkanBuffer.h"
+#include "VulkanCheckedCast.h"
+#include "VulkanDevice.h"
 #include "VulkanSampler.h"
 #include "VulkanTexture.h"
 #include "VulkanUtils.h"
@@ -17,15 +19,14 @@ namespace XEngine
         Destroy();
     }
 
-    bool VulkanBindGroupLayout::Create(VkDevice device, const RHIBindGroupLayoutDesc& desc)
+    bool VulkanBindGroupLayout::Create(VulkanDevice& device, const RHIBindGroupLayoutDesc& desc)
     {
-        if (device == VK_NULL_HANDLE)
+        m_Device = device.GetHandle();
+        if (m_Device == VK_NULL_HANDLE)
         {
             XENGINE_LOG_ERROR("Cannot create Vulkan bind group layout without a valid device");
             return false;
         }
-
-        m_Device = device;
 
         std::vector<VkDescriptorSetLayoutBinding> bindings;
         bindings.reserve(desc.Entries.size());
@@ -91,24 +92,25 @@ namespace XEngine
     }
 
     bool VulkanBindGroup::Create(
-        VkDevice device,
+        VulkanDevice& device,
         VkDescriptorPool descriptorPool,
         const RHIBindGroupDesc& desc)
     {
-        if (device == VK_NULL_HANDLE || descriptorPool == VK_NULL_HANDLE || desc.Layout == nullptr)
+        m_Device = device.GetHandle();
+        if (m_Device == VK_NULL_HANDLE || descriptorPool == VK_NULL_HANDLE || desc.Layout == nullptr)
         {
             XENGINE_LOG_ERROR("Cannot create Vulkan bind group without device, descriptor pool, and layout");
             return false;
         }
 
-        auto* layout = dynamic_cast<VulkanBindGroupLayout*>(desc.Layout);
+        VulkanDevice& deviceRef = static_cast<VulkanDevice&>(desc.Layout->GetOwnerDevice());
+        auto* layout = CheckedVulkanCast<VulkanBindGroupLayout>(desc.Layout, deviceRef);
         if (layout == nullptr || layout->GetHandle() == VK_NULL_HANDLE)
         {
             XENGINE_LOG_ERROR("Vulkan bind group requires a valid Vulkan bind group layout");
             return false;
         }
 
-        m_Device = device;
         m_DescriptorPool = descriptorPool;
 
         VkDescriptorSetLayout vkLayout = layout->GetHandle();
@@ -138,8 +140,10 @@ namespace XEngine
         {
             if (resource.Type == RHIBindingType::CombinedImageSampler)
             {
-                auto* texture = dynamic_cast<VulkanTexture*>(resource.Texture);
-                auto* sampler = dynamic_cast<VulkanSampler*>(resource.Sampler);
+                XENGINE_ASSERT(resource.Texture != nullptr && resource.Sampler != nullptr, "Combined image sampler binding requires non-null texture and sampler");
+                VulkanDevice& deviceRef = static_cast<VulkanDevice&>(resource.Texture->GetOwnerDevice());
+                auto* texture = CheckedVulkanCast<VulkanTexture>(resource.Texture, deviceRef);
+                auto* sampler = CheckedVulkanCast<VulkanSampler>(resource.Sampler, deviceRef);
                 if (texture == nullptr || sampler == nullptr ||
                     texture->GetImageView() == VK_NULL_HANDLE || sampler->GetHandle() == VK_NULL_HANDLE)
                 {
@@ -166,7 +170,9 @@ namespace XEngine
 
             if (resource.Type == RHIBindingType::UniformBuffer || resource.Type == RHIBindingType::StorageBuffer)
             {
-                auto* buffer = dynamic_cast<VulkanBuffer*>(resource.Buffer);
+                XENGINE_ASSERT(resource.Buffer != nullptr, "Buffer binding requires a non-null RHIBuffer");
+                VulkanDevice& deviceRef = static_cast<VulkanDevice&>(resource.Buffer->GetOwnerDevice());
+                auto* buffer = CheckedVulkanCast<VulkanBuffer>(resource.Buffer, deviceRef);
                 if (buffer == nullptr || buffer->GetHandle() == VK_NULL_HANDLE)
                 {
                     XENGINE_LOG_ERROR("Buffer binding requires a valid Vulkan buffer");

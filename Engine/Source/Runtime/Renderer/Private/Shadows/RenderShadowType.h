@@ -26,6 +26,8 @@ namespace XEngine
         u32 Resolution = 0;
 
         Vec4 ShadowMapSize = Vec4(0.0f);
+        
+        // x = depth bias   y = normal bias   z = slope-scaled bias factor   w = reserved
         Vec4 BiasParams = Vec4(0.0f);
 
         AABB WorldBounds;
@@ -55,3 +57,34 @@ namespace XEngine
         RenderDirectionalShadowFrameData Directional;
     };
 }
+
+// struct RenderShadowCascade
+// {
+//     Mat4 LightView = Mat4(1.0f);
+//     Mat4 LightProjection = Mat4(1.0f);
+//     Mat4 LightViewProjection = Mat4(1.0f);
+
+//     float SplitNear = 0.0f;
+//     float SplitFar = 0.0f;
+
+//     u32 LayerIndex = 0;
+//     u32 Resolution = 0;
+
+//     // x = width, y = height, z = 1.0/width, w = 1.0/height
+//     Vec4 ShadowMapSize = Vec4(0.0f);
+
+//     // x = depth bias (light-space z offset)
+//     // y = normal bias
+//     // z = slope-scaled bias factor
+//     // w = reserved (future receiver-plane bias)
+//     // Must match the GPU-side GPUCascadeShadowData.Params layout.
+//     Vec4 BiasParams = Vec4(0.0f);
+
+//     AABB WorldBounds;
+//     AABB LightSpaceBounds;
+// };
+
+// static_assert(std::is_standard_layout_v<RenderShadowCascade>,
+//     "RenderShadowCascade must be standard-layout for predictable memory layout");
+// static_assert(sizeof(RenderShadowCascade) % 16 == 0,
+//     "RenderShadowCascade size should be 16-byte aligned");

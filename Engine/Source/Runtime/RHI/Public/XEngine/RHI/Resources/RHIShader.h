@@ -1,6 +1,7 @@
 #pragma once
 
 #include <XEngine/Core/Types.h>
+#include <XEngine/RHI/RHIResource.h>
 #include <XEngine/Shader/ShaderTypes.h>
 
 #include <cstddef>
@@ -22,12 +23,15 @@ namespace XEngine
         const char* DebugName = nullptr;
     };
 
-    class RHIShader
+    class RHIShader : public RHIResource
     {
     public:
-        virtual ~RHIShader() = default;
+        ~RHIShader() override = default;
 
         virtual ShaderStage GetStage() const = 0;
         virtual ShaderTarget GetTarget() const = 0;
+
+    protected:
+        explicit RHIShader(RHIDevice& ownerDevice);
     };
 }

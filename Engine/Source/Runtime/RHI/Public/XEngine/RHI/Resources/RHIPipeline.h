@@ -1,6 +1,7 @@
 #pragma once
 
 #include <XEngine/RHI/RHITypes.h>
+#include <XEngine/RHI/RHIResource.h>
 #include <XEngine/Shader/ShaderTypes.h>
 
 #include <vector>
@@ -31,6 +32,11 @@ namespace XEngine
         RHIFormat ColorFormat = RHIFormat::BGRA8Unorm;
         RHIFormat DepthFormat = RHIFormat::D32Float;
 
+        // True for color-writing pipelines. False for depth-only pipelines
+        // (e.g. ShadowDepth). When false, ColorFormat is ignored and
+        // the backend will skip color attachment setup.
+        bool HasColorAttachment = true;
+
         bool EnableDepthTest = true;
         bool EnableDepthWrite = true;
 
@@ -44,9 +50,12 @@ namespace XEngine
         const char* DebugName = nullptr;
     };
 
-    class RHIPipeline
+    class RHIPipeline : public RHIResource   
     {
     public:
-        virtual ~RHIPipeline() = default;
+        ~RHIPipeline() override = default;    
+
+    protected:                                 
+        explicit RHIPipeline(RHIDevice& ownerDevice);
     };
 }

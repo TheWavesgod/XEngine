@@ -30,4 +30,13 @@ namespace XEngine
 
         std::array<GPUCascadeShadowData, MaxShadowCascades> Cascades;
     };
+
+    static_assert(std::is_standard_layout_v<GPUCascadeShadowData>,
+        "GPUCascadeShadowData must be standard-layout for shader interop");
+    static_assert(std::is_standard_layout_v<GPUShadowData>,
+        "GPUShadowData must be standard-layout for shader interop");
+    static_assert(sizeof(GPUCascadeShadowData) == 80,
+        "GPUCascadeShadowData must be Mat4 (64B) + Vec4 (16B) = 80B");
+    static_assert(sizeof(GPUShadowData) == 16 + MaxShadowCascades * 80,
+        "GPUShadowData size must match Slang-side layout");
 }

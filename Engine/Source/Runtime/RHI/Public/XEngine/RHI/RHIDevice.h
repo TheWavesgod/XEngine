@@ -9,6 +9,7 @@
 #include <XEngine/RHI/Resources/RHISampler.h>
 #include <XEngine/RHI/Resources/RHIShader.h>
 #include <XEngine/RHI/Resources/RHITexture.h>
+#include <XEngine/RHI/Resources/RHITextureView.h>
 
 #include <cstddef>
 #include <functional>
@@ -42,15 +43,27 @@ namespace XEngine
             const void* initialData,
             std::size_t initialDataSize) = 0;
 
-        // TODO Stage 8/10:
+        // TODO: Stage 8/10:
         // Split RHIDevice resource creation into RHIResourceFactory and texture uploads into RHIUploadManager.
         virtual std::shared_ptr<RHITexture> CreateTexture(
             const RHITextureDesc& desc,
             const void* initialData,
             std::size_t initialDataSize) = 0;
 
+        virtual std::shared_ptr<RHITextureView> CreateTextureView(
+            const RHITextureViewDesc& desc) = 0;
+
         virtual std::shared_ptr<RHISampler> CreateSampler(
             const RHISamplerDesc& desc) = 0;
+
+        // Update an existing bind group's sampled-texture binding in-place.
+        // Used by RenderFrameResources to swap shadow texture / sampler when
+        // ShadowResourceCache rebuilds the shadow array.
+        virtual void UpdateBindGroupSampledTexture(
+            RHIBindGroup* bindGroup,
+            u32 binding,
+            RHITextureView* view,
+            RHISampler* sampler) = 0;  // TODO: is really needed to do it here
 
         virtual std::shared_ptr<RHIBindGroupLayout> CreateBindGroupLayout(
             const RHIBindGroupLayoutDesc& desc) = 0;

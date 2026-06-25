@@ -1,5 +1,5 @@
 #include "VulkanTexture.h"
-
+#include "VulkanDevice.h"
 #include "VulkanUtils.h"
 
 #include <XEngine/Logging/Log.h>
@@ -28,8 +28,9 @@ namespace XEngine
         }
     }
 
-    VulkanTexture::VulkanTexture(VkDevice device, VmaAllocator allocator, const RHITextureDesc& desc)
-        : m_Device(device)
+    VulkanTexture::VulkanTexture(VulkanDevice& device, VmaAllocator allocator, const RHITextureDesc& desc)
+        : RHITexture(device)
+        , m_Device(device.GetHandle())
         , m_Allocator(allocator)
         , m_Desc(desc)
     {
@@ -147,7 +148,7 @@ namespace XEngine
         return m_ImageView;
     }
 
-    void* VulkanTexture::GetNativeImageView(RHIBackend backend) const
+    void* VulkanTexture::GetNativeDefaultView(RHIBackend backend) const
     {
         return backend == RHIBackend::Vulkan ? m_ImageView : nullptr;
     }

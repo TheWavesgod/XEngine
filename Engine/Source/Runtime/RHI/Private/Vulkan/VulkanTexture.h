@@ -11,7 +11,7 @@ namespace XEngine
     {
     public:
         VulkanTexture() = default;
-        VulkanTexture(VkDevice device, VmaAllocator allocator, const RHITextureDesc& desc);
+        VulkanTexture(class VulkanDevice& device, VmaAllocator allocator, const RHITextureDesc& desc);
         ~VulkanTexture() override;
 
         VulkanTexture(const VulkanTexture&) = delete;
@@ -22,7 +22,7 @@ namespace XEngine
 
         VkImage GetImage() const;
         VkImageView GetImageView() const;
-        void* GetNativeImageView(RHIBackend backend) const override;
+        void* GetNativeDefaultView(RHIBackend backend) const override;
         VkImageLayout* GetLayoutPtr();
 
     private:

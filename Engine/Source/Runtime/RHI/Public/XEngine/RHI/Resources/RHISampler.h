@@ -1,6 +1,7 @@
 #pragma once
 
 #include <XEngine/RHI/RHITypes.h>
+#include <XEngine/RHI/RHIResource.h>
 
 namespace XEngine
 {
@@ -18,10 +19,10 @@ namespace XEngine
         const char* DebugName = nullptr;
     };
 
-    class RHISampler
+    class RHISampler : public RHIResource
     {
     public:
-        virtual ~RHISampler() = default;
+        ~RHISampler() override = default;
 
         virtual const RHISamplerDesc& GetDesc() const = 0;
         virtual void* GetNativeSampler(RHIBackend backend) const
@@ -29,5 +30,8 @@ namespace XEngine
             (void)backend;
             return nullptr;
         }
+
+    protected:
+        explicit RHISampler(RHIDevice& ownerDevice);
     };
 }

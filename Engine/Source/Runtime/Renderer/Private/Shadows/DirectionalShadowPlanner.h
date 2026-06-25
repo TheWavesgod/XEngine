@@ -18,6 +18,9 @@ namespace XEngine
         float CameraFar = 1000.0f; 
         Vec3 CameraPosition = Vec3(0.0f); 
         
+        // Aggregate world-space AABB of all shadow-casting OpaqueObjects.
+        // RenderShadowManager builds this by CombineAABB'ing every
+        // RenderObject.WorldBounds where object.CastShadow == true.
         AABB SceneBounds; 
         
         u32 CascadeCount = 4; 
@@ -28,6 +31,8 @@ namespace XEngine
         float NormalBias = 0.0f; 
         
         bool StabilizeCascades = true; 
+
+        bool ReverseZ = true;
     };
 
 /*

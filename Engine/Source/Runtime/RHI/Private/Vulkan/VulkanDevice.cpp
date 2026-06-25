@@ -326,6 +326,7 @@ namespace XEngine
         m_FrameActive = true;
 
         m_CommandList.BeginFrame(
+            *this,
             m_FrameResources.GetCommandBuffer(),
             m_Swapchain.GetImage(m_CurrentImageIndex),
             m_Swapchain.GetImageView(m_CurrentImageIndex),
@@ -503,7 +504,7 @@ namespace XEngine
 
     std::shared_ptr<RHIShader> VulkanDevice::CreateShader(const RHIShaderDesc& desc)
     {
-        auto vulkanShader = std::make_shared<VulkanShader>(m_Device, desc);
+        auto vulkanShader = std::make_shared<VulkanShader>(*this, desc);
         if (!vulkanShader->IsValid())
         {
             return nullptr;
@@ -518,7 +519,7 @@ namespace XEngine
         const void* initialData,
         std::size_t initialDataSize)
     {
-        auto buffer = std::make_shared<VulkanBuffer>(m_Allocator.GetHandle(), desc, initialData, initialDataSize);
+        auto buffer = std::make_shared<VulkanBuffer>(*this, m_Allocator.GetHandle(), desc, initialData, initialDataSize);
         if (!buffer->IsValid())
         {
             return nullptr;
@@ -532,7 +533,7 @@ namespace XEngine
         const void* initialData,
         std::size_t initialDataSize)
     {
-        auto texture = std::make_shared<VulkanTexture>(m_Device, m_Allocator.GetHandle(), desc);
+        auto texture = std::make_shared<VulkanTexture>(*this, m_Allocator.GetHandle(), desc);
         if (!texture->IsValid())
         {
             return nullptr;
@@ -546,7 +547,7 @@ namespace XEngine
             stagingDesc.MemoryUsage = RHIMemoryUsage::CPUToGPU;
             stagingDesc.DebugName = "Texture upload staging buffer";
 
-            VulkanBuffer stagingBuffer(m_Allocator.GetHandle(), stagingDesc, initialData, initialDataSize);
+            VulkanBuffer stagingBuffer(*this, m_Allocator.GetHandle(), stagingDesc, initialData, initialDataSize);
             if (!stagingBuffer.IsValid())
             {
                 XENGINE_LOG_ERROR("Failed to create texture upload staging buffer");
@@ -638,7 +639,7 @@ namespace XEngine
 
     std::shared_ptr<RHISampler> VulkanDevice::CreateSampler(const RHISamplerDesc& desc)
     {
-        auto sampler = std::make_shared<VulkanSampler>(m_Device, desc);
+        auto sampler = std::make_shared<VulkanSampler>(*this, desc);
         if (!sampler->IsValid())
         {
             return nullptr;
@@ -650,7 +651,7 @@ namespace XEngine
     std::shared_ptr<RHIBindGroupLayout> VulkanDevice::CreateBindGroupLayout(const RHIBindGroupLayoutDesc& desc)
     {
         auto layout = std::make_shared<VulkanBindGroupLayout>();
-        if (!layout->Create(m_Device, desc))
+        if (!layout->Create(*this, desc))
         {
             return nullptr;
         }
@@ -661,7 +662,7 @@ namespace XEngine
     std::shared_ptr<RHIBindGroup> VulkanDevice::CreateBindGroup(const RHIBindGroupDesc& desc)
     {
         auto bindGroup = std::make_shared<VulkanBindGroup>();
-        if (!bindGroup->Create(m_Device, m_DescriptorPool, desc))
+        if (!bindGroup->Create(*this, m_DescriptorPool, desc))
         {
             return nullptr;
         }
@@ -671,7 +672,7 @@ namespace XEngine
 
     std::shared_ptr<RHIPipeline> VulkanDevice::CreateGraphicsPipeline(const RHIGraphicsPipelineDesc& desc)
     {
-        auto pipeline = std::make_shared<VulkanPipeline>(m_Device, desc);
+        auto pipeline = std::make_shared<VulkanPipeline>(*this, desc);
         if (!pipeline->IsValid())
         {
             return nullptr;
@@ -800,7 +801,7 @@ namespace XEngine
         desc.Usage = RHITextureUsageFlags::DepthStencilAttachment;
         desc.DebugName = "Swapchain depth";
 
-        auto depthTexture = std::make_unique<VulkanTexture>(m_Device, m_Allocator.GetHandle(), desc);
+        auto depthTexture = std::make_unique<VulkanTexture>(*this, m_Allocator.GetHandle(), desc);
         if (!depthTexture->IsValid())
         {
             return false;

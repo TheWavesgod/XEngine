@@ -67,6 +67,8 @@ namespace XEngine
         void RenderVulkanOverlay(const std::function<void(RHINativeCommandBuffer)>& callback) override;
         void WaitIdle() override;
 
+        inline VkDevice GetHandle() const { return m_Device; }
+
     private:
         bool PickPhysicalDevice();
         bool CreateLogicalDevice();

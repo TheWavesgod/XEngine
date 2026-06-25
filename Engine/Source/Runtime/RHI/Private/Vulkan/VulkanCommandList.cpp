@@ -1,9 +1,10 @@
 #include "VulkanCommandList.h"
-
+#include "VulkanDevice.h"
 #include "VulkanBuffer.h"
 #include "VulkanDescriptor.h"
 #include "VulkanPipeline.h"
 #include "VulkanTexture.h"
+#include "VulkanCheckedCast.h"
 
 #include <XEngine/Logging/Log.h>
 
@@ -41,13 +42,15 @@ namespace XEngine
     }
 
     void VulkanCommandList::BeginFrame(
+        VulkanDevice& device,
         VkCommandBuffer commandBuffer,
-            VkImage swapchainImage,
-            VkImageView swapchainImageView,
-            VkExtent2D swapchainExtent,
-            VkImageLayout* swapchainImageLayout,
-            VulkanTexture* depthTexture)
+        VkImage swapchainImage,
+        VkImageView swapchainImageView,
+        VkExtent2D swapchainExtent,
+        VkImageLayout* swapchainImageLayout,
+        VulkanTexture* depthTexture)
     {
+        m_Device = &device;   
         m_CommandBuffer = commandBuffer;
         m_SwapchainImage = swapchainImage;
         m_SwapchainImageView = swapchainImageView;
@@ -64,6 +67,7 @@ namespace XEngine
 
     void VulkanCommandList::Reset()
     {
+        m_Device = nullptr;  
         m_CommandBuffer = VK_NULL_HANDLE;
         m_SwapchainImage = VK_NULL_HANDLE;
         m_SwapchainImageView = VK_NULL_HANDLE;
@@ -106,8 +110,9 @@ namespace XEngine
             return;
         }
 
-        auto* vulkanPipeline = dynamic_cast<VulkanPipeline*>(pipeline);
-        if (vulkanPipeline == nullptr || !vulkanPipeline->IsValid())
+        XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
+        auto* vulkanPipeline = CheckedVulkanCast<VulkanPipeline>(pipeline, *m_Device);
+        if (!vulkanPipeline->IsValid())
         {
             XENGINE_LOG_ERROR("Attempted to bind an invalid Vulkan graphics pipeline");
             return;
@@ -132,7 +137,8 @@ namespace XEngine
 
     void VulkanCommandList::TransitionTextureToShaderRead(RHITexture* texture)
     {
-        auto* vulkanTexture = dynamic_cast<VulkanTexture*>(texture);
+        XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
+        auto* vulkanTexture = CheckedVulkanCast<VulkanTexture>(texture, *m_Device);
         if (vulkanTexture == nullptr)
         {
             return;
@@ -151,7 +157,8 @@ namespace XEngine
             return;
         }
 
-        auto* vulkanBindGroup = dynamic_cast<VulkanBindGroup*>(bindGroup);
+        XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
+        auto* vulkanBindGroup = CheckedVulkanCast<VulkanBindGroup>(bindGroup, *m_Device);
         if (vulkanBindGroup == nullptr || vulkanBindGroup->GetHandle() == VK_NULL_HANDLE)
         {
             XENGINE_LOG_ERROR("Attempted to bind an invalid Vulkan bind group");
@@ -177,7 +184,8 @@ namespace XEngine
             return;
         }
 
-        auto* vulkanBuffer = dynamic_cast<VulkanBuffer*>(buffer);
+        XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
+        auto* vulkanBuffer = CheckedVulkanCast<VulkanBuffer>(buffer, *m_Device);
         if (vulkanBuffer == nullptr || !vulkanBuffer->IsValid())
         {
             XENGINE_LOG_ERROR("Attempted to bind an invalid Vulkan vertex buffer");
@@ -196,7 +204,8 @@ namespace XEngine
             return;
         }
 
-        auto* vulkanBuffer = dynamic_cast<VulkanBuffer*>(buffer);
+        XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
+        auto* vulkanBuffer = CheckedVulkanCast<VulkanBuffer>(buffer, *m_Device);
         if (vulkanBuffer == nullptr || !vulkanBuffer->IsValid())
         {
             XENGINE_LOG_ERROR("Attempted to bind an invalid Vulkan index buffer");
@@ -271,8 +280,9 @@ namespace XEngine
         bool renderToSwapchain = m_RenderOutput.RenderToSwapchain;
         if (!renderToSwapchain)
         {
-            colorTexture = dynamic_cast<VulkanTexture*>(m_RenderOutput.ColorTarget);
-            depthTexture = dynamic_cast<VulkanTexture*>(m_RenderOutput.DepthTarget);
+            XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
+            colorTexture = CheckedVulkanCast<VulkanTexture>(m_RenderOutput.ColorTarget, *m_Device);
+            depthTexture = CheckedVulkanCast<VulkanTexture>(m_RenderOutput.DepthTarget, *m_Device);
             if (colorTexture == nullptr || !colorTexture->IsValid())
             {
                 XENGINE_LOG_ERROR("Offscreen render output requires a valid Vulkan color texture");

@@ -6,10 +6,12 @@
 
 namespace XEngine
 {
+    class VulkanDevice;
+
     class VulkanPipeline final : public RHIPipeline
     {
     public:
-        VulkanPipeline(VkDevice device, const RHIGraphicsPipelineDesc& desc);
+        VulkanPipeline(VulkanDevice& device, const RHIGraphicsPipelineDesc& desc);
         ~VulkanPipeline() override;
 
         VulkanPipeline(const VulkanPipeline&) = delete;

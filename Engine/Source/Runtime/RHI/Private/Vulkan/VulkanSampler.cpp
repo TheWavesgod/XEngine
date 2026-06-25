@@ -1,5 +1,6 @@
 #include "VulkanSampler.h"
 
+#include "VulkanDevice.h"
 #include "VulkanUtils.h"
 
 #include <XEngine/Logging/Log.h>
@@ -8,8 +9,9 @@
 
 namespace XEngine
 {
-    VulkanSampler::VulkanSampler(VkDevice device, const RHISamplerDesc& desc)
-        : m_Device(device)
+    VulkanSampler::VulkanSampler(VulkanDevice& device, const RHISamplerDesc& desc)
+        : RHISampler(device)
+        , m_Device(device.GetHandle())
         , m_Desc(desc)
     {
         if (m_Device == VK_NULL_HANDLE)

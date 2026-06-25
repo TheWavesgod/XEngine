@@ -6,6 +6,7 @@
 
 namespace XEngine
 {
+    class VulkanDevice;
     class VulkanBindGroup;
     class VulkanPipeline;
     class VulkanTexture;
@@ -17,6 +18,7 @@ namespace XEngine
         ~VulkanCommandList() override = default;
 
         void BeginFrame(
+            VulkanDevice& device,
             VkCommandBuffer commandBuffer,
             VkImage swapchainImage,
             VkImageView swapchainImageView,
@@ -58,6 +60,7 @@ namespace XEngine
         void TransitionColorImage(VulkanTexture& texture, VkImageLayout newLayout);
         void TransitionDepthImage(VulkanTexture& texture, VkImageLayout newLayout);
 
+        VulkanDevice* m_Device = nullptr;
         VkCommandBuffer m_CommandBuffer = VK_NULL_HANDLE;
         VkImage m_SwapchainImage = VK_NULL_HANDLE;
         VkImageView m_SwapchainImageView = VK_NULL_HANDLE;

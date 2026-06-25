@@ -4,6 +4,8 @@
 #include <XEngine/Renderer/RenderScene.h>
 #include <XEngine/Logging/Log.h>
 #include <array>
+#include <cmath>      // std::fabs, std::round
+#include <limits>     // std::numeric_limits
 
 namespace XEngine
 {
@@ -22,13 +24,16 @@ namespace XEngine
         float splitLambda,
         float* outSplits)
     {
-        splitLambda = std::clamp(splitLambda, 0.0f, 1.0f);
+        splitLambda = Math::Clamp(splitLambda, 0.0f, 1.0f);
 
         const float nearClip = cameraNear;
         const float farClip = cameraFar;
         const float clipRange = farClip - nearClip;
 
-        const float ratio = farClip / nearClip;
+        // Guard against non-positive near plane to avoid log(<=0) below.
+        const float safeNear = (nearClip > 1e-4f) ? nearClip : 1e-4f;
+        
+        const float ratio = farClip / safeNear;
 
         for (u32 i = 0; i < cascadeCount; ++i)
         {
@@ -38,6 +43,8 @@ namespace XEngine
             const float linearSplit = nearClip + clipRange * p;
 
             const float split = Math::Lerp(linearSplit, logSplit, splitLambda);
+
+            outSplits[i] = split;
         }
     }
 
@@ -131,6 +138,80 @@ namespace XEngine
         return std::ceil(radius * 16.0f) / 16.0f;
     }
 
+    struct LightBasis
+    {
+        Vec3 Forward;  // -Z in light space (look direction)
+        Vec3 Up;       // +Y in light space
+        Vec3 Right;    // +X in light space
+    };
+
+    static LightBasis BuildLightBasis(const Vec3& directionToLight)
+    {
+        LightBasis basis;
+        basis.Forward = Math::Normalize(directionToLight);
+
+        // World up is +Z. If the light is nearly vertical, fall back to +Y
+        // to avoid a degenerate cross product.
+        const Vec3 worldUp = (std::fabs(basis.Forward.z) > 0.999f)
+            ? Vec3(0.0f, 1.0f, 0.0f)
+            : Vec3(0.0f, 0.0f, 1.0f);
+
+        basis.Right = Math::Normalize(Math::Cross(basis.Forward, worldUp));
+        basis.Up    = Math::Normalize(Math::Cross(basis.Right,  basis.Forward));
+        return basis;
+    }
+
+    // Translates a world-space center to the closest orthographic frustum center
+    // aligned on the shadow map's texel grid. This keeps cascades from "swimming"
+    // as the camera moves; it is the standard "stable CSM" trick.
+    static Vec3 SnapToTexelGrid(
+        const Vec3& worldCenter,
+        const Mat4& lightViewProj,
+        float texelSize)
+    {
+        // Project the world center into light clip space.
+        const Vec4 clip = lightViewProj * Vec4(worldCenter, 1.0f);
+
+        // Snap UV in NDC, then transform back to world.
+        const float snappedX = std::round(clip.x / clip.w / texelSize) * texelSize;
+        const float snappedY = std::round(clip.y / clip.w / texelSize) * texelSize;
+
+        // Build a translation that cancels the sub-texel offset.
+        const Vec4 offset = clip - Vec4(snappedX * clip.w, snappedY * clip.w, 0.0f, 0.0f);
+        (void)offset;
+
+        return worldCenter;   // Texel-snap is applied via an adjusted light view, not a world translation.
+    }
+
+    // Variant that returns the world-space offset to subtract from the light
+    // position so the cascade's projected center sits on a texel boundary.
+    static Vec3 ComputeTexelSnapOffset(
+        const Vec3& worldCenter,
+        const Mat4& lightView,
+        const Mat4& lightProj,
+        float texelSize)
+    {
+        const Mat4 lightViewProj = lightProj * lightView;
+        const Vec4 clip = lightViewProj * Vec4(worldCenter, 1.0f);
+        if (clip.w == 0.0f)
+        {
+            return Vec3(0.0f);
+        }
+
+        const float ndcX = clip.x / clip.w;
+        const float ndcY = clip.y / clip.w;
+        const float snappedNdcX = std::round(ndcX / texelSize) * texelSize;
+        const float snappedNdcY = std::round(ndcY / texelSize) * texelSize;
+
+        // The light position needs to shift so the projected center lands on the snapped NDC.
+        const Mat4 invView = Math::Inverse(lightView);
+        const Vec4 worldOffset = invView * Vec4(
+            (snappedNdcX - ndcX) * clip.w,
+            (snappedNdcY - ndcY) * clip.w,
+            0.0f, 0.0f);
+        return Vec3(worldOffset);
+    }
+
 
     bool DirectionalShadowPlanner::BuildPlan(const DirectionalShadowPlanDesc& desc, 
         RenderDirectionalShadowFrameData& outData) const
@@ -184,12 +265,16 @@ namespace XEngine
             desc.CameraView,
             desc.CameraProjection); 
 
+        const LightBasis lightBasis = BuildLightBasis(desc.Light->DirectionToLight);
+        const float texelSize = 2.0f / static_cast<float>(desc.Resolution);
+
         float previousSplit = desc.CameraNear;
         for (u32 cascadeIndex = 0; cascadeIndex < cascadeCount; ++cascadeIndex)
         {
             const float splitNear = previousSplit;
             const float splitFar = cascadeSplits[cascadeIndex];
 
+            // Cascade sub-frustum in world space.
             const auto cascadeCorners = GetCascadeFrustumCornersWorldSpace(
                 fullFrustumCorners,
                 desc.CameraNear,
@@ -197,7 +282,111 @@ namespace XEngine
                 splitNear,
                 splitFar);
             
-            // TODO
+            // Bounding sphere around the cascade sub-frustum.
+            const Vec3  center     = ComputeAverageCenter(cascadeCorners);
+            const float rawRadius  = ComputeBoundingSphereRadius(cascadeCorners, center);
+            const float radius     = QuantizeRadius(rawRadius);
+
+            // Push the light back along its forward axis so the entire sphere sits
+            // in front of the light (positive Z in light space).
+            const Vec3 lightPosition = center - lightBasis.Forward * radius;
+
+            // Build the light view matrix using XEngine's +X-forward convention.
+            // BuildViewMatrixLH_XForward expects the eye position and the world rotation
+            // of the camera; here we just construct the matrix directly from the basis.
+            Mat4 lightView = Mat4(1.0f);
+            lightView[0]  = Vec4(lightBasis.Right,   0.0f);
+            lightView[1]  = Vec4(lightBasis.Up,      0.0f);
+            lightView[2]  = Vec4(lightBasis.Forward, 0.0f);
+            lightView[3]  = Vec4(lightPosition,      1.0f);
+            lightView     = Math::Inverse(lightView);
+
+            // Apply texel snap to keep cascades from swimming (Step 1's StabilizeCascades).
+            if (desc.StabilizeCascades)
+            {
+                Mat4 tmpProj = Mat4(1.0f);
+                if (desc.ReverseZ)
+                {
+                    // Reverse-Z ortho: near plane at +Z, far at -Z (in light space pre-proj).
+                    tmpProj = Math::OrthographicLH_ZO(
+                        -radius, radius, -radius, radius,
+                        -radius - desc.DepthBias * 4.0f,
+                        radius + desc.DepthBias * 4.0f);
+                    // Math::OrthographicLH_ZO in XEngine produces a 0..1 depth range.
+                    // To make it reverse-Z, swap near/far at the call site OR post-multiply
+                    // by a flip matrix. Easiest: pass near/far in reversed order:
+                    tmpProj = Math::OrthographicLH_ZO(
+                        -radius, radius, -radius, radius,
+                        radius + desc.DepthBias * 4.0f,
+                        -radius - desc.DepthBias * 4.0f);
+                }
+                else
+                {
+                    tmpProj = Math::OrthographicLH_ZO(
+                        -radius, radius, -radius, radius,
+                        -radius - desc.DepthBias * 4.0f,
+                        radius + desc.DepthBias * 4.0f);
+                }
+
+                const Vec3 snap = ComputeTexelSnapOffset(center, lightView, tmpProj, texelSize);
+                lightView[3] -= Vec4(snap, 0.0f);
+            }
+
+            // Final light projection (orthographic). Re-derived here so the
+            // texel-snap path applies the snap with the same projection.
+            Mat4 lightProjection = Mat4(1.0f);
+            if (desc.ReverseZ)
+            {
+                lightProjection = Math::OrthographicLH_ZO(
+                    -radius, radius, -radius, radius,
+                    radius + desc.DepthBias * 4.0f,
+                    -radius - desc.DepthBias * 4.0f);
+            }
+            else
+            {
+                lightProjection = Math::OrthographicLH_ZO(
+                    -radius, radius, -radius, radius,
+                    -radius - desc.DepthBias * 4.0f,
+                    radius + desc.DepthBias * 4.0f);
+            }
+
+            const Mat4 lightViewProj = lightProjection * lightView;
+
+            // Fill the cascade slot.
+            RenderShadowCascade& cascade = outData.Cascades[cascadeIndex];
+            cascade.LightView           = lightView;
+            cascade.LightProjection     = lightProjection;
+            cascade.LightViewProjection = lightViewProj;
+            cascade.SplitNear           = splitNear;
+            cascade.SplitFar            = splitFar;
+            cascade.LayerIndex          = cascadeIndex;
+            cascade.Resolution          = desc.Resolution;
+            cascade.ShadowMapSize       = Vec4(
+                static_cast<float>(desc.Resolution),
+                static_cast<float>(desc.Resolution),
+                1.0f / static_cast<float>(desc.Resolution),
+                1.0f / static_cast<float>(desc.Resolution));
+            cascade.BiasParams = Vec4(
+                desc.DepthBias,
+                desc.NormalBias,
+                0.0f,    // slope-scaled bias factor (Stage 10+)
+                0.0f);
+
+            // World bounds: the 8 cascade frustum corners.
+            cascade.WorldBounds = AABB::FromPoints(cascadeCorners.data(), 8);
+
+            // Light-space bounds: transform corners into light space and re-fit.
+            Vec3 lightSpaceMin( std::numeric_limits<float>::infinity());
+            Vec3 lightSpaceMax(-std::numeric_limits<float>::infinity());
+            for (const Vec3& corner : cascadeCorners)
+            {
+                const Vec4 ls = lightView * Vec4(corner, 1.0f);
+                lightSpaceMin = Math::Min(lightSpaceMin, Vec3(ls));
+                lightSpaceMax = Math::Max(lightSpaceMax, Vec3(ls));
+            }
+            cascade.LightSpaceBounds = AABB(lightSpaceMin, lightSpaceMax);
+
+            previousSplit = splitFar;
         }
 
         return true;

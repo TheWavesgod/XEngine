@@ -1,10 +1,13 @@
 #pragma once
 
 #include <XEngine/Core/Types.h>
+#include <XEngine/RHI/RHIResource.h>
 #include <XEngine/RHI/RHITypes.h>
 
 namespace XEngine
-{
+{   
+    class RHITextureView;
+
     struct RHITextureDesc
     {
         u32 Width = 1;
@@ -20,16 +23,21 @@ namespace XEngine
         const char* DebugName = nullptr;
     };
 
-    class RHITexture
+    class RHITexture : public RHIResource
     {
     public:
-        virtual ~RHITexture() = default;
+        ~RHITexture() override = default;
 
         virtual const RHITextureDesc& GetDesc() const = 0;
-        virtual void* GetNativeImageView(RHIBackend backend) const
-        {
-            (void)backend;
-            return nullptr;
-        }
+
+        // Default-view accessor: every texture owns one default view that
+        // covers all mips and all layers, sampled usage, the texture's
+        // primary aspect.
+        virtual RHITextureView* GetDefaultView() const = 0;
+
+        virtual void* GetNativeDefaultView(RHIBackend backend) const;
+
+    protected:
+        explicit RHITexture(RHIDevice& ownerDevice);
     };
 }

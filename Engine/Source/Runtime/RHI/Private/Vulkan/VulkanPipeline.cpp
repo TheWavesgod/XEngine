@@ -1,5 +1,6 @@
 #include "VulkanPipeline.h"
-
+#include "VulkanDevice.h"
+#include "VulkanCheckedCast.h"
 #include "VulkanDescriptor.h"
 #include "VulkanShader.h"
 #include "VulkanUtils.h"
@@ -12,8 +13,9 @@
 
 namespace XEngine
 {
-    VulkanPipeline::VulkanPipeline(VkDevice device, const RHIGraphicsPipelineDesc& desc)
-        : m_Device(device)
+    VulkanPipeline::VulkanPipeline(VulkanDevice& device, const RHIGraphicsPipelineDesc& desc)
+        : RHIPipeline(device) 
+        , m_Device(device.GetHandle())
         , m_PushConstantStages(ToVulkanShaderStageFlags(desc.PushConstantStages))
     {
         XENGINE_LOG_INFO("Creating Vulkan graphics pipeline");
@@ -24,8 +26,10 @@ namespace XEngine
             return;
         }
 
-        auto* vertexShader = dynamic_cast<VulkanShader*>(desc.VertexShader);
-        auto* fragmentShader = dynamic_cast<VulkanShader*>(desc.FragmentShader);
+        XENGINE_ASSERT(desc.VertexShader != nullptr && desc.FragmentShader != nullptr, "Vulkan graphics pipeline requires non-null vertex and fragment shaders");
+        XENGINE_ASSERT(&desc.VertexShader->GetOwnerDevice() == &device, "Vulkan graphics pipeline shaders must belong to the owning device");
+        auto* vertexShader = CheckedVulkanCast<VulkanShader>(desc.VertexShader, device);
+        auto* fragmentShader = CheckedVulkanCast<VulkanShader>(desc.FragmentShader, device);
         if (vertexShader == nullptr || fragmentShader == nullptr ||
             !vertexShader->IsValid() || !fragmentShader->IsValid())
         {
@@ -39,7 +43,7 @@ namespace XEngine
         descriptorSetLayouts.reserve(desc.BindGroupLayouts.size());
         for (RHIBindGroupLayout* layout : desc.BindGroupLayouts)
         {
-            auto* vulkanLayout = dynamic_cast<VulkanBindGroupLayout*>(layout);
+            auto* vulkanLayout = CheckedVulkanCast<VulkanBindGroupLayout>(layout, device);
             if (vulkanLayout == nullptr || vulkanLayout->GetHandle() == VK_NULL_HANDLE)
             {
                 XENGINE_LOG_ERROR("Vulkan pipeline received an invalid bind group layout");

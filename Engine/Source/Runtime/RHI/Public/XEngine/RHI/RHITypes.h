@@ -4,7 +4,7 @@
 
 namespace XEngine
 {
-    enum class RHIBackend
+    enum class RHIBackend : u8
     {
         None,
         Vulkan,
@@ -139,11 +139,12 @@ namespace XEngine
     };
 
     class RHITexture;
+    class RHITextureView;
 
     struct RHIRenderOutputDesc
     {
-        RHITexture* ColorTarget = nullptr;
-        RHITexture* DepthTarget = nullptr;
+        RHITexture* ColorTarget = nullptr;      // null for depth-only rendering
+        RHITextureView* DepthTarget = nullptr;  // may be a per-layer view
         RHIRect2D Viewport {};
         RHIFormat ColorFormat = RHIFormat::BGRA8Unorm;
         RHIFormat DepthFormat = RHIFormat::D32Float;

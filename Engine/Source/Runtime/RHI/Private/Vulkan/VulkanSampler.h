@@ -10,7 +10,7 @@ namespace XEngine
     {
     public:
         VulkanSampler() = default;
-        VulkanSampler(VkDevice device, const RHISamplerDesc& desc);
+        VulkanSampler(class VulkanDevice& device, const RHISamplerDesc& desc);
         ~VulkanSampler() override;
 
         VulkanSampler(const VulkanSampler&) = delete;

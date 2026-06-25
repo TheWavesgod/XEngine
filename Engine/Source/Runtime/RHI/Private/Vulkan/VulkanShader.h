@@ -11,8 +11,8 @@ namespace XEngine
     class VulkanShader final : public RHIShader
     {
     public:
-        VulkanShader(VkDevice device, const RHIShaderDesc& desc);
-        ~VulkanShader() override;
+        VulkanShader(class VulkanDevice& device, const RHIShaderDesc& desc);
+        ~VulkanShader();
 
         VulkanShader(const VulkanShader&) = delete;
         VulkanShader& operator=(const VulkanShader&) = delete;

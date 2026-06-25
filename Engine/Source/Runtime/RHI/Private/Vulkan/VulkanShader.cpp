@@ -1,5 +1,5 @@
 #include "VulkanShader.h"
-
+#include "VulkanDevice.h"
 #include "VulkanUtils.h"
 
 #include <XEngine/Logging/Log.h>
@@ -28,8 +28,9 @@ namespace XEngine
         }
     }
 
-    VulkanShader::VulkanShader(VkDevice device, const RHIShaderDesc& desc)
-        : m_Device(device)
+    VulkanShader::VulkanShader(VulkanDevice& device, const RHIShaderDesc& desc)
+        : RHIShader(device) 
+        , m_Device(device.GetHandle())
         , m_Stage(desc.Stage)
         , m_Target(desc.Target)
         , m_EntryPoint(desc.EntryPoint)

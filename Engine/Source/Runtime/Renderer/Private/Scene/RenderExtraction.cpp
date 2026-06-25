@@ -85,6 +85,10 @@ namespace XEngine
                     transform->GetWorldMatrix());
                 object.ObjectId = entity.Index + 1u;
 
+                object.Visible       = renderer->Visible;
+                object.CastShadow    = renderer->CastShadow;
+                object.ReceiveShadow = renderer->ReceiveShadow;
+
                 outRenderScene.OpaqueObjects.push_back(object);
             }
 

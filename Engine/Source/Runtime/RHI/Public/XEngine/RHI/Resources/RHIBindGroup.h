@@ -1,6 +1,7 @@
 #pragma once
 
 #include <XEngine/Core/Types.h>
+#include <XEngine/RHI/RHIResource.h>
 #include <XEngine/RHI/RHITypes.h>
 
 #include <vector>
@@ -25,12 +26,15 @@ namespace XEngine
         const char* DebugName = nullptr;
     };
 
-    class RHIBindGroupLayout
+    class RHIBindGroupLayout : public RHIResource
     {
     public:
-        virtual ~RHIBindGroupLayout() = default;
+        ~RHIBindGroupLayout() override = default;
 
         virtual const RHIBindGroupLayoutDesc& GetDesc() const = 0;
+
+    protected:
+        explicit RHIBindGroupLayout(RHIDevice& ownerDevice);
     };
 
     struct RHIBindingResource
@@ -50,11 +54,14 @@ namespace XEngine
         const char* DebugName = nullptr;
     };
 
-    class RHIBindGroup
+    class RHIBindGroup : public RHIResource
     {
     public:
-        virtual ~RHIBindGroup() = default;
+        ~RHIBindGroup() override = default;
 
         virtual const RHIBindGroupDesc& GetDesc() const = 0;
+
+    protected:
+        explicit RHIBindGroup(RHIDevice& ownerDevice);
     };
 }

@@ -11,7 +11,7 @@ namespace XEngine
     {
     public:
         VulkanBuffer() = default;
-        VulkanBuffer(VmaAllocator allocator, const RHIBufferDesc& desc, const void* initialData, std::size_t initialDataSize);
+        VulkanBuffer(class VulkanDevice& device, VmaAllocator allocator, const RHIBufferDesc& desc, const void* initialData, std::size_t initialDataSize);
         ~VulkanBuffer() override;
 
         VulkanBuffer(const VulkanBuffer&) = delete;
@@ -24,6 +24,7 @@ namespace XEngine
 
     private:
         VmaAllocator m_Allocator = VK_NULL_HANDLE;
+        VkDevice m_Device = VK_NULL_HANDLE;
         VkBuffer m_Buffer = VK_NULL_HANDLE;
         VmaAllocation m_Allocation = VK_NULL_HANDLE;
         VmaAllocationInfo m_AllocationInfo {};
