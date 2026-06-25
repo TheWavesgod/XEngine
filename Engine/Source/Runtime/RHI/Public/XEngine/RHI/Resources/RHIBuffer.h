@@ -1,6 +1,7 @@
 #pragma once
 
 #include <XEngine/Core/Types.h>
+#include <XEngine/RHI/RHIResource.h>
 
 #include <cstddef>
 
@@ -42,12 +43,15 @@ namespace XEngine
         const char* DebugName = nullptr;
     };
 
-    class RHIBuffer
+    class RHIBuffer : public RHIResource
     {
     public:
-        virtual ~RHIBuffer() = default;
+        ~RHIBuffer() = default;
 
         virtual std::size_t GetSize() const = 0;
         virtual bool Update(const void* data, std::size_t size, std::size_t offset = 0) = 0;
+
+    protected:
+        explicit RHIBuffer(RHIDevice& ownerDevice);
     };
 }
