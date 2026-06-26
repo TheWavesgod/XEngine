@@ -8,44 +8,22 @@ namespace XEngine
 {
     class RHITexture;
 
-    enum class RHITextureViewDimension : u8
-    {
-        Texture2D,
-        Texture2DArray,
-        TextureCube,
-    };
-
-    enum class RHITextureAspectFlags : u8
-    {
-        None     = 0,
-        Color    = 1 << 0,
-        Depth    = 1 << 1,
-        Stencil  = 1 << 2,
-        DepthStencil = Depth | Stencil,
-    };
-
-    inline RHITextureAspectFlags operator| (RHITextureAspectFlags lhs, RHITextureAspectFlags rhs)
-    {
-        return static_cast<RHITextureAspectFlags>(
-            static_cast<u8>(lhs) | static_cast<u8>(rhs));
-    } 
-
-    inline bool HasFlag(RHITextureAspectFlags value, RHITextureAspectFlags flag)
-    {
-        return (static_cast<u8>(value) & static_cast<u8>(flag)) != 0;
-    } 
-
     struct RHITextureViewDesc
     {
-        const RHITexture*       Texture = nullptr;
-        RHITextureViewDimension ViewDimension = RHITextureViewDimension::Texture2D;
-        RHIFormat               Format = RHIFormat::Undefined;
-        u32                     BaseMipLevel = 0;
-        u32                     MipCount = 1;
-        u32                     BaseArrayLayer = 0;
-        u32                     ArrayLayerCount = 1;
-        RHITextureAspectFlags   Aspect = RHITextureAspectFlags::Color;
-        const char*             DebugName = nullptr;
+        const RHITexture*           Texture = nullptr;
+        RHITextureViewUsageFlags    Usage = RHITextureViewUsageFlags::Sampled;
+        RHITextureViewDimension     ViewDimension = RHITextureViewDimension::Texture2D;
+        
+        RHITextureAspectFlags       Aspect = RHITextureAspectFlags::Color;
+        
+        RHIFormat                   Format = RHIFormat::Undefined;
+        
+        u32                         BaseMipLevel = 0;
+        u32                         MipCount = 1;       // 0 means "all remaining mips" — Stage 7 validation
+        u32                         BaseArrayLayer = 0;
+        u32                         ArrayLayerCount = 1; // 0 means "all remaining layers"
+        
+        const char*                 DebugName = nullptr;
     };
 
     class RHITextureView : public RHIResource

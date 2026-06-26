@@ -143,7 +143,7 @@ namespace XEngine
         return m_Image;
     }
 
-    VkImageView VulkanTexture::GetImageView() const
+    VkImageView VulkanTexture::GetDefaultView() const
     {
         return m_ImageView;
     }

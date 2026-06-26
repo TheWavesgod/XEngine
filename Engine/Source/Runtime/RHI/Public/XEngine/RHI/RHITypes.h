@@ -19,6 +19,34 @@ namespace XEngine
         Transfer
     };
 
+    enum class RHIBufferUsage : u32
+    {
+        None = 0,
+        Vertex = 1 << 0,
+        Index = 1 << 1,
+        Uniform = 1 << 2,
+        Storage = 1 << 3,
+        TransferSrc = 1 << 4,
+        TransferDst = 1 << 5
+    };
+
+    inline RHIBufferUsage operator|(RHIBufferUsage lhs, RHIBufferUsage rhs)
+    {
+        return static_cast<RHIBufferUsage>(static_cast<u32>(lhs) | static_cast<u32>(rhs));
+    }
+
+    inline bool HasFlag(RHIBufferUsage value, RHIBufferUsage flag)
+    {
+        return (static_cast<u32>(value) & static_cast<u32>(flag)) != 0;
+    }
+
+    enum class RHIMemoryUsage
+    {
+        GPUOnly,
+        CPUToGPU,
+        GPUToCPU
+    };
+
     enum class RHIFormat
     {
         Undefined,
@@ -86,6 +114,54 @@ namespace XEngine
     {
         return (static_cast<u32>(value) & static_cast<u32>(flag)) != 0;
     }
+
+    enum class RHITextureViewDimension : u8
+    {
+        Texture2D,
+        Texture2DArray,
+        TextureCube,
+    };
+
+    enum class RHITextureViewUsageFlags : u32
+    {
+        None            = 0,
+        Sampled         = 1 << 0,
+        ColorAttachment = 1 << 1,
+        DepthAttachment = 1 << 2,
+    };
+
+    inline RHITextureViewUsageFlags operator|(
+        RHITextureViewUsageFlags a, RHITextureViewUsageFlags b)
+    {
+        return static_cast<RHITextureViewUsageFlags>(
+            static_cast<u32>(a) | static_cast<u32>(b));
+    }
+
+    inline bool HasFlag(RHITextureViewUsageFlags v, RHITextureViewUsageFlags f)
+    {
+        return (static_cast<u32>(v) & static_cast<u32>(f)) != 0;
+    }
+
+    enum class RHITextureAspectFlags : u8
+    {
+        None     = 0,
+        Color    = 1 << 0,
+        Depth    = 1 << 1,
+        Stencil  = 1 << 2,
+        DepthStencil = Depth | Stencil,
+        MetaData = 1 << 3,
+    };
+
+    inline RHITextureAspectFlags operator| (RHITextureAspectFlags lhs, RHITextureAspectFlags rhs)
+    {
+        return static_cast<RHITextureAspectFlags>(
+            static_cast<u8>(lhs) | static_cast<u8>(rhs));
+    } 
+
+    inline bool HasFlag(RHITextureAspectFlags value, RHITextureAspectFlags flag)
+    {
+        return (static_cast<u8>(value) & static_cast<u8>(flag)) != 0;
+    } 
 
     enum class RHIBindingType
     {
