@@ -62,13 +62,16 @@ VulkanCheckedCast<...>        (debug-asserts + static_cast helper)
 Resource / view split (CSM example):
 
 ```text
-RHITexture* shadowTexture
+ShadowResourceCache (semantic owner)
+  shared_ptr<RHITexture> shadowTexture
   - VkImage, Texture2DArray, D32Float, 4 layers
 
-RHITextureView* wholeArraySampledView      (all layers, sampled, full mip)
-RHITextureView* layer0DepthAttachmentView  (layer 0 only, depth attachment)
-RHITextureView* layer1DepthAttachmentView  (layer 1 only, depth attachment)
+  shared_ptr<RHITextureView> wholeArraySampledView
+  shared_ptr<RHITextureView> layer0DepthAttachmentView
+  shared_ptr<RHITextureView> layer1DepthAttachmentView
 ...
+
+Pass descriptors/frame data borrow raw pointers from this owner.
 ```
 
 ## Stage list and dependencies
@@ -83,7 +86,7 @@ Stage 4  RHIUploadManager                          │  Move upload off RHIDevic
 Stage 5  View-based RenderPass + BindGroup         │  CSM-ready attachments / bindings
 Stage 6  Depth-only Pipeline                       │  ShadowDepthPass-ready pipeline
 Stage 7  Capabilities, Format Utils, Validation,   │  Diagnostics + safety
-         Debug Names, Deferred Deletion            │
+         Debug Names                               │
 Stage 8  Migration Checklist                       │  Switch Renderer to new APIs
        ──────────────────────────────────────────── ┘
 ```
@@ -98,14 +101,13 @@ without behavioural change before the next stage begins.
 >   Keep `shared_ptr` throughout this cleanup unless a dedicated ownership
 >   migration stage is added.
 > - The pipeline type is `RHIPipeline`, not `RHIGraphicsPipeline`.
-> - `RHIGraphicsPipelineDesc` currently has `HasColorAttachment`; Stage 6 may
->   either keep it or explicitly replace it with `ColorAttachmentCount`, but the
->   two fields must not coexist.
+> - `RHIGraphicsPipelineDesc` currently has `HasColorAttachment`; Stage 6 keeps
+>   it. MRT can replace it with an attachment count in a dedicated later stage.
 > - `RHIRenderOutputDesc` currently contains `ColorTarget` and `DepthTarget`,
->   not `ColorTexture` / `DepthTexture`. Stage 5/8 migration should rename them
->   to `ColorTargetView` / `DepthTargetView`.
-> - `RHITextureView` currently uses `GetNativeImageView`; if Stage 2 renames it
->   to `GetNativeView`, all later stages must use the renamed spelling.
+>   and both fields are `RHITextureView*`. Keep those names throughout the
+>   cleanup; do not add fallback texture fields.
+> - Stage 2's texture-owned default view is transitional. Stage 5 moves view
+>   ownership to semantic renderer owners and Stage 8 removes the default view.
 
 Stage 5 depends on Stage 2 (view abstraction) and Stage 3 (factory), so it
 must come after both. Stage 6 is independent of Stage 5. Stage 7 can be split
@@ -124,8 +126,9 @@ These rules are enforced across every stage below:
    release. The single editor-native overlay path (`ImGuiVulkanBackend`) is the
    one place where a `static_cast<VkImageView>(...)` from a stored handle is
    acceptable because ImGui-Vulkan is intrinsically a Vulkan backend.
-3. **Resource ≠ View.** Every `RHITexture` exposes zero or more
-   `RHITextureView*` it owns; consumers always bind views, never textures.
+3. **Resource ≠ View.** `RHITexture` owns no views in the final design.
+   Renderer feature/resource owners retain `shared_ptr<RHITextureView>`;
+   transient descriptors and frame data borrow raw pointers.
 4. **Factory centralises validation.** `RHIResourceFactory::CreateX` runs
    `validate + normalize + capability check` and only then calls the backend
    `CreateXImpl`. Backends do not duplicate validation logic.
@@ -139,6 +142,9 @@ These rules are enforced across every stage below:
 8. **No RHI changes that force a Renderer-wide rewrite in one commit.**
    Old APIs continue to work as transitional wrappers until Stage 8 explicitly
    removes them.
+9. **No generic texture-view cache.** View reuse is a policy of the semantic
+   owner (`RenderTextureManager`, viewport target, shadow cache, or future
+   RenderGraph), never an unbounded map hidden inside `RHITexture`.
 
 ## Global do-not-do list
 
@@ -162,19 +168,21 @@ After this cleanup, the Stage 9 ShadowDepthPass can:
    `Texture2DArray` shadow texture with `ArrayLayers = NumCascades`.
 2. Use the same factory to allocate `N` per-layer `RHITextureView`s with
    `BaseArrayLayer = i, LayerCount = 1, Aspect = Depth`.
-3. Bind one layer view as depth attachment for each cascade draw, while
+3. Store the texture, whole-array sampled view, per-layer attachment views,
+   and sampler as owning `shared_ptr`s in `ShadowResourceCache`.
+4. Bind one layer view as depth attachment for each cascade draw, while
    sampling the whole-array view for the lighting pass.
-4. Use `RHIDevice::GetUploadManager().UploadTexture(...)` only for the (very
+5. Use `RHIDevice::GetUploadManager().UploadTexture(...)` only for the (very
    small) cascade-bound CPU data, if any.
-5. Construct a depth-only pipeline using the new
-   `RHIGraphicsPipelineDesc::ColorAttachmentCount = 0` mode from Stage 6.
+6. Construct a depth-only pipeline with `HasColorAttachment = false` and an
+   optional fragment shader using the Stage 6 path.
 
 Without Stages 1–6, none of the above is expressible.
 
 ## How this prepares future RenderGraph / PostProcess / TAA
 
-- A `RHITexture` with multiple views lets RenderGraph pass-construction pick
-  whichever view each pass needs without re-allocating GPU memory.
+- Multiple explicitly owned views of one `RHITexture` let RenderGraph
+  pass-construction pick subresources without re-allocating GPU memory.
 - `RHIResourceFactory` becomes the single chokepoint for "create / reuse /
   alias" decisions in a future transient allocator.
 - `RHIUploadManager` becomes the single chokepoint for staging-buffer reuse
@@ -258,9 +266,12 @@ Engine/Source/Runtime/Renderer/Private/Shadows/ShadowResourceCache.h
 
 ## Stage file index and per-stage content
 
-Each stage file is a self-contained implementation guide. The Detailed
-Code Plan section of every stage contains concrete before/after code
-blocks, full new file contents, and exact diff anchors.
+The Stage 5–8 design review and corrected decisions are summarized in
+[RHI_Cleanup_Review_2026-06-27.md](RHI_Cleanup_Review_2026-06-27.md).
+
+Each stage file is a self-contained implementation guide. Treat the checked-in
+source as the authority for exact line locations; the guides define required
+API shapes, ownership rules, implementation order, and stage gates.
 
 | File                                                 | What it adds                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -268,10 +279,10 @@ blocks, full new file contents, and exact diff anchors.
 | [Stage 2](RHI_Cleanup_02_TextureView.md)              | `RHITextureView` with `RHITextureViewDesc` / `RHITextureAspect` / `RHITextureViewUsageFlags`, `VulkanTextureView`, per-texture `m_DefaultView`, `CreateTextureView` factory.                                                                                                                                                                                                                                                          |
 | [Stage 3](RHI_Cleanup_03_ResourceFactory.md)          | `RHIResourceFactory` NVI base, `VulkanResourceFactory` with verbatim creation bodies, validation wrappers, factory lifetime managed by `VulkanDevice`.                                                                                                                                                                                                                                                                                |
 | [Stage 4](RHI_Cleanup_04_UploadManager.md)            | `RHITextureSubresourceRange`, `RHIUploadManager` abstract base, `VulkanUploadManager` V0 with staging-buffer pool, `CreateTextureImpl` no longer inlines upload.                                                                                                                                                                                                                                                                     |
-| [Stage 5](RHI_Cleanup_05_ViewBasedRenderPass_And_BindGroup.md) | `RHIRenderOutputDesc::ColorTargetView/DepthTargetView`, `RHIBindingResource::TextureView`, `RHITexture::GetOrCreateWholeArraySampledView` / `GetOrCreateLayerDepthView` / `GetOrCreateSubresourceView` with detail cache, 12+ Renderer passes migrated, `ShadowResourceCache.h` view fields filled in.                                                                                                                                  |
-| [Stage 6](RHI_Cleanup_06_DepthOnlyPipeline.md)       | `RHIGraphicsPipelineDesc::ColorAttachmentCount = 0` with `MakeDepthOnly` helper, Vulkan `colorAttachmentCount = 0` + `pColorAttachmentFormats = nullptr` + `colorBlend.attachmentCount = 0` + `depthBiasEnable`, `RenderPassKind::ShadowDepth` pipeline construction in `RenderPipelineStateCache`.                                                                                                                                  |
-| [Stage 7](RHI_Cleanup_07_Capabilities_Validation_DebugNames.md) | `RHICapabilities` struct populated from `VkPhysicalDeviceProperties`, `RHIUtils` format helpers (`IsDepth` / `IsStencil` / `IsSrgb` / `GetBytesPerPixel` / `GetMaxMipLevels` / `GetDefaultAspect`), capability-aware factory validation, `VulkanDebugName` helper wired into every `VulkanX` constructor, `RHIDeferredDeleter` placeholder drained at `BeginFrame`, anisotropy wired through `caps.MaxSamplerAnisotropy`.        |
-| [Stage 8](RHI_Cleanup_08_Migration_Checklist.md)      | Migration of every Renderer caller (8 resource managers, 9 passes, editor ImGui), removal of `RHITexture::GetNativeImageView`, removal of `RHIRenderOutputDesc::ColorTexture / DepthTexture`, removal of `RHIDevice::CreateX` virtuals (with `[[deprecated]]` window), restricted `RHITextureView::GetNativeView`.                                                                                                                       |
+| [Stage 5](RHI_Cleanup_05_ViewBasedRenderPass_And_BindGroup.md) | View-only render outputs and bind groups; explicit view ownership in `RenderTextureManager`, viewport targets, and `ShadowResourceCache`; correct Vulkan view/image resolution; conservative whole-image barriers; no `RHITexture` view cache. |
+| [Stage 6](RHI_Cleanup_06_DepthOnlyPipeline.md)       | Keep `HasColorAttachment`; allow vertex-only depth pipelines; conditionally emit fragment/color state; place depth bias in Vulkan rasterization state; key every baked bias value. |
+| [Stage 7](RHI_Cleanup_07_Capabilities_Validation_DebugNames.md) | Minimal truthful capabilities, format/descriptor validation, enabled-feature-aware anisotropy, and correctly typed Vulkan debug names. Deferred deletion is intentionally excluded. |
+| [Stage 8](RHI_Cleanup_08_Migration_Checklist.md)      | Migrate all owners/callers, remove the texture-owned default view and `RHIDevice::CreateX` compatibility paths, unify the narrow native-handle interop API, and review the one-off bind-group update method. |
 
 ## After completing all 8 stages
 
@@ -281,8 +292,7 @@ The RHI surface collapses to:
 RHIDevice
   ├─ GetResourceFactory()         → RHIResourceFactory
   ├─ GetUploadManager()           → RHIUploadManager
-  ├─ GetCapabilities()            → const RHICapabilities&
-  └─ GetDeferredDeleter()         → RHIDeferredDeleter&
+  └─ GetCapabilities()            → const RHICapabilities&
 
 RHIResourceFactory
   ├─ CreateBuffer
@@ -304,23 +314,21 @@ RHIResource (base)
   └─ (virtual dtor)
 
 RHITexture : RHIResource
-  ├─ GetDefaultView()             → RHITextureView*
-  ├─ GetOrCreateWholeArraySampledView()
-  ├─ GetOrCreateLayerDepthView(layer)
-  └─ GetOrCreateSubresourceView(...)
+  └─ image description/resource only; owns no views
 
 RHITextureView : RHIResource
-  └─ GetNativeView(RHIBackend)    (backend-private override)
+  ├─ normalized subresource description
+  └─ GetNativeHandle(RHIBackend)  (interop escape hatch)
 
 RHIBindingResource
   └─ TextureView (not Texture)
 
 RHIRenderOutputDesc
-  └─ ColorTargetView / DepthTargetView (not ColorTexture / DepthTexture)
+  └─ ColorTarget / DepthTarget (both RHITextureView*)
 
 RHIGraphicsPipelineDesc
-  ├─ ColorAttachmentCount         (0 = depth-only)
-  └─ MakeDepthOnly(...)           (CSM helper)
+  ├─ HasColorAttachment           (false = depth-only)
+  └─ generic rasterization depth-bias fields
 ```
 
 Stage 9 (CSM) is then a Renderer-side implementation effort only; no

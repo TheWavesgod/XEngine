@@ -4,6 +4,7 @@
 #include "VulkanDescriptor.h"
 #include "VulkanPipeline.h"
 #include "VulkanTexture.h"
+#include "VulkanTextureView.h"
 #include "VulkanCheckedCast.h"
 
 #include <XEngine/Logging/Log.h>
@@ -289,7 +290,7 @@ namespace XEngine
                 return;
             }
 
-            colorImageView = colorTexture->GetImageView();
+            colorImageView = CheckedVulkanCast<VulkanTextureView>(colorTexture->GetDefaultView(), *m_Device)->GetHandle();
         }
         else if (m_SwapchainImage == VK_NULL_HANDLE || m_SwapchainImageView == VK_NULL_HANDLE)
         {

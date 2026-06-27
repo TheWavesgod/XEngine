@@ -12,6 +12,7 @@ namespace XEngine
 {
     class RHICommandList;
     class RHIResourceFactory;
+    class RHIUploadManager;
     struct VulkanNativeContext;
     using RHINativeCommandBuffer = void*;
 
@@ -57,5 +58,8 @@ namespace XEngine
 
         virtual RHIResourceFactory& GetResourceFactory() = 0;
         virtual const RHIResourceFactory& GetResourceFactory() const = 0;
+
+        virtual RHIUploadManager& GetUploadManager() = 0;             
+        virtual const RHIUploadManager& GetUploadManager() const = 0; 
     };
 }

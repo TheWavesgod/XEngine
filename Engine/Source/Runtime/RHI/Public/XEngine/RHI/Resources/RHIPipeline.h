@@ -40,6 +40,11 @@ namespace XEngine
         bool EnableDepthTest = true;
         bool EnableDepthWrite = true;
 
+        bool EnableDepthBias = false;
+        f32 DepthBiasConstantFactor = 0.0f;
+        f32 DepthBiasClamp = 0.0f;
+        f32 DepthBiasSlopeFactor = 0.0f;
+
         RHIVertexBufferLayoutDesc VertexLayout;
 
         std::vector<RHIBindGroupLayout*> BindGroupLayouts;

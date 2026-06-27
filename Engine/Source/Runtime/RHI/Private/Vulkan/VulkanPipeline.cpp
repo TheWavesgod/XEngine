@@ -142,6 +142,10 @@ namespace XEngine
         rasterization.cullMode = VK_CULL_MODE_NONE;
         rasterization.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterization.lineWidth = 1.0f;
+        rasterization.depthBiasEnable = desc.EnableDepthBias ? VK_TRUE : VK_FALSE; 
+        rasterization.depthBiasConstantFactor = desc.DepthBiasConstantFactor;
+        rasterization.depthBiasClamp = desc.DepthBiasClamp;
+        rasterization.depthBiasSlopeFactor = desc.DepthBiasSlopeFactor;
 
         VkPipelineMultisampleStateCreateInfo multisampling {};
         multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -162,8 +166,8 @@ namespace XEngine
 
         VkPipelineColorBlendStateCreateInfo colorBlend {};
         colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        colorBlend.attachmentCount = 1;
-        colorBlend.pAttachments = &colorBlendAttachment;
+        colorBlend.attachmentCount = desc.HasColorAttachment ? 1u : 0u;
+        colorBlend.pAttachments = desc.HasColorAttachment ? &colorBlendAttachment : nullptr;
 
         const std::array<VkDynamicState, 2> dynamicStates = {
             VK_DYNAMIC_STATE_VIEWPORT,

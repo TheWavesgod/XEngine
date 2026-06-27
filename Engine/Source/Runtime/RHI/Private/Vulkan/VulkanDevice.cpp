@@ -1,6 +1,7 @@
 #include "VulkanDevice.h"
 
 #include "VulkanResourceFactory.h"
+#include "VulkanUploadManager.h"
 #include "VulkanUtils.h"
 
 #include <XEngine/Logging/Log.h>
@@ -165,6 +166,7 @@ namespace XEngine
         }
 
         m_ResourceFactory = std::make_unique<VulkanResourceFactory>(*this);
+        m_UploadManager   = std::make_unique<VulkanUploadManager>(*this);     
 
         m_EnableVSync = createInfo.EnableVSync;
         m_PendingResizeWidth = createInfo.Width;
@@ -207,6 +209,9 @@ namespace XEngine
         }
 
         WaitIdle();
+
+        m_UploadManager.reset();     
+        m_ResourceFactory.reset();
 
         DestroyDepthTexture();
         m_FrameResources.Destroy();
@@ -615,6 +620,18 @@ namespace XEngine
     {
         XENGINE_ASSERT(m_ResourceFactory != nullptr, "Vulkan Resource Factory is null");
         return *m_ResourceFactory;
+    }
+
+    RHIUploadManager& VulkanDevice::GetUploadManager()
+    {
+        XENGINE_ASSERT(m_UploadManager != nullptr, "Vulkan Upload Manager is null");
+        return *m_UploadManager;
+    }
+
+    const RHIUploadManager& VulkanDevice::GetUploadManager() const
+    {
+        XENGINE_ASSERT(m_UploadManager != nullptr, "Vulkan Upload Manager is null");
+        return *m_UploadManager;
     }
 
     bool VulkanDevice::CreateDepthTexture()

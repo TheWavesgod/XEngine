@@ -32,6 +32,11 @@ namespace XEngine
         bool DepthWriteEnabled = true;
         bool BlendEnabled = false;
         bool DoubleSided = false;
+        bool HasColorAttachment = true;
+        bool EnableDepthBias = false;
+        f32 DepthBiasConstantFactor = 0.0f;
+        f32 DepthBiasClamp = 0.0f;
+        f32 DepthBiasSlopeFactor = 0.0f;
 
         // Bump this layout version when shader-visible bind group layout changes.
         u32 PipelineLayoutVersion = 1;
@@ -44,6 +49,13 @@ namespace XEngine
         std::size_t operator()(const GraphicsPipelineStateKey& key) const
         {
             std::size_t value = 0;
+            
+            auto FloatBits = [](f32 v) 
+            {
+                v = (v == 0.0f) ? 0.0f : v;
+                return std::bit_cast<int>(v);
+            };
+
             const auto combine = [&value](std::size_t part)
             {
                 value ^= part + 0x9e3779b9u + (value << 6u) + (value >> 2u);
@@ -58,6 +70,11 @@ namespace XEngine
             combine(std::hash<bool> {}(key.DepthWriteEnabled));
             combine(std::hash<bool> {}(key.BlendEnabled));
             combine(std::hash<bool> {}(key.DoubleSided));
+            combine(std::hash<bool> {}(key.HasColorAttachment));
+            combine(std::hash<bool> {}(key.EnableDepthBias));
+            combine(std::hash<int> {}(key.DepthBiasConstantFactor));
+            combine(std::hash<int> {}(key.DepthBiasClamp));
+            combine(std::hash<int> {}(key.DepthBiasSlopeFactor));
             combine(std::hash<u32> {}(key.PipelineLayoutVersion));
             return value;
         }

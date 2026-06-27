@@ -22,6 +22,7 @@
 namespace XEngine
 {
     class RHIResourceFactory; 
+    class RHIUploadManager;  
 
     struct VulkanDeviceCreateInfo
     {
@@ -65,6 +66,9 @@ namespace XEngine
         RHIResourceFactory& GetResourceFactory() override;
         const RHIResourceFactory& GetResourceFactory() const override;
 
+        RHIUploadManager& GetUploadManager();
+        const RHIUploadManager& GetUploadManager() const;
+
         inline VkDevice GetHandle() const { return m_Device; }
 
     private:
@@ -83,6 +87,8 @@ namespace XEngine
         VulkanFrameResources m_FrameResources;
         VulkanCommandList m_CommandList;
         std::unique_ptr<RHIResourceFactory> m_ResourceFactory;
+        std::unique_ptr<RHIUploadManager> m_UploadManager;
+
         std::unique_ptr<VulkanTexture> m_DepthTexture;
 
         VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;

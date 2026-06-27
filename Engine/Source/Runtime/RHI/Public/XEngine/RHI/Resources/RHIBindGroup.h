@@ -9,7 +9,7 @@
 namespace XEngine
 {
     class RHIBuffer;
-    class RHITexture;
+    class RHITextureView;
     class RHISampler;
 
     struct RHIBindGroupLayoutEntry
@@ -42,7 +42,7 @@ namespace XEngine
         u32 Binding = 0;
         RHIBindingType Type = RHIBindingType::Unknown;
 
-        RHITexture* Texture = nullptr;
+        RHITextureView* TextureView = nullptr;
         RHISampler* Sampler = nullptr;
         RHIBuffer* Buffer = nullptr;
     };

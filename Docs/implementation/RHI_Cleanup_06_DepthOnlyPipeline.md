@@ -1,112 +1,43 @@
-# Stage 6 — Depth-Only Pipeline
+# Stage 6 — Depth-Only Graphics Pipeline
 
 ## 1. Goal
 
-Allow `RHIGraphicsPipelineDesc` to describe a depth-only pipeline:
+Allow the existing graphics-pipeline and dynamic-rendering paths to operate
+without a color attachment. This is the last generic RHI feature required by
+Stage 9 `ShadowDepthPass`.
 
-- `ColorAttachmentCount = 0` means "no color attachments" (depth-only /
-  shadow depth pass).
-- `ColorFormat` becomes optional.
-- `DepthFormat` is still required.
-- Pipeline key `RenderPassKind::ShadowDepth` becomes constructible.
-
-This is required for Stage 9 ShadowDepthPass but it is intentionally a
-self-contained RHI change so Stage 9 is purely a Renderer-side concern.
-
-> Current-source correction (2026-06-25): the checked-in
-> `RHIGraphicsPipelineDesc` already has `bool HasColorAttachment`. Prefer
-> extending that path for Stage 6:
->
-> - `HasColorAttachment == false` maps to Vulkan dynamic rendering
->   `colorAttachmentCount = 0`.
-> - `HasColorAttachment == true` maps to the existing single-colour path.
-> - Add depth-bias fields if needed by shadow pipelines.
->
-> If `ColorAttachmentCount` is still desired for future MRT, make Stage 6 an
-> explicit rename from `HasColorAttachment` to `ColorAttachmentCount`; do not
-> leave both fields in the descriptor.
-
-## 2. Current Code Audit
-
-Relevant existing files:
+The current descriptor already has `bool HasColorAttachment`; keep it for this
+stage:
 
 ```text
-Engine/Source/Runtime/RHI/Public/XEngine/RHI/Resources/RHIPipeline.h
-  - RHIGraphicsPipelineDesc
-      RHIShader* VertexShader
-      RHIShader* FragmentShader
-      RHIFormat ColorFormat = RHIFormat::BGRA8Unorm;     // required
-      RHIFormat DepthFormat = RHIFormat::D32Float;
-      bool EnableDepthTest, EnableDepthWrite
-      RHIVertexBufferLayoutDesc VertexLayout
-      std::vector<RHIBindGroupLayout*> BindGroupLayouts
-      u32 PushConstantSize
-      RHIShaderStageFlags PushConstantStages
-      const char* DebugName
-
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanPipeline.cpp
-  - hardcoded: renderingCreateInfo.colorAttachmentCount = 1
-  - hardcoded: pColorAttachmentFormats points to a single format
-  - hardcoded: colorBlend.attachmentCount = 1
-  - colorBlendAttachment colorWriteMask unconditionally all bits
-
-Engine/Source/Runtime/Renderer/Private/Resources/GraphicsPipelineStateKey.h
-  - RenderPassKind::ShadowDepth already exists
-  - key has ColorFormat and DepthFormat; pipeline cache does not yet
-    construct ShadowDepth pipelines.
+HasColorAttachment = true   one color attachment (current forward path)
+HasColorAttachment = false  zero color attachments (depth-only path)
 ```
 
-What already exists:
+Do not replace it with `ColorAttachmentCount` until MRT is implemented. An
+integer that rejects every value above one is not useful future-proofing.
 
-- `RenderPassKind::ShadowDepth` is referenced in the pipeline key but no
-  pipeline is constructed for it yet.
-- `VulkanPipeline` supports `VK_FORMAT_UNDEFINED` for `DepthFormat` only —
-  ColorFormat is currently required to be valid.
+## 2. Corrections to the Earlier Draft
 
-What is missing:
+The previous plan contained three implementation-breaking errors:
 
-- `RHIGraphicsPipelineDesc::ColorAttachmentCount`.
-- Backend support for `colorAttachmentCount = 0`.
-- Backend support for `pColorAttachmentFormats = nullptr`.
+1. Vulkan does **not** require a fragment shader for a depth-only graphics
+   pipeline. `FragmentShader == nullptr` is valid when
+   `HasColorAttachment == false`; the backend must omit the fragment stage.
+2. Depth bias belongs to `VkPipelineRasterizationStateCreateInfo`, not
+   `VkPipelineDepthStencilStateCreateInfo`.
+3. The pipeline and command-recording sides must agree. Creating a zero-color
+   pipeline is insufficient if `vkCmdBeginRendering` still declares one color
+   attachment.
 
-What should **not** be changed yet:
+The earlier `RHIGraphicsPipelineDesc::MakeDepthOnly` helper is also removed.
+It embedded shadow-specific bias defaults in the generic RHI. Renderer code
+should fill the generic descriptor explicitly.
 
-- `RHITexture::GetNativeImageView` (transitional, Stage 8).
-- `RHIDevice::CreateX` wrappers (transitional, Stage 8).
-- View-based render pass / bind group are already done (Stage 5).
-- Renderer ShadowDepthPass implementation (Stage 9).
+## 3. Descriptor Changes
 
-## 3. Files to Add
-
-None. This is a header change plus backend wiring.
-
-## 4. Files to Modify
-
-```text
-Engine/Source/Runtime/RHI/Public/XEngine/RHI/Resources/RHIPipeline.h
-
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanPipeline.cpp
-
-Engine/Source/Runtime/Renderer/Private/Resources/GraphicsPipelineStateKey.h
-  (no change to key; RenderPassKind::ShadowDepth already exists)
-
-Engine/Source/Runtime/RHI/Private/RHIResourceFactory.cpp  (Stage 3 file;
-  validation: depth-only pipeline requires non-null fragment shader)
-```
-
-## 5. Detailed Code Plan
-
-### 5.1 Modify: `Resources/RHIPipeline.h` — add `ColorAttachmentCount` and helper
-
-For the current source baseline, read this section as one of two valid
-alternatives:
-
-1. Minimal Stage 6: keep `HasColorAttachment` and add only the depth-bias
-   fields plus Vulkan handling for `HasColorAttachment == false`.
-2. MRT-ready Stage 6: replace `HasColorAttachment` with
-   `ColorAttachmentCount`. Update all existing call sites in the same commit.
-
-**Before** (lines 56–75 of `RHIPipeline.h`, the body of `RHIGraphicsPipelineDesc`):
+Extend the current `RHIGraphicsPipelineDesc` only with generic rasterization
+state:
 
 ```cpp
 struct RHIGraphicsPipelineDesc
@@ -116,523 +47,224 @@ struct RHIGraphicsPipelineDesc
 
     RHIFormat ColorFormat = RHIFormat::BGRA8Unorm;
     RHIFormat DepthFormat = RHIFormat::D32Float;
+    bool HasColorAttachment = true;
 
     bool EnableDepthTest = true;
     bool EnableDepthWrite = true;
 
-    RHIVertexBufferLayoutDesc VertexLayout;
-    std::vector<RHIBindGroupLayout*> BindGroupLayouts;
+    bool EnableDepthBias = false;
+    f32 DepthBiasConstantFactor = 0.0f;
+    f32 DepthBiasClamp = 0.0f;
+    f32 DepthBiasSlopeFactor = 0.0f;
 
-    u32 PushConstantSize = 0;
-    RHIShaderStageFlags PushConstantStages = RHIShaderStageFlags::Vertex;
-
-    const char* DebugName = nullptr;
+    // existing vertex layout, bind-group layouts, push constants, name...
 };
 ```
 
-**After**:
+Bias values are pipeline state in Stage 6. If Stage 9 needs to tune them every
+frame, add dynamic depth bias as a separate, deliberate command-list feature;
+do not silently omit the values from the pipeline cache key.
+
+## 4. Factory Validation
+
+`RHIResourceFactory::CreateGraphicsPipeline` is the common validation point:
 
 ```cpp
-struct RHIGraphicsPipelineDesc
+if (desc.VertexShader == nullptr)
 {
-    RHIShader* VertexShader = nullptr;
-    RHIShader* FragmentShader = nullptr;
+    return nullptr;
+}
 
-    // 0 = depth-only pipeline (Stage 6 / Stage 9 ShadowDepth).
-    // 1 = single color attachment (default; matches Stage 5 behaviour).
-    // >1 = rejected in Stage 6 (multi-rendertarget comes later).
-    u32 ColorAttachmentCount = 1;
-
-    // Ignored when ColorAttachmentCount == 0.
-    RHIFormat ColorFormat = RHIFormat::BGRA8Unorm;
-
-    RHIFormat DepthFormat = RHIFormat::D32Float;
-
-    bool EnableDepthTest = true;
-    bool EnableDepthWrite = true;
-
-    // Shadow depth pipelines typically want fixed bias. Defaults still
-    // safe; Renderer / Stage 9 sets them when the key says ShadowDepth.
-    bool DepthBiasEnable = false;
-    float DepthBiasConstantFactor = 0.0f;
-    float DepthBiasSlopeFactor = 0.0f;
-
-    RHIVertexBufferLayoutDesc VertexLayout;
-    std::vector<RHIBindGroupLayout*> BindGroupLayouts;
-
-    u32 PushConstantSize = 0;
-    RHIShaderStageFlags PushConstantStages = RHIShaderStageFlags::Vertex;
-
-    const char* DebugName = nullptr;
-
-    // Convenience for Stage 9 ShadowDepth construction.
-    static RHIGraphicsPipelineDesc MakeDepthOnly(
-        RHIShader* vertexShader,
-        RHIShader* fragmentShader,
-        RHIFormat depthFormat,
-        const RHIVertexBufferLayoutDesc& vertexLayout,
-        std::vector<RHIBindGroupLayout*> bindGroupLayouts,
-        u32 pushConstantSize = 0,
-        RHIShaderStageFlags pushConstantStages = RHIShaderStageFlags::Vertex,
-        bool depthBiasEnable = true,
-        float depthBiasConstantFactor = 1.25f,
-        float depthBiasSlopeFactor = 1.75f,
-        const char* debugName = nullptr);
-};
-```
-
-### 5.2 Modify: `Resources/RHIPipeline.cpp` — implement `MakeDepthOnly`
-
-`RHIPipeline.cpp` may be a header-only translation unit today. If it is
-not, add a new `.cpp`:
-
-**New file**: `Private/Resources/RHIPipeline.cpp`
-
-```cpp
-// Engine/Source/Runtime/RHI/Private/Resources/RHIPipeline.cpp
-#include "XEngine/RHI/Resources/RHIPipeline.h"
-
-namespace XEngine
+if (desc.HasColorAttachment)
 {
-    RHIGraphicsPipelineDesc RHIGraphicsPipelineDesc::MakeDepthOnly(
-        RHIShader* vertexShader,
-        RHIShader* fragmentShader,
-        RHIFormat depthFormat,
-        const RHIVertexBufferLayoutDesc& vertexLayout,
-        std::vector<RHIBindGroupLayout*> bindGroupLayouts,
-        u32 pushConstantSize,
-        RHIShaderStageFlags pushConstantStages,
-        bool depthBiasEnable,
-        float depthBiasConstantFactor,
-        float depthBiasSlopeFactor,
-        const char* debugName)
+    if (desc.FragmentShader == nullptr ||
+        desc.ColorFormat == RHIFormat::Undefined)
     {
-        RHIGraphicsPipelineDesc desc;
-        desc.VertexShader = vertexShader;
-        desc.FragmentShader = fragmentShader;
-        desc.ColorAttachmentCount = 0;
-        desc.ColorFormat = RHIFormat::Undefined;
-        desc.DepthFormat = depthFormat;
-        desc.EnableDepthTest = true;
-        desc.EnableDepthWrite = true;
-        desc.DepthBiasEnable = depthBiasEnable;
-        desc.DepthBiasConstantFactor = depthBiasConstantFactor;
-        desc.DepthBiasSlopeFactor = depthBiasSlopeFactor;
-        desc.VertexLayout = vertexLayout;
-        desc.BindGroupLayouts = std::move(bindGroupLayouts);
-        desc.PushConstantSize = pushConstantSize;
-        desc.PushConstantStages = pushConstantStages;
-        desc.DebugName = debugName;
-        return desc;
+        return nullptr;
     }
 }
-```
 
-`CMake` picks it up via `GLOB_RECURSE`.
-
-### 5.3 Modify: `Vulkan/VulkanPipeline.cpp` — honour `ColorAttachmentCount`
-
-**Before** (the block that builds `VkPipelineRenderingCreateInfo` and the
-`VkPipelineColorBlendStateCreateInfo` — approximately lines 274–295):
-
-```cpp
-const VkFormat colorFormat = RHIFormatToVulkanFormat(desc.ColorFormat);
-const VkFormat depthFormat = RHIFormatToVulkanFormat(desc.DepthFormat);
-if (colorFormat == VK_FORMAT_UNDEFINED)
+if (!desc.HasColorAttachment && desc.DepthFormat == RHIFormat::Undefined)
 {
-    XENGINE_LOG_ERROR("Vulkan graphics pipeline received an unsupported color format");
-    return;
+    // With no color and no depth, this stage has no usable attachment.
+    return nullptr;
 }
 
-VkPipelineRenderingCreateInfo renderingCreateInfo {};
-renderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-renderingCreateInfo.colorAttachmentCount = 1;
-renderingCreateInfo.pColorAttachmentFormats = &colorFormat;
-renderingCreateInfo.depthAttachmentFormat = depthFormat;
+if ((desc.EnableDepthTest || desc.EnableDepthWrite) &&
+    desc.DepthFormat == RHIFormat::Undefined)
+{
+    return nullptr;
+}
+```
 
-// ...
+Also validate that every shader and bind-group layout belongs to the factory's
+device. Stage 7 adds complete format/capability validation.
 
-VkPipelineColorBlendAttachmentState colorBlendAttachment {};
-colorBlendAttachment.colorWriteMask =
+## 5. Vulkan Pipeline Implementation
+
+### 5.1 Shader stages
+
+Build the shader-stage vector conditionally:
+
+```cpp
+std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+shaderStages.push_back(MakeShaderStage(*vertexShader));
+
+if (desc.FragmentShader != nullptr)
+{
+    auto* fragmentShader = CheckedVulkanCast<VulkanShader>(
+        desc.FragmentShader, device);
+    if (fragmentShader == nullptr)
+    {
+        return false;
+    }
+    shaderStages.push_back(MakeShaderStage(*fragmentShader));
+}
+```
+
+For the Stage 9 shadow pipeline, leave `FragmentShader` null. If a later depth
+pass intentionally uses fragment tests (for example alpha-masked shadows), it
+may supply a fragment shader while still setting `HasColorAttachment = false`.
+
+### 5.2 Dynamic-rendering formats
+
+```cpp
+const VkFormat colorFormat = desc.HasColorAttachment
+    ? RHIFormatToVulkanFormat(desc.ColorFormat)
+    : VK_FORMAT_UNDEFINED;
+const VkFormat depthFormat = RHIFormatToVulkanFormat(desc.DepthFormat);
+
+VkPipelineRenderingCreateInfo renderingInfo {};
+renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+renderingInfo.colorAttachmentCount = desc.HasColorAttachment ? 1u : 0u;
+renderingInfo.pColorAttachmentFormats =
+    desc.HasColorAttachment ? &colorFormat : nullptr;
+renderingInfo.depthAttachmentFormat = depthFormat;
+renderingInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+```
+
+Reject undefined color format only when a color attachment exists. Reject an
+undefined depth format when depth test/write is enabled or when the pipeline
+has no color attachment.
+
+### 5.3 Color blend state
+
+```cpp
+VkPipelineColorBlendAttachmentState colorAttachment {};
+colorAttachment.colorWriteMask =
     VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
     VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
 VkPipelineColorBlendStateCreateInfo colorBlend {};
 colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-colorBlend.attachmentCount = 1;
-colorBlend.pAttachments = &colorBlendAttachment;
+colorBlend.attachmentCount = desc.HasColorAttachment ? 1u : 0u;
+colorBlend.pAttachments = desc.HasColorAttachment ? &colorAttachment : nullptr;
 ```
 
-**After**:
+### 5.4 Rasterization depth bias
+
+Apply bias to the existing rasterization state:
 
 ```cpp
-const bool depthOnly = desc.ColorAttachmentCount == 0;
-const VkFormat colorFormat = depthOnly
-                                ? VK_FORMAT_UNDEFINED
-                                : RHIFormatToVulkanFormat(desc.ColorFormat);
-const VkFormat depthFormat = RHIFormatToVulkanFormat(desc.DepthFormat);
-if (!depthOnly && colorFormat == VK_FORMAT_UNDEFINED)
-{
-    XENGINE_LOG_ERROR("Vulkan graphics pipeline received an unsupported color format");
-    return;
-}
-if (depthFormat == VK_FORMAT_UNDEFINED)
-{
-    XENGINE_LOG_ERROR("Vulkan graphics pipeline received an unsupported depth format");
-    return;
-}
-
-VkPipelineRenderingCreateInfo renderingCreateInfo {};
-renderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-renderingCreateInfo.colorAttachmentCount = depthOnly ? 0u : 1u;
-renderingCreateInfo.pColorAttachmentFormats = depthOnly ? nullptr : &colorFormat;
-renderingCreateInfo.depthAttachmentFormat = depthFormat;
-renderingCreateInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
-
-// ...
-
-VkPipelineColorBlendAttachmentState colorBlendAttachment {};
-if (!depthOnly)
-{
-    colorBlendAttachment.colorWriteMask =
-        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-}
-
-VkPipelineColorBlendStateCreateInfo colorBlend {};
-colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-colorBlend.attachmentCount = depthOnly ? 0u : 1u;
-colorBlend.pAttachments = depthOnly ? nullptr : &colorBlendAttachment;
+rasterization.depthBiasEnable = desc.EnableDepthBias ? VK_TRUE : VK_FALSE;
+rasterization.depthBiasConstantFactor = desc.DepthBiasConstantFactor;
+rasterization.depthBiasClamp = desc.DepthBiasClamp;
+rasterization.depthBiasSlopeFactor = desc.DepthBiasSlopeFactor;
 ```
 
-### 5.4 Modify: `Vulkan/VulkanPipeline.cpp` — depth bias wiring
+Do not write these members on `VkPipelineDepthStencilStateCreateInfo`; they do
+not exist there.
 
-**Before** (the depth-stencil state block — approximately lines 256–268):
+## 6. Dynamic-Rendering Command Path
+
+Update `VulkanCommandList::BeginRenderingIfNeeded` so attachment count follows
+the actual output descriptor:
 
 ```cpp
-VkPipelineDepthStencilStateCreateInfo depthStencil {};
-depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-depthStencil.depthTestEnable = desc.EnableDepthTest;
-depthStencil.depthWriteEnable = desc.EnableDepthWrite;
-depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-depthStencil.depthBoundsTestEnable = VK_FALSE;
-depthStencil.stencilTestEnable = VK_FALSE;
+const bool hasColor = renderToSwapchain || m_RenderOutput.ColorTarget != nullptr;
+const bool hasDepth = m_RenderOutput.DepthTarget != nullptr;
+
+VkRenderingInfo renderingInfo {};
+renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+renderingInfo.renderArea = renderArea;
+renderingInfo.layerCount = 1;
+renderingInfo.colorAttachmentCount = hasColor ? 1u : 0u;
+renderingInfo.pColorAttachments = hasColor ? &colorAttachment : nullptr;
+renderingInfo.pDepthAttachment = hasDepth ? &depthAttachment : nullptr;
 ```
 
-**After**:
+Rules:
+
+- swapchain rendering always has one color attachment;
+- offscreen color + depth keeps the existing path;
+- depth-only requires `ColorTarget == nullptr`, a valid `DepthTarget`, and
+  `ColorFormat == Undefined` by convention;
+- reject an offscreen descriptor with neither color nor depth;
+- derive attachment image views from Stage-5 view objects.
+
+## 7. Renderer Pipeline Cache
+
+`GraphicsPipelineStateKey` must contain every field that changes the native
+pipeline. Add:
 
 ```cpp
-VkPipelineDepthStencilStateCreateInfo depthStencil {};
-depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-depthStencil.depthTestEnable = desc.EnableDepthTest;
-depthStencil.depthWriteEnable = desc.EnableDepthWrite;
-depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-depthStencil.depthBoundsTestEnable = VK_FALSE;
-depthStencil.stencilTestEnable = VK_FALSE;
-depthStencil.depthBiasEnable = desc.DepthBiasEnable ? VK_TRUE : VK_FALSE;
-depthStencil.depthBiasConstantFactor = desc.DepthBiasConstantFactor;
-depthStencil.depthBiasSlopeFactor = desc.DepthBiasSlopeFactor;
-depthStencil.depthBiasClamp = 0.0f;
+bool HasColorAttachment = true;
+bool EnableDepthBias = false;
+f32 DepthBiasConstantFactor = 0.0f;
+f32 DepthBiasClamp = 0.0f;
+f32 DepthBiasSlopeFactor = 0.0f;
 ```
 
-(`LESS_OR_EQUAL` matches the existing SkyboxPass depth-test behaviour —
-this is not a Stage 6 change, just kept explicit so the bias is
-reviewable.)
+Update equality and hashing for all five fields. Hash floating-point values by
+their bit representation (for example `std::bit_cast<u32>`), and normalize
+`-0.0f` to `0.0f` when constructing the key.
 
-### 5.5 Modify: `RHIResourceFactory.cpp` — validate depth-only input
-
-**Before** (the `CreateGraphicsPipeline` wrapper in
-`RHIResourceFactory.cpp`):
+For `RenderPassKind::ShadowDepth`, `RenderPipelineStateCache` constructs:
 
 ```cpp
-std::unique_ptr<RHIGraphicsPipeline> RHIResourceFactory::CreateGraphicsPipeline(
-    const RHIGraphicsPipelineDesc& desc)
-{
-    if (desc.VertexShader == nullptr || desc.FragmentShader == nullptr)
-    {
-        XENGINE_LOG_ERROR("CreateGraphicsPipeline requires both vertex and fragment shaders");
-        return nullptr;
-    }
-    return CreateGraphicsPipelineImpl(desc);
-}
+RHIGraphicsPipelineDesc desc;
+desc.VertexShader = shadowVertexShader;
+desc.FragmentShader = nullptr;
+desc.HasColorAttachment = false;
+desc.ColorFormat = RHIFormat::Undefined;
+desc.DepthFormat = key.DepthFormat;
+desc.EnableDepthTest = true;
+desc.EnableDepthWrite = true;
+desc.EnableDepthBias = key.EnableDepthBias;
+desc.DepthBiasConstantFactor = key.DepthBiasConstantFactor;
+desc.DepthBiasClamp = key.DepthBiasClamp;
+desc.DepthBiasSlopeFactor = key.DepthBiasSlopeFactor;
 ```
 
-**After**:
+Shader paths, bias policy, and default bias values belong to the Renderer/
+Stage 9 plan, not RHI.
 
-```cpp
-std::unique_ptr<RHIGraphicsPipeline> RHIResourceFactory::CreateGraphicsPipeline(
-    const RHIGraphicsPipelineDesc& desc)
-{
-    if (desc.VertexShader == nullptr)
-    {
-        XENGINE_LOG_ERROR("CreateGraphicsPipeline requires a vertex shader");
-        return nullptr;
-    }
-    if (desc.FragmentShader == nullptr)
-    {
-        XENGINE_LOG_ERROR("CreateGraphicsPipeline requires a fragment shader (depth-only pipelines still need one)");
-        return nullptr;
-    }
-    if (desc.ColorAttachmentCount == 0)
-    {
-        if (desc.DepthFormat == RHIFormat::Undefined)
-        {
-            XENGINE_LOG_ERROR("Depth-only graphics pipeline requires a depth format");
-            return nullptr;
-        }
-    }
-    else
-    {
-        if (desc.ColorAttachmentCount > 1)
-        {
-            XENGINE_LOG_ERROR("Stage 6 does not support more than one color attachment");
-            return nullptr;
-        }
-        if (desc.ColorFormat == RHIFormat::Undefined)
-        {
-            XENGINE_LOG_ERROR("Color-attached graphics pipeline requires a color format");
-            return nullptr;
-        }
-    }
-    return CreateGraphicsPipelineImpl(desc);
-}
-```
+## 8. Implementation Order
 
-The wrapper in `RHIResourceFactory.cpp` is the only validation site for
-both backends; `VulkanResourceFactory::CreateGraphicsPipelineImpl`
-inherits the same guarantees.
+1. Add generic depth-bias fields to `RHIGraphicsPipelineDesc`.
+2. Update common factory validation, including optional fragment shader.
+3. Make Vulkan shader stages, rendering formats, color blend state, and
+   rasterization bias conditional.
+4. Make `vkCmdBeginRendering` use zero color attachments for depth-only output.
+5. Extend `GraphicsPipelineStateKey` equality/hash and create the
+   `ShadowDepth` branch.
+6. Build and validate forward, editor offscreen, and depth-only paths.
 
-### 5.6 Modify: `Vulkan/VulkanResourceFactory.cpp` — assert stage contract
+## 9. Verification
 
-After the validation in `RHIResourceFactory`, the Vulkan implementation
-can assume the desc is well-formed. Add an explicit assert at the top of
-`VulkanResourceFactory::CreateGraphicsPipelineImpl` for safety:
+- Existing forward pipelines still contain vertex + fragment stages and one
+  color attachment.
+- A depth-only test pipeline succeeds with `FragmentShader == nullptr`.
+- RenderDoc shows zero color formats/blend attachments for that pipeline.
+- `vkCmdBeginRendering` uses `colorAttachmentCount == 0` and
+  `pColorAttachments == nullptr` for the test pass.
+- Pipeline cache entries differ when any baked depth-bias value differs.
+- Vulkan validation has no dynamic-rendering compatibility warnings.
 
-**Before**:
+## 10. Out of Scope
 
-```cpp
-std::unique_ptr<RHIGraphicsPipeline> VulkanResourceFactory::CreateGraphicsPipelineImpl(
-    const RHIGraphicsPipelineDesc& desc)
-{
-    if (desc.VertexShader == nullptr || desc.FragmentShader == nullptr)
-    {
-        XENGINE_LOG_ERROR("Vulkan graphics pipeline requires both vertex and fragment shaders");
-        return nullptr;
-    }
-    // ...
-}
-```
-
-**After**:
-
-```cpp
-std::unique_ptr<RHIGraphicsPipeline> VulkanResourceFactory::CreateGraphicsPipelineImpl(
-    const RHIGraphicsPipelineDesc& desc)
-{
-    // Validation already performed in RHIResourceFactory::CreateGraphicsPipeline.
-    XE_ASSERT(desc.VertexShader != nullptr);
-    XE_ASSERT(desc.FragmentShader != nullptr);
-    XE_ASSERT(desc.ColorAttachmentCount <= 1);
-    // ...
-}
-```
-
-### 5.7 Modify: `Renderer/Private/Resources/GraphicsPipelineStateKey.h`
-
-**Before** (the body of `GraphicsPipelineStateKey`):
-
-```cpp
-struct GraphicsPipelineStateKey
-{
-    RenderPassKind PassKind = RenderPassKind::ForwardOpaque;
-    RHIFormat ColorFormat = RHIFormat::BGRA8Unorm;
-    RHIFormat DepthFormat = RHIFormat::D32Float;
-    RHIVertexLayoutId VertexLayout = InvalidVertexLayoutId;
-    std::vector<RHIBindGroupLayoutId> BindGroupLayouts;
-    u32 PushConstantSize = 0;
-    RHIShaderStageFlags PushConstantStages = RHIShaderStageFlags::Vertex;
-    // ...
-};
-```
-
-**After** — add `DepthBiasEnable` so the cache key for shadow pipelines
-is unique when toggling bias on/off:
-
-```cpp
-struct GraphicsPipelineStateKey
-{
-    RenderPassKind PassKind = RenderPassKind::ForwardOpaque;
-    RHIFormat ColorFormat = RHIFormat::BGRA8Unorm;
-    RHIFormat DepthFormat = RHIFormat::D32Float;
-    RHIVertexLayoutId VertexLayout = InvalidVertexLayoutId;
-    std::vector<RHIBindGroupLayoutId> BindGroupLayouts;
-    u32 PushConstantSize = 0;
-    RHIShaderStageFlags PushConstantStages = RHIShaderStageFlags::Vertex;
-    bool DepthBiasEnable = false;
-    // ...
-};
-```
-
-Add a free-function helper (or static method) so call sites stay short:
-
-```cpp
-inline GraphicsPipelineStateKey MakeShadowDepthKey(
-    RHIFormat depthFormat,
-    RHIVertexLayoutId vertexLayout,
-    std::vector<RHIBindGroupLayoutId> bindGroupLayouts)
-{
-    GraphicsPipelineStateKey key;
-    key.PassKind = RenderPassKind::ShadowDepth;
-    key.ColorFormat = RHIFormat::Undefined;
-    key.DepthFormat = depthFormat;
-    key.VertexLayout = vertexLayout;
-    key.BindGroupLayouts = std::move(bindGroupLayouts);
-    key.PushConstantSize = 0;
-    key.PushConstantStages = RHIShaderStageFlags::Vertex;
-    key.DepthBiasEnable = true;
-    return key;
-}
-```
-
-### 5.8 Modify: `Renderer/Private/Resources/RenderPipelineStateCache.cpp`
-
-**Before** (the body of `CreateGraphicsPipeline`):
-
-```cpp
-RHIGraphicsPipeline* RenderPipelineStateCache::CreateGraphicsPipeline(
-    const GraphicsPipelineStateKey& key,
-    const RenderPipelineShaderSet& shaders,
-    const VertexLayoutMap& layouts)
-{
-    RHIGraphicsPipelineDesc desc;
-    desc.VertexShader = shaders.Vertex;
-    desc.FragmentShader = shaders.Fragment;
-    desc.ColorFormat = key.ColorFormat;
-    desc.DepthFormat = key.DepthFormat;
-    desc.VertexLayout = ResolveLayout(key.VertexLayout, layouts);
-    for (auto id : key.BindGroupLayouts) desc.BindGroupLayouts.push_back(Lookup(id));
-    desc.PushConstantSize = key.PushConstantSize;
-    desc.PushConstantStages = key.PushConstantStages;
-    desc.DebugName = "RenderPipeline";
-    return m_Device->CreateGraphicsPipeline(desc).release();
-}
-```
-
-**After**:
-
-```cpp
-RHIGraphicsPipeline* RenderPipelineStateCache::CreateGraphicsPipeline(
-    const GraphicsPipelineStateKey& key,
-    const RenderPipelineShaderSet& shaders,
-    const VertexLayoutMap& layouts)
-{
-    if (key.PassKind == RenderPassKind::ShadowDepth)
-    {
-        auto desc = RHIGraphicsPipelineDesc::MakeDepthOnly(
-            shaders.Vertex,
-            shaders.Fragment,
-            key.DepthFormat,
-            ResolveLayout(key.VertexLayout, layouts),
-            ResolveBindGroupLayouts(key.BindGroupLayouts),
-            key.PushConstantSize,
-            key.PushConstantStages,
-            key.DepthBiasEnable,        // bool overload
-            key.DepthBiasEnable ? 1.25f : 0.0f,
-            key.DepthBiasEnable ? 1.75f : 0.0f,
-            "ShadowDepth");
-        return m_Device->GetResourceFactory().CreateGraphicsPipeline(desc).release();
-    }
-
-    RHIGraphicsPipelineDesc desc;
-    desc.VertexShader = shaders.Vertex;
-    desc.FragmentShader = shaders.Fragment;
-    desc.ColorAttachmentCount = 1;
-    desc.ColorFormat = key.ColorFormat;
-    desc.DepthFormat = key.DepthFormat;
-    desc.VertexLayout = ResolveLayout(key.VertexLayout, layouts);
-    for (auto id : key.BindGroupLayouts) desc.BindGroupLayouts.push_back(Lookup(id));
-    desc.PushConstantSize = key.PushConstantSize;
-    desc.PushConstantStages = key.PushConstantStages;
-    desc.DebugName = "RenderPipeline";
-    return m_Device->GetResourceFactory().CreateGraphicsPipeline(desc).release();
-}
-```
-
-`ResolveBindGroupLayouts` is a small helper to keep the call site
-readable:
-
-```cpp
-std::vector<RHIBindGroupLayout*> RenderPipelineStateCache::ResolveBindGroupLayouts(
-    const std::vector<RHIBindGroupLayoutId>& ids) const
-{
-    std::vector<RHIBindGroupLayout*> out;
-    out.reserve(ids.size());
-    for (auto id : ids) out.push_back(Lookup(id));
-    return out;
-}
-```
-
-If `CreateGraphicsPipeline` already returns `RHIGraphicsPipeline*` (raw
-pointer owned by the cache), `.release()` is not needed. Adjust per
-existing convention.
-
-### 5.9 CMake
-
-No edits. New file `Private/Resources/RHIPipeline.cpp` is picked up by
-`GLOB_RECURSE`.
-
-## 6. Implementation Order
-
-1. Add `ColorAttachmentCount` and `MakeDepthOnly` to `RHIGraphicsPipelineDesc`.
-2. Update `VulkanPipeline.cpp` to honour `ColorAttachmentCount = 0`.
-3. Update `RHIResourceFactory::CreateGraphicsPipelineImpl` wrapper
-   validation.
-4. Update `RenderPipelineStateCache::CreateGraphicsPipeline` to construct
-   a depth-only pipeline when `key.PassKind == RenderPassKind::ShadowDepth`.
-5. Compile and run Editor + Sandbox to confirm existing pipelines still
-   work.
-
-## 7. Verification
-
-- **Build:** Compiles.
-- **Sandbox smoke test:** Forward PBR scene unchanged.
-- **Editor smoke test:** Editor viewport unchanged.
-- **Depth-only pipeline creation:** Add a temporary test in
-  `RenderPipelineStateCache::CreateGraphicsPipeline` that requests a
-  `RenderPassKind::ShadowDepth` pipeline and inspects the resulting
-  `VkPipeline` via `RenderDoc`. Confirm `colorAttachmentCount == 0` and
-  `depthAttachmentFormat == VK_FORMAT_D32_SFLOAT`.
-- **RenderDoc:** A depth-only pipeline should not produce any color
-  attachment writes — verify with a manual draw that calls
-  `vkCmdBindPipeline` and `vkCmdDraw` and observing no colour writes.
-
-## 8. Common Mistakes
-
-- Setting `colorAttachmentCount = 0` but leaving
-  `pColorAttachmentFormats = &someFormat` — Vulkan spec says when
-  `colorAttachmentCount == 0`, `pColorAttachmentFormats` must be `nullptr`.
-- Forgetting to set `colorBlend.attachmentCount = 0` for depth-only
-  pipelines. Vulkan validation will catch it.
-- Forgetting to set `colorBlendAttachment.colorWriteMask = 0` (although
-  with `attachmentCount = 0` it does not matter, leaving a non-zero mask
-  is misleading).
-- Allowing `desc.ColorAttachmentCount > 1` in Stage 6. Stage 6 explicitly
-  caps it at 1 (or 0). Reject with `XE_ASSERT` if a future caller passes
-  >1.
-- Constructing a depth-only pipeline without a fragment shader. Vulkan
-  requires a fragment stage even if no colour is written. The validation
-  in `RHIResourceFactory` should reject null fragment shader.
-
-## 9. What This Stage Intentionally Does Not Do
-
-- Does **not** implement the actual `ShadowDepthPass` in the Renderer.
-  Stage 9.
-- Does **not** add depth bias / front-face culling state to
-  `RHIGraphicsPipelineDesc`. Stage 9.
-- Does **not** allow multi-colour attachments (`ColorAttachmentCount > 1`).
-  Deferred.
-- Does **not** remove `RHITexture::GetNativeImageView` or the
-  `RHIDevice::CreateX` wrappers. Stage 8.
-- Does **not** introduce a generic per-pass view API. RenderGraph V1.
-- Does **not** add `RHICapabilities` (max colour attachments per subpass,
-  independent blend, etc.). Stage 7.
+- MRT and `ColorAttachmentCount > 1`.
+- Dynamic depth bias commands.
+- Alpha-masked shadow materials.
+- CSM planning/drawing.
+- Full resource-state tracking.

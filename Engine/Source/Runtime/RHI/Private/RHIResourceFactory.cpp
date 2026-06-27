@@ -152,14 +152,31 @@ namespace XEngine
     std::shared_ptr<RHIPipeline> RHIResourceFactory::CreateGraphicsPipeline(
         const RHIGraphicsPipelineDesc& desc)
     {
-        if (desc.VertexShader == nullptr || desc.FragmentShader == nullptr)
+        if (desc.VertexShader == nullptr)
         {
-            XENGINE_LOG_ERROR("RHI graphics pipeline requires both vertex and fragment shaders");
+            XENGINE_LOG_ERROR("RHI graphics pipeline requires vertex shaders");
             return nullptr;
         }
-        if (desc.ColorFormat == RHIFormat::Undefined)
+
+        if (desc.HasColorAttachment)
         {
-            XENGINE_LOG_ERROR("RHI graphics pipeline requires a color format (Stage 6 will lift this)");
+            if (desc.FragmentShader == nullptr ||
+                desc.ColorFormat == RHIFormat::Undefined)
+            {
+                XENGINE_LOG_ERROR("RHI graphics pipeline with color attachment requires a color format and fragment shaders");
+                return nullptr;
+            }
+        }
+
+        if (!desc.HasColorAttachment && desc.DepthFormat == RHIFormat::Undefined)
+        {
+            XENGINE_LOG_ERROR("With no color and no depth, this stage has no usable attachment.");
+            return nullptr;
+        }
+
+        if ((desc.EnableDepthTest || desc.EnableDepthWrite) &&
+            desc.DepthFormat == RHIFormat::Undefined)
+        {
             return nullptr;
         }
         return CreateGraphicsPipelineImpl(desc);

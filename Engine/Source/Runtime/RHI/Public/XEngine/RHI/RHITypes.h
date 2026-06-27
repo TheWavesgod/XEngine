@@ -214,13 +214,13 @@ namespace XEngine
         u32 Height = 0;
     };
 
-    class RHITexture;
     class RHITextureView;
 
     struct RHIRenderOutputDesc
     {
-        RHITexture* ColorTarget = nullptr;      // null for depth-only rendering
-        RHITextureView* DepthTarget = nullptr;  // may be a per-layer view
+        RHITextureView* ColorTarget = nullptr;      // null for depth-only rendering
+        RHITextureView* DepthTarget = nullptr;      // may be a per-layer view
+        
         RHIRect2D Viewport {};
         RHIFormat ColorFormat = RHIFormat::BGRA8Unorm;
         RHIFormat DepthFormat = RHIFormat::D32Float;

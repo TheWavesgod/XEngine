@@ -8,6 +8,7 @@
 #include "VulkanShader.h"
 #include "VulkanTexture.h"
 #include "VulkanTextureView.h"
+#include "VulkanUploadManager.h"
 #include "VulkanUtils.h"
 
 #include <XEngine/Core/Assert.h>
@@ -55,27 +56,7 @@ namespace XEngine
 
         if (initialData != nullptr && initialDataSize > 0)
         {
-            // Verbatim copy of the inline upload code from
-            // VulkanDevice::CreateTexture (lines 541–633).
-            RHIBufferDesc stagingDesc;
-            stagingDesc.Size = initialDataSize;
-            stagingDesc.Usage = RHIBufferUsage::TransferSrc;
-            stagingDesc.MemoryUsage = RHIMemoryUsage::CPUToGPU;
-            stagingDesc.DebugName = "Texture upload staging buffer";
-
-            VulkanBuffer stagingBuffer(dev, m_Allocator, stagingDesc, initialData, initialDataSize);
-            if (!stagingBuffer.IsValid())
-            {
-                XENGINE_LOG_ERROR("Failed to create texture upload staging buffer");
-                return nullptr;
-            }
-
-            // dev.ImmediateSubmit([&](VkCommandBuffer commandBuffer)
-            // {
-            //     // ... unchanged barriers + vkCmdCopyBufferToImage ...
-            // });
-
-            *texture->GetLayoutPtr() = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            dev.GetUploadManager().UploadTexture(*texture, initialData, initialDataSize);
         }
 
         return texture;
@@ -158,4 +139,4 @@ namespace XEngine
         }
         return pipeline;
     }
-}
+} 

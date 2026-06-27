@@ -9,6 +9,7 @@
 #include "VulkanUtils.h"
 
 #include <XEngine/Logging/Log.h>
+#include <XEngine/Core/Assert.h>
 
 #include <string>
 #include <vector>
@@ -141,18 +142,16 @@ namespace XEngine
         {
             if (resource.Type == RHIBindingType::CombinedImageSampler)
             {
-                XENGINE_ASSERT(resource.Texture != nullptr && resource.Sampler != nullptr, "Combined image sampler binding requires non-null texture and sampler");
-                VulkanDevice& deviceRef = static_cast<VulkanDevice&>(resource.Texture->GetOwnerDevice());
-                auto* texture = CheckedVulkanCast<VulkanTexture>(resource.Texture, deviceRef);
+                XENGINE_ASSERT(resource.TextureView != nullptr && resource.Sampler != nullptr, "Combined image sampler binding requires non-null texture and sampler");
+                VulkanDevice& deviceRef = static_cast<VulkanDevice&>(resource.TextureView->GetOwnerDevice());
+                auto* view = CheckedVulkanCast<VulkanTextureView>(resource.TextureView, deviceRef);
                 auto* sampler = CheckedVulkanCast<VulkanSampler>(resource.Sampler, deviceRef);
-                if (texture == nullptr || sampler == nullptr ||
-                    texture->GetDefaultView() == nullptr || sampler->GetHandle() == VK_NULL_HANDLE)
+                if (view == nullptr || sampler == nullptr ||
+                    view->GetHandle() == VK_NULL_HANDLE || sampler->GetHandle() == VK_NULL_HANDLE)
                 {
                     XENGINE_LOG_ERROR("Combined image sampler binding requires a valid Vulkan texture and sampler");
                     return false;
                 }
-
-                auto* view = CheckedVulkanCast<VulkanTextureView>(texture->GetDefaultView(), deviceRef);
 
                 VkDescriptorImageInfo imageInfo {};
                 imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

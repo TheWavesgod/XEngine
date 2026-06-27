@@ -23,6 +23,19 @@ namespace XEngine
         const char* DebugName = nullptr;
     };
 
+    struct RHITextureSubresourceRange
+    {
+        u32 BaseMipLevel = 0;
+        u32 MipCount = 0;            // 0 = all remaining
+        u32 BaseArrayLayer = 0;
+        u32 ArrayLayerCount = 0;     // 0 = all remaining
+    };
+
+    inline RHITextureSubresourceRange AllSubresources()
+    {
+        return RHITextureSubresourceRange { 0, 0, 0, 0 };
+    }
+
     class RHITexture : public RHIResource
     {
     public:

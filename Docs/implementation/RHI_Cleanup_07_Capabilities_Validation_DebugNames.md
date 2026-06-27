@@ -1,1123 +1,339 @@
-# Stage 7 — Capabilities, Format Utils, Validation, Debug Names
+# Stage 7 — Capabilities, Validation, and Debug Names
 
-## 1. Goal
+## 1. Goal and Scope
 
-Introduce the diagnostic / safety infrastructure that makes every preceding
-stage robust:
+Add only the safety and diagnostics needed by the resource/view work:
 
-- `RHICapabilities` exposes per-backend limits (max sampled-image layers,
-  max array layers, supported depth formats, anisotropy range, etc.).
-- `RHIFormat` helpers in `RHIUtils` (bytes-per-pixel, depth/stencil-ness,
-  aspect resolution, `IsCompressed`, `IsDepth`, `IsStencil`).
-- `RHIResourceFactory::CreateTexture(Impl)` validates the descriptor
-  against `RHICapabilities`.
-- `RHIResourceFactory::CreateTextureView(Impl)` validates subresource
-  range against the source texture's description and the capabilities.
-- `RHIResourceFactory::CreateBindGroupLayout(Impl)` validates shader
-  visibility flags.
-- Debug names flow uniformly from descriptor `DebugName` field to
-  `vkSetDebugUtilsObjectNameEXT` (via a small helper that looks up the
-  function pointer from `VulkanDevice` once at startup).
-- A `RHIDeferredDeleter` placeholder is added (a static queue of
-  `std::function<void()>` that is drained once per frame at
-  `RHIDevice::BeginFrame`). Stage 9 / future stages will use it to safely
-  destroy resources that may still be referenced by an in-flight
-  command buffer. This stage does **not** wire any resource into it yet —
-  it only sets up the API.
+- a small, truthful `RHICapabilities` snapshot;
+- centralized format and descriptor validation in `RHIResourceFactory`;
+- Vulkan object debug names.
 
-> Safety correction (2026-06-25): a single static queue drained at the top of
-> `BeginFrame` is not sufficient for Vulkan resource lifetime safety. Deferred
-> destruction must be tied to frame-slot/fence completion. For Stage 7 either:
->
-> - add only a private placeholder type and do not expose
->   `RHIDevice::GetDeferredDeleter()` yet, or
-> - implement a per-frame queue and drain only after the frame slot's fence is
->   known to be complete.
->
-> Do not route real resource destruction through a queue that flushes before
-> acquire/fence handling.
-
-## 2. Current Code Audit
-
-Relevant existing files:
+Implement this as two buildable batches:
 
 ```text
-Engine/Source/Runtime/RHI/Public/XEngine/RHI/RHITypes.h
-  - RHIFormat enum (Undefined, RGBA8Unorm/Srgb, BGRA8Unorm/Srgb,
-    RGBA16Float, RGBA32Float, D32Float, R32G32Float, R32G32B32Float,
-    R32G32B32A32Float)
-  - No aspect helpers, no bytes-per-pixel.
-
-Engine/Source/Runtime/RHI/Public/XEngine/RHI/RHIUtils.h          (Stage 1 stub)
-Engine/Source/Runtime/RHI/Private/RHIUtils.cpp                    (Stage 1 stub)
-
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanUtils.h/.cpp
-  - VulkanFormatToRHIFormat, RHIFormatToVulkanFormat,
-    ToVulkanImageUsageFlags, ToVulkanFilter, ToVulkanAddressMode,
-    ToVulkanDescriptorType, ToVulkanShaderStageFlags,
-    XENGINE_VK_CHECK, VulkanResultToString.
-
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanDevice.cpp
-  - VulkanSampler.cpp logs "anisotropy feature query is not wired in
-    Stage 6A. Creating sampler without anisotropy."
-
-Engine/Source/Runtime/RHI/Private/RHIResourceFactory.cpp   (Stage 3)
-  - currently only minimal validation; no capability reads.
+Stage 7A  capabilities + format helpers + factory validation
+Stage 7B  Vulkan debug names
 ```
 
-What already exists:
+Deferred destruction is explicitly removed from this stage. A callback queue
+flushed at `BeginFrame` is not GPU-safe, and an unused placeholder adds public
+API without solving lifetime. Add deferred destruction later together with
+frame-slot fences and actual resource integration.
 
-- `RHITypes.h` enums.
-- `VulkanUtils` translation helpers.
-- `XENGINE_VK_CHECK` macro.
-- Every descriptor carries a `const char* DebugName` field but only
-  `VulkanPipeline` actually logs it (in `vkCreateGraphicsPipelines` call
-  site). No Vulkan object is named via `vkSetDebugUtilsObjectNameEXT`.
+## 2. Corrections to the Earlier Draft
 
-What is missing:
+Do not implement these earlier proposals:
 
-- `RHICapabilities` struct.
-- `RHIDevice::GetCapabilities()`.
-- `RHIFormat` helper functions (`IsDepth`, `IsStencil`, `GetAspectMask`,
-  `GetBytesPerPixel`).
-- A uniform debug-name path.
-- A deferred-deleter API.
+- `RHIDeferredDeleter` or `RHIDevice::GetDeferredDeleter()`;
+- `MaxBufferSize = maxStorageBufferRange` (those are different limits);
+- `MaxSampleCount` by casting Vulkan sample-count bitmasks to an integer;
+- `MaxBindingsPerBindGroup` by summing unrelated per-stage descriptor limits;
+- rejecting `RHIBindGroupLayoutEntry::Count > 1` when bindless is disabled
+  (ordinary fixed descriptor arrays are not bindless);
+- claiming dynamic rendering is guaranteed by Vulkan 1.0;
+- refreshing physical-device limits on swapchain recreation;
+- silently narrowing float anisotropy limits to `u32`.
 
-What should **not** be changed yet:
+Capabilities describe limits/features actually queried and enabled by the
+created logical device. Unsupported or unqueried future features should not be
+represented as optimistic booleans.
 
-- `RHITexture::GetNativeImageView` (transitional, Stage 8).
-- `RHIDevice::CreateX` wrappers (transitional, Stage 8).
-- View-based render pass and bind group (Stage 5).
-- Depth-only pipeline (Stage 6).
+## 3. Stage 7A — Capabilities
 
-## 3. Files to Add
+### 3.1 Public shape
 
-```text
-Engine/Source/Runtime/RHI/Public/XEngine/RHI/RHICapabilities.h
-Engine/Source/Runtime/RHI/Private/RHIDeferredDeleter.h
-Engine/Source/Runtime/RHI/Private/RHIDeferredDeleter.cpp
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanCapabilities.h
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanCapabilities.cpp
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanDebugName.h
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanDebugName.cpp
-```
-
-## 4. Files to Modify
-
-```text
-Engine/Source/Runtime/RHI/Public/XEngine/RHI/RHI.h
-Engine/Source/Runtime/RHI/Public/XEngine/RHI/RHIUtils.h
-Engine/Source/Runtime/RHI/Private/RHIUtils.cpp
-Engine/Source/Runtime/RHI/Public/XEngine/RHI/RHIDevice.h
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanDevice.h
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanDevice.cpp
-
-Engine/Source/Runtime/RHI/Private/RHIResourceFactory.cpp    (use capabilities + format helpers)
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanResourceFactory.cpp  (call debug-name helper)
-
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanBuffer.cpp
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanTexture.cpp
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanShader.cpp
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanPipeline.cpp
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanSampler.cpp
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanTextureView.cpp
-Engine/Source/Runtime/RHI/Private/Vulkan/VulkanDescriptor.cpp
-                                                    (each: apply debug name)
-
-Engine/Source/Runtime/RHI/CMakeLists.txt
-```
-
-## 5. Detailed Code Plan
-
-### 5.1 New file: `Public/XEngine/RHI/RHICapabilities.h` — full content
+Add `Public/XEngine/RHI/RHICapabilities.h`:
 
 ```cpp
-// Engine/Source/Runtime/RHI/Public/XEngine/RHI/RHICapabilities.h
 #pragma once
 
 #include <XEngine/Core/Types.h>
 
-#include <vector>
-
 namespace XEngine
 {
-    // Read-only device capabilities surfaced by RHIDevice::GetCapabilities().
-    // Filled once at device init. Capabilities that depend on per-object
-    // state (e.g. swapchain) are refreshed only on swapchain recreate.
     struct RHICapabilities
     {
-        // Textures.
         u32 MaxTextureDimension2D = 0;
-        u32 MaxTextureDimensionCube = 0;
         u32 MaxTextureArrayLayers = 0;
-        u32 MaxSamplerAnisotropy = 0;
-
-        // Buffers.
-        u64 MaxBufferSize = 0;
-
-        // Push constants.
         u32 MaxPushConstantSize = 0;
+        u32 MaxBoundDescriptorSets = 0;
 
-        // Descriptor limits.
-        u32 MaxBindGroups = 0;
-        u32 MaxBindingsPerBindGroup = 0;
+        bool SupportsSamplerAnisotropy = false;
+        f32 MaxSamplerAnisotropy = 1.0f;
 
-        // Reserved for future MSAA / multi-view paths. Stage 7 only stores.
-        u32 MaxSampleCount = 1;
-
-        // Feature flags.
-        bool SupportsDepthOnlyPipeline = true;
-        bool SupportsConservativeRaster = false;
-        bool SupportsMultiView = false;
-        bool SupportsBindless = false;     // always false in Stage 7
+        // True only if dynamic rendering was enabled on the logical device.
+        bool SupportsDynamicRendering = false;
     };
 }
 ```
 
-### 5.2 Modify: `Public/XEngine/RHI/RHI.h` — pull in the header
-
-**Before** (the include block at the top of `RHI.h`):
+Expose it read-only:
 
 ```cpp
-#include <XEngine/RHI/RHIDevice.h>
-#include <XEngine/RHI/RHITypes.h>
-#include <XEngine/RHI/RHIUtils.h>
+virtual const RHICapabilities& GetCapabilities() const = 0;
+virtual bool SupportsTextureFormat(
+    RHIFormat format,
+    RHITextureUsageFlags usage) const = 0;
 ```
 
-**After**:
+`SupportsTextureFormat` is a capability query, not a creation path. The Vulkan
+implementation derives it from `vkGetPhysicalDeviceFormatProperties` and may
+cache the small result table at device initialization. This keeps validation
+policy in the factory without putting Vulkan types in public headers.
+
+Populate once during device initialization, after physical-device selection
+and after the enabled logical-device feature set is known. These fields do not
+change when the swapchain is recreated.
+
+### 3.2 Vulkan mapping
+
+Use `VkPhysicalDeviceProperties::limits` for limits and the device's enabled
+feature/extension record for feature booleans:
 
 ```cpp
-#include <XEngine/RHI/RHICapabilities.h>
-#include <XEngine/RHI/RHIDevice.h>
-#include <XEngine/RHI/RHITypes.h>
-#include <XEngine/RHI/RHIUtils.h>
+VkPhysicalDeviceProperties properties {};
+vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+caps.MaxTextureDimension2D = properties.limits.maxImageDimension2D;
+caps.MaxTextureArrayLayers = properties.limits.maxImageArrayLayers;
+caps.MaxPushConstantSize = properties.limits.maxPushConstantsSize;
+caps.MaxBoundDescriptorSets = properties.limits.maxBoundDescriptorSets;
+
+caps.SupportsSamplerAnisotropy = enabledFeatures.samplerAnisotropy == VK_TRUE;
+caps.MaxSamplerAnisotropy = caps.SupportsSamplerAnisotropy
+    ? properties.limits.maxSamplerAnisotropy
+    : 1.0f;
+
+caps.SupportsDynamicRendering = dynamicRenderingWasEnabled;
 ```
 
-### 5.3 New file: `Private/Vulkan/VulkanCapabilities.h` — full content
+Use the actual feature/extension state already maintained by `VulkanDevice`;
+do not invent `VulkanPhysicalDevice` or `m_PhysicalDeviceCtx` types that are
+not in the repository.
+
+## 4. Stage 7A — Format Helpers
+
+Add helpers for the current `RHIFormat` enum only:
 
 ```cpp
-// Engine/Source/Runtime/RHI/Private/Vulkan/VulkanCapabilities.h
-#pragma once
+bool IsDepthFormat(RHIFormat format);
+bool IsStencilFormat(RHIFormat format);
+bool IsSrgbFormat(RHIFormat format);
+u32 GetFormatTexelSize(RHIFormat format); // 0 for Undefined/unsupported
+RHITextureAspectFlags GetDefaultAspect(RHIFormat format);
+u32 GetMaxMipLevels(u32 width, u32 height);
+```
 
-#include "XEngine/RHI/RHICapabilities.h"
+Keep these backend-independent. Do not add depth/stencil formats to helper
+switches until they are added to `RHIFormat` and mapped by every active
+backend.
 
-#include <vulkan/vulkan.h>
+Use the name `GetFormatTexelSize`, not `GetBytesPerPixel`: the latter becomes
+misleading once block-compressed formats arrive.
 
-namespace XEngine
+## 5. Stage 7A — Factory Validation
+
+Validation and normalization happen once in public NVI methods before calling
+`CreateXImpl`. Backend constructors may retain assertions for impossible
+states but must not duplicate policy.
+
+### 5.1 Texture validation
+
+`CreateTexture` rejects:
+
+- zero width/height, mip count, or array-layer count;
+- extents/layers above device limits;
+- mip count above `GetMaxMipLevels(width, height)`;
+- `Format == Undefined` or `Usage == None`;
+- `Texture2D` with `ArrayLayers != 1`;
+- `Texture2DArray` with fewer than one layer;
+- `TextureCube` with width != height or `ArrayLayers != 6`;
+- depth/stencil attachment usage on a color format;
+- color attachment usage on a depth format;
+- sampled/storage/attachment usage unsupported by the Vulkan format.
+
+The last check is backend capability, not a generic enum property. The factory
+calls `RHIDevice::SupportsTextureFormat(format, usage)`; Vulkan answers from
+`vkGetPhysicalDeviceFormatProperties` (preferably a cached table). Reject
+unsupported feature combinations and do not silently alter the request.
+
+### 5.2 Texture-view normalization and validation
+
+Normalize `MipCount == 0` and `ArrayLayerCount == 0` to the remaining range,
+then validate using overflow-safe comparisons:
+
+```cpp
+if (baseMip >= textureDesc.MipLevels ||
+    mipCount > textureDesc.MipLevels - baseMip)
 {
-    class VulkanPhysicalDevice;
+    return nullptr;
+}
 
-    RHICapabilities BuildVulkanCapabilities(
-        VkPhysicalDevice physicalDevice,
-        const VulkanPhysicalDevice& physicalDeviceContext);
+if (baseLayer >= textureDesc.ArrayLayers ||
+    layerCount > textureDesc.ArrayLayers - baseLayer)
+{
+    return nullptr;
 }
 ```
 
-### 5.4 New file: `Private/Vulkan/VulkanCapabilities.cpp` — full content
+Also validate:
+
+- source texture is non-null and belongs to this factory's device;
+- aspect is non-empty and compatible with the source format;
+- view usage is supported by the texture's creation usage;
+- `Format == Undefined` normalizes to source format;
+- any other format is rejected until mutable-format images are supported;
+- `Texture2D` view has exactly one layer;
+- `Texture2DArray` view may cover one or more layers;
+- `TextureCube` view covers exactly six layers, starts on a cube boundary, and
+  the source texture was created cube-compatible.
+
+The normalized descriptor is the descriptor stored by `RHITextureView`, so
+backend code never has to interpret zero counts.
+
+### 5.3 Bind-group validation
+
+For `CreateBindGroupLayout`:
+
+- reject duplicate binding numbers, `Unknown` types, zero counts, and empty
+  visibility;
+- fixed `Count > 1` is allowed if it fits the backend descriptor limits;
+- reject unsupported binding types explicitly.
+
+For `CreateBindGroup`:
+
+- layout and every resource must belong to the same device;
+- each resource binding must exist in the layout and have matching type;
+- required resources are non-null;
+- reject duplicate or missing bindings for the V0 one-resource-per-entry API.
+
+Do not call fixed arrays "bindless". Descriptor indexing/update-after-bind is
+a later feature with separate capability checks.
+
+### 5.4 Pipeline validation
+
+Retain Stage-6 validation and add:
+
+- shader and bind-group-layout owner-device checks;
+- `PushConstantSize <= MaxPushConstantSize`;
+- bind-group layout count `<= MaxBoundDescriptorSets`;
+- color/depth formats compatible with the corresponding attachment roles.
+
+## 6. Stage 7A — Sampler Anisotropy
+
+Enable anisotropy only when the feature was enabled on the logical device:
 
 ```cpp
-// Engine/Source/Runtime/RHI/Private/Vulkan/VulkanCapabilities.cpp
-#include "VulkanCapabilities.h"
-
-#include "VulkanPhysicalDevice.h"
-
-#include <algorithm>
-
-namespace XEngine
-{
-    RHICapabilities BuildVulkanCapabilities(
-        VkPhysicalDevice physicalDevice,
-        const VulkanPhysicalDevice& physicalDeviceContext)
-    {
-        RHICapabilities caps;
-
-        VkPhysicalDeviceProperties properties {};
-        vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-
-        caps.MaxTextureDimension2D    = properties.limits.maxImageDimension2D;
-        caps.MaxTextureDimensionCube   = properties.limits.maxImageDimensionCube;
-        caps.MaxTextureArrayLayers    = properties.limits.maxImageArrayLayers;
-        caps.MaxSamplerAnisotropy      = static_cast<u32>(properties.limits.maxSamplerAnisotropy);
-        caps.MaxPushConstantSize      = properties.limits.maxPushConstantsSize;
-        caps.MaxSampleCount            = static_cast<u32>(properties.limits.framebufferColorSampleCounts
-                                                       & properties.limits.framebufferDepthSampleCounts);
-        caps.MaxSampleCount            = std::max<u32>(1, caps.MaxSampleCount);
-        caps.MaxBufferSize             = static_cast<u64>(properties.limits.maxStorageBufferRange);
-
-        // Per-stage descriptor limits aggregate to "max bindings per set".
-        caps.MaxBindingsPerBindGroup =
-            properties.limits.maxPerStageDescriptorSampledImages
-          + properties.limits.maxPerStageDescriptorUniformBuffers
-          + properties.limits.maxPerStageDescriptorStorageBuffers
-          + properties.limits.maxPerStageDescriptorSampledImages
-          + properties.limits.maxPerStageDescriptorStorageImages;
-
-        // Vulkan 1.0+ always supports depth-only pipelines via dynamic
-        // rendering (VK_KHR_dynamic_rendering). Stage 7 just asserts.
-        caps.SupportsDepthOnlyPipeline = true;
-        caps.SupportsBindless = false;
-
-        return caps;
-    }
-}
-```
-
-(Vulkan 1.2 / 1.3 paths can be added later to read
-`VkPhysicalDeviceVulkan12Properties` for `maxBindGroups` and friends. The
-above covers what Stage 7 needs.)
-
-### 5.5 Modify: `Private/Vulkan/VulkanDevice.h` — cache + accessors
-
-**Before** (the private section of `VulkanDevice`):
-
-```cpp
-private:
-    VkInstance m_Instance = VK_NULL_HANDLE;
-    VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
-    // ... many more members ...
-    std::unique_ptr<RHIResourceFactory> m_ResourceFactory;
-    std::unique_ptr<RHIUploadManager>   m_UploadManager;
-};
-```
-
-**After**:
-
-```cpp
-private:
-    VkInstance m_Instance = VK_NULL_HANDLE;
-    VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
-    // ... many more members ...
-    std::unique_ptr<RHIResourceFactory> m_ResourceFactory;
-    std::unique_ptr<RHIUploadManager>   m_UploadManager;
-
-    RHICapabilities m_Capabilities {};
-    RHIDeferredDeleter m_DeferredDeleter;
-
-    PFN_vkSetDebugUtilsObjectNameEXT m_PfnSetDebugName = nullptr;
-};
-```
-
-Add at the top of the header:
-
-```cpp
-#include "XEngine/RHI/RHICapabilities.h"
-#include "RHIDeferredDeleter.h"
-```
-
-In the public section:
-
-```cpp
-    const RHICapabilities& GetCapabilities() const override { return m_Capabilities; }
-    RHIDeferredDeleter&    GetDeferredDeleter() override     { return m_DeferredDeleter; }
-
-    PFN_vkSetDebugUtilsObjectNameEXT GetDebugNameFn() const { return m_PfnSetDebugName; }
-```
-
-### 5.6 Modify: `Private/Vulkan/VulkanDevice.cpp::Initialize` — populate caps and fn
-
-**Before** (the bottom of `Initialize`, just before creating the
-resource factory):
-
-```cpp
-    m_ResourceFactory = std::make_unique<VulkanResourceFactory>(*this, m_Allocator, m_DescriptorPool);
-    m_UploadManager   = std::make_unique<VulkanUploadManager>(*this, m_CommandPool);
-```
-
-**After**:
-
-```cpp
-    m_Capabilities = BuildVulkanCapabilities(m_PhysicalDevice, m_PhysicalDeviceCtx);
-    XE_LOG_INFO("RHI capabilities: maxImageDimension2D=%u maxImageArrayLayers=%u "
-                "maxSamplerAnisotropy=%u maxPushConstantsSize=%u maxBindGroups=%u",
-                m_Capabilities.MaxTextureDimension2D,
-                m_Capabilities.MaxTextureArrayLayers,
-                m_Capabilities.MaxSamplerAnisotropy,
-                m_Capabilities.MaxPushConstantSize,
-                m_Capabilities.MaxBindGroups);
-
-    m_PfnSetDebugName = reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(
-        vkGetInstanceProcAddr(m_Instance, "vkSetDebugUtilsObjectNameEXT"));
-    if (m_PfnSetDebugName == nullptr)
-    {
-        XE_LOG_WARN("vkSetDebugUtilsObjectNameEXT not available; Vulkan debug names disabled");
-    }
-
-    m_ResourceFactory = std::make_unique<VulkanResourceFactory>(*this, m_Allocator, m_DescriptorPool);
-    m_UploadManager   = std::make_unique<VulkanUploadManager>(*this, m_CommandPool);
-```
-
-`m_PhysicalDeviceCtx` is the Stage 1 type alias / wrapper the device
-already uses to hold feature/extension state. If that wrapper does not
-exist in the current codebase, replace the call with:
-
-```cpp
-    m_Capabilities = BuildVulkanCapabilities(m_PhysicalDevice, *this);
-```
-
-and adjust the function signature accordingly.
-
-### 5.7 Modify: `Public/XEngine/RHI/RHIDevice.h` — surface capabilities + deleter
-
-**Before** (the public section of `RHIDevice`):
-
-```cpp
-    class RHI_API RHIDevice
-    {
-    public:
-        virtual ~RHIDevice() = default;
-        // ... factory, upload, etc. ...
-    };
-```
-
-**After**:
-
-```cpp
-    class RHIResourceFactory;
-    class RHIUploadManager;
-    class RHIDeferredDeleter;     // fwd decl
-
-    class RHI_API RHIDevice
-    {
-    public:
-        virtual ~RHIDevice() = default;
-
-        // ... existing factory / upload / BeginFrame accessors ...
-
-        virtual const RHICapabilities& GetCapabilities() const = 0;
-        virtual RHIDeferredDeleter&    GetDeferredDeleter() = 0;
-    };
-```
-
-Add the include at the top:
-
-```cpp
-#include "XEngine/RHI/RHICapabilities.h"
-```
-
-### 5.8 New file: `Private/RHIDeferredDeleter.h` — full content
-
-For the current cleanup, prefer a fence-aware shape over the simple queue shown
-below. Minimal acceptable API:
-
-```cpp
-class RHIDeferredDeleter
-{
-public:
-    void Enqueue(u32 frameSlot, std::function<void()> destroy);
-    void FlushCompletedFrame(u32 frameSlot);
-    bool IsEmpty() const;
-};
-```
-
-`VulkanDevice` should call `FlushCompletedFrame(frameSlot)` only after waiting
-or confirming the fence for that slot. If that frame-slot information is not
-available yet, keep this class private and unused in Stage 7.
-
-```cpp
-// Engine/Source/Runtime/RHI/Private/RHIDeferredDeleter.h
-#pragma once
-
-#include <functional>
-#include <vector>
-
-namespace XEngine
-{
-    // Stage 7 placeholder. Drains a list of destruction callbacks once per
-    // frame at BeginFrame. Future stages will route resource destruction
-    // through it.
-    class RHIDeferredDeleter
-    {
-    public:
-        void Enqueue(std::function<void()> destroy);
-        void Flush();
-        bool IsEmpty() const;
-
-    private:
-        std::vector<std::function<void()>> m_Pending;
-    };
-}
-```
-
-### 5.9 New file: `Private/RHIDeferredDeleter.cpp` — full content
-
-```cpp
-// Engine/Source/Runtime/RHI/Private/RHIDeferredDeleter.cpp
-#include "RHIDeferredDeleter.h"
-
-#include <XEngine/Logging/Log.h>
-
-namespace XEngine
-{
-    void RHIDeferredDeleter::Enqueue(std::function<void()> destroy)
-    {
-        m_Pending.push_back(std::move(destroy));
-    }
-
-    void RHIDeferredDeleter::Flush()
-    {
-        if (m_Pending.empty()) return;
-
-        for (auto& fn : m_Pending)
-        {
-            if (fn) fn();
-        }
-        m_Pending.clear();
-    }
-
-    bool RHIDeferredDeleter::IsEmpty() const
-    {
-        return m_Pending.empty();
-    }
-}
-```
-
-### 5.10 Modify: `Private/Vulkan/VulkanDevice.cpp::BeginFrame` — drain
-
-**Before** (the top of `BeginFrame`):
-
-```cpp
-void VulkanDevice::BeginFrame()
-{
-    // (existing acquire / fence handling)
-}
-```
-
-**After**:
-
-```cpp
-void VulkanDevice::BeginFrame()
-{
-    // Stage 7: drain any deferred-deletion work scheduled by previous frames.
-    // This must run BEFORE the renderer submits new commands.
-    m_DeferredDeleter.Flush();
-
-    // (existing acquire / fence handling)
-}
-```
-
-### 5.11 Modify: `Public/XEngine/RHI/RHIUtils.h` — format helpers
-
-**Before** (the Stage 1 stub):
-
-```cpp
-namespace XEngine
-{
-    const char* RHIBackendToString(RHIBackend backend);
-    const char* RHIFormatToString(RHIFormat format);
-}
-```
-
-**After**:
-
-```cpp
-namespace XEngine
-{
-    const char* RHIBackendToString(RHIBackend backend);
-    const char* RHIFormatToString(RHIFormat format);
-
-    bool        IsDepthFormat(RHIFormat format);
-    bool        IsStencilFormat(RHIFormat format);
-    bool        IsSrgbFormat(RHIFormat format);
-    u32         GetBytesPerPixel(RHIFormat format);
-    u32         GetMaxMipLevels(u32 width, u32 height);
-    RHITextureAspect GetDefaultAspect(RHIFormat format);
-}
-```
-
-Add include for the aspect enum:
-
-```cpp
-#include "XEngine/RHI/Resources/RHITextureView.h"
-```
-
-### 5.12 New file (or extension to): `Private/RHIUtils.cpp` — implementations
-
-```cpp
-// Engine/Source/Runtime/RHI/Private/RHIUtils.cpp
-#include "XEngine/RHI/RHIUtils.h"
-
-#include <XEngine/Core/Assert.h>
-
-namespace XEngine
-{
-    const char* RHIBackendToString(RHIBackend backend)
-    {
-        switch (backend)
-        {
-            case RHIBackend::Vulkan:  return "Vulkan";
-            case RHIBackend::D3D12:   return "D3D12";
-            case RHIBackend::Metal:   return "Metal";
-            default:                  return "Unknown";
-        }
-    }
-
-    const char* RHIFormatToString(RHIFormat format)
-    {
-        switch (format)
-        {
-            case RHIFormat::RGBA8Unorm:    return "RGBA8Unorm";
-            case RHIFormat::RGBA8Srgb:     return "RGBA8Srgb";
-            case RHIFormat::BGRA8Unorm:    return "BGRA8Unorm";
-            case RHIFormat::BGRA8Srgb:     return "BGRA8Srgb";
-            case RHIFormat::RGBA16Float:   return "RGBA16Float";
-            case RHIFormat::RGBA32Float:   return "RGBA32Float";
-            case RHIFormat::R32G32Float:   return "R32G32Float";
-            case RHIFormat::R32G32B32Float:    return "R32G32B32Float";
-            case RHIFormat::R32G32B32A32Float: return "R32G32B32A32Float";
-            case RHIFormat::D32Float:      return "D32Float";
-            case RHIFormat::D24UnormS8Uint:return "D24UnormS8Uint";
-            case RHIFormat::D32FloatS8Uint:return "D32FloatS8Uint";
-            default:                       return "Undefined";
-        }
-    }
-
-    bool IsDepthFormat(RHIFormat format)
-    {
-        return format == RHIFormat::D32Float
-            || format == RHIFormat::D24UnormS8Uint
-            || format == RHIFormat::D32FloatS8Uint;
-    }
-
-    bool IsStencilFormat(RHIFormat format)
-    {
-        return format == RHIFormat::D24UnormS8Uint
-            || format == RHIFormat::D32FloatS8Uint;
-    }
-
-    bool IsSrgbFormat(RHIFormat format)
-    {
-        return format == RHIFormat::RGBA8Srgb
-            || format == RHIFormat::BGRA8Srgb;
-    }
-
-    u32 GetBytesPerPixel(RHIFormat format)
-    {
-        switch (format)
-        {
-            case RHIFormat::RGBA8Unorm:
-            case RHIFormat::RGBA8Srgb:
-            case RHIFormat::BGRA8Unorm:
-            case RHIFormat::BGRA8Srgb:
-                return 4;
-            case RHIFormat::RGBA16Float:
-                return 8;
-            case RHIFormat::RGBA32Float:
-                return 16;
-            case RHIFormat::R32G32Float:
-                return 8;
-            case RHIFormat::R32G32B32Float:
-                return 12;
-            case RHIFormat::R32G32B32A32Float:
-                return 16;
-            case RHIFormat::D32Float:
-                return 4;
-            case RHIFormat::D24UnormS8Uint:
-                return 4;
-            case RHIFormat::D32FloatS8Uint:
-                return 8;
-            default:
-                XE_ASSERT(false);
-                return 0;
-        }
-    }
-
-    u32 GetMaxMipLevels(u32 width, u32 height)
-    {
-        u32 max = (width > height) ? width : height;
-        u32 levels = 1;
-        while (max > 1) { max >>= 1; ++levels; }
-        return levels;
-    }
-
-    RHITextureAspect GetDefaultAspect(RHIFormat format)
-    {
-        if (IsDepthFormat(format))
-        {
-            return IsStencilFormat(format)
-                ? (RHITextureAspect::Depth | RHITextureAspect::Stencil)
-                : RHITextureAspect::Depth;
-        }
-        return RHITextureAspect::Color;
-    }
-}
-```
-
-### 5.13 Modify: `Private/RHIResourceFactory.cpp` — capability-aware validation
-
-**Before** (the `CreateTexture` wrapper):
-
-```cpp
-std::unique_ptr<RHITexture> RHIResourceFactory::CreateTexture(const RHITextureDesc& desc)
-{
-    // (Stage 3 basic null / zero checks)
-    if (desc.DebugName == nullptr) desc.DebugName = "UnnamedTexture";
-    return CreateTextureImpl(desc);
-}
-```
-
-**After**:
-
-```cpp
-std::unique_ptr<RHITexture> RHIResourceFactory::CreateTexture(const RHITextureDesc& desc)
-{
-    const RHICapabilities& caps = m_Device.GetCapabilities();
-
-    if (desc.Width == 0 || desc.Height == 0)
-    {
-        XENGINE_LOG_ERROR("CreateTexture rejected: zero width/height (%u, %u)", desc.Width, desc.Height);
-        return nullptr;
-    }
-    if (desc.Width > caps.MaxTextureDimension2D || desc.Height > caps.MaxTextureDimension2D)
-    {
-        XENGINE_LOG_ERROR("CreateTexture rejected: %ux%u exceeds maxImageDimension2D=%u",
-            desc.Width, desc.Height, caps.MaxTextureDimension2D);
-        return nullptr;
-    }
-    if (desc.ArrayLayers > caps.MaxTextureArrayLayers)
-    {
-        XENGINE_LOG_ERROR("CreateTexture rejected: ArrayLayers=%u exceeds maxImageArrayLayers=%u",
-            desc.ArrayLayers, caps.MaxTextureArrayLayers);
-        return nullptr;
-    }
-    const u32 maxMips = GetMaxMipLevels(desc.Width, desc.Height);
-    if (desc.MipLevels == 0 || desc.MipLevels > maxMips)
-    {
-        XENGINE_LOG_ERROR("CreateTexture rejected: MipLevels=%u out of range (1..%u)",
-            desc.MipLevels, maxMips);
-        return nullptr;
-    }
-    if (desc.Usage == RHITextureUsageFlags::None)
-    {
-        XENGINE_LOG_ERROR("CreateTexture rejected: Usage is None (texture has no purpose)");
-        return nullptr;
-    }
-
-    const RHITextureAspect aspect = GetDefaultAspect(desc.Format);
-    const bool formatIsDepth = IsDepthFormat(desc.Format);
-    if (formatIsDepth && !HasAllFlags(desc.Usage, RHITextureUsageFlags::DepthAttachment))
-    {
-        XENGINE_LOG_WARN("CreateTexture: depth format %s without DepthAttachment usage",
-            RHIFormatToString(desc.Format));
-    }
-    if (!formatIsDepth && HasAllFlags(desc.Usage, RHITextureUsageFlags::DepthAttachment))
-    {
-        XENGINE_LOG_ERROR("CreateTexture rejected: DepthAttachment usage on non-depth format %s",
-            RHIFormatToString(desc.Format));
-        return nullptr;
-    }
-
-    return CreateTextureImpl(desc);
-}
-```
-
-Add the missing helpers at the top of `RHIResourceFactory.cpp`:
-
-```cpp
-#include "XEngine/RHI/RHIUtils.h"
-```
-
-`m_Device` is the cached `RHIDevice&` Stage 3's factory holds.
-
-### 5.14 Modify: `Private/RHIResourceFactory.cpp::CreateTextureView` — validate range
-
-**Before**:
-
-```cpp
-std::unique_ptr<RHITextureView> RHIResourceFactory::CreateTextureView(
-    const RHITextureViewDesc& desc)
-{
-    return CreateTextureViewImpl(desc);
-}
-```
-
-**After**:
-
-```cpp
-std::unique_ptr<RHITextureView> RHIResourceFactory::CreateTextureView(
-    const RHITextureViewDesc& desc)
-{
-    if (desc.Texture == nullptr)
-    {
-        XENGINE_LOG_ERROR("CreateTextureView rejected: source texture is null");
-        return nullptr;
-    }
-
-    const RHITextureDesc& src = desc.Texture->GetDesc();
-    if (desc.BaseMipLevel >= src.MipLevels)
-    {
-        XENGINE_LOG_ERROR("CreateTextureView rejected: BaseMipLevel=%u out of range (MipLevels=%u)",
-            desc.BaseMipLevel, src.MipLevels);
-        return nullptr;
-    }
-    if (desc.MipCount == 0 || desc.BaseMipLevel + desc.MipCount > src.MipLevels)
-    {
-        XENGINE_LOG_ERROR("CreateTextureView rejected: MipCount=%u exceeds MipLevels=%u",
-            desc.MipCount, src.MipLevels);
-        return nullptr;
-    }
-    if (desc.BaseArrayLayer >= src.ArrayLayers)
-    {
-        XENGINE_LOG_ERROR("CreateTextureView rejected: BaseArrayLayer=%u out of range (ArrayLayers=%u)",
-            desc.BaseArrayLayer, src.ArrayLayers);
-        return nullptr;
-    }
-    if (desc.ArrayLayerCount == 0 || desc.BaseArrayLayer + desc.ArrayLayerCount > src.ArrayLayers)
-    {
-        XENGINE_LOG_ERROR("CreateTextureView rejected: ArrayLayerCount=%u exceeds ArrayLayers=%u",
-            desc.ArrayLayerCount, src.ArrayLayers);
-        return nullptr;
-    }
-    if (desc.ArrayLayerCount > m_Device.GetCapabilities().MaxTextureArrayLayers)
-    {
-        XENGINE_LOG_ERROR("CreateTextureView rejected: ArrayLayerCount=%u exceeds device limit=%u",
-            desc.ArrayLayerCount, m_Device.GetCapabilities().MaxTextureArrayLayers);
-        return nullptr;
-    }
-
-    return CreateTextureViewImpl(desc);
-}
-```
-
-### 5.15 Modify: `Private/RHIResourceFactory.cpp::CreateBindGroupLayout` — flag gate
-
-**Before**:
-
-```cpp
-std::unique_ptr<RHIBindGroupLayout> RHIResourceFactory::CreateBindGroupLayout(
-    const RHIBindGroupLayoutDesc& desc)
-{
-    if (desc.Bindings.empty()) { XENGINE_LOG_ERROR("..."); return nullptr; }
-    return CreateBindGroupLayoutImpl(desc);
-}
-```
-
-**After**:
-
-```cpp
-std::unique_ptr<RHIBindGroupLayout> RHIResourceFactory::CreateBindGroupLayout(
-    const RHIBindGroupLayoutDesc& desc)
-{
-    if (desc.Bindings.empty())
-    {
-        XENGINE_LOG_ERROR("CreateBindGroupLayout rejected: Bindings is empty");
-        return nullptr;
-    }
-    for (const auto& b : desc.Bindings)
-    {
-        if (b.Count > 1 && !m_Device.GetCapabilities().SupportsBindless)
-        {
-            XENGINE_LOG_ERROR("CreateBindGroupLayout rejected: array binding Count=%u but bindless is not supported",
-                b.Count);
-            return nullptr;
-        }
-    }
-    return CreateBindGroupLayoutImpl(desc);
-}
-```
-
-### 5.16 Modify: `Private/RHIResourceFactory.cpp::CreateGraphicsPipeline` — push constant + bind group limits
-
-**Before** (the existing wrapper after the Stage 6 changes):
-
-```cpp
-std::unique_ptr<RHIGraphicsPipeline> RHIResourceFactory::CreateGraphicsPipeline(
-    const RHIGraphicsPipelineDesc& desc)
-{
-    // ... Stage 6 validation ...
-    return CreateGraphicsPipelineImpl(desc);
-}
-```
-
-**After** — append two more checks:
-
-```cpp
-    const RHICapabilities& caps = m_Device.GetCapabilities();
-    if (desc.PushConstantSize > caps.MaxPushConstantSize)
-    {
-        XENGINE_LOG_ERROR("CreateGraphicsPipeline rejected: PushConstantSize=%u exceeds MaxPushConstantSize=%u",
-            desc.PushConstantSize, caps.MaxPushConstantSize);
-        return nullptr;
-    }
-    if (desc.BindGroupLayouts.size() > caps.MaxBindGroups)
-    {
-        XENGINE_LOG_ERROR("CreateGraphicsPipeline rejected: %zu bind groups exceeds MaxBindGroups=%u",
-            desc.BindGroupLayouts.size(), caps.MaxBindGroups);
-        return nullptr;
-    }
-    return CreateGraphicsPipelineImpl(desc);
-```
-
-### 5.17 New file: `Private/Vulkan/VulkanDebugName.h`
-
-```cpp
-// Engine/Source/Runtime/RHI/Private/Vulkan/VulkanDebugName.h
-#pragma once
-
-#include <vulkan/vulkan.h>
-
-#include <XEngine/Core/Types.h>
-
-namespace XEngine
-{
-    class VulkanDevice;
-
-    void VulkanSetDebugName(
-        VulkanDevice& device,
-        VkObjectType objectType,
-        u64 objectHandle,
-        const char* debugName);
-}
-```
-
-### 5.18 New file: `Private/Vulkan/VulkanDebugName.cpp`
-
-```cpp
-// Engine/Source/Runtime/RHI/Private/Vulkan/VulkanDebugName.cpp
-#include "VulkanDebugName.h"
-
-#include "VulkanDevice.h"
-
-namespace XEngine
-{
-    void VulkanSetDebugName(
-        VulkanDevice& device,
-        VkObjectType objectType,
-        u64 objectHandle,
-        const char* debugName)
-    {
-        if (debugName == nullptr) return;
-
-        PFN_vkSetDebugUtilsObjectNameEXT fn = device.GetDebugNameFn();
-        if (fn == nullptr) return;
-
-        VkDebugUtilsObjectNameInfoEXT info {};
-        info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-        info.objectType = objectType;
-        info.objectHandle = objectHandle;
-        info.pObjectName = debugName;
-        fn(device.GetHandle(), &info);
-    }
-}
-```
-
-`VulkanDevice::GetHandle()` is the Stage 1 accessor returning
-`VkDevice`.
-
-### 5.19 Modify: every `VulkanX` constructor — apply debug name
-
-Apply this same shape to each `VulkanX` constructor after the handle has
-been successfully created.
-
-**`VulkanBuffer.cpp` — after `vkCreateBuffer` succeeds**:
-
-**Before**:
-```cpp
-VulkanBuffer::VulkanBuffer(
-    VulkanDevice& device,
-    VkBuffer buffer,
-    VmaAllocation allocation,
-    const RHIBufferDesc& desc)
-    : RHIBuffer(device)
-    , m_Device(device.GetHandle())
-    , m_Buffer(buffer)
-    , m_Allocation(allocation)
-{
-    (void)desc;
-}
-```
-
-**After**:
-```cpp
-VulkanBuffer::VulkanBuffer(
-    VulkanDevice& device,
-    VkBuffer buffer,
-    VmaAllocation allocation,
-    const RHIBufferDesc& desc)
-    : RHIBuffer(device)
-    , m_Device(device.GetHandle())
-    , m_Buffer(buffer)
-    , m_Allocation(allocation)
-{
-    VulkanSetDebugName(device, VK_OBJECT_TYPE_BUFFER, (u64)m_Buffer, desc.DebugName);
-}
-```
-
-**`VulkanTexture.cpp`** — after `vkCreateImage` succeeds:
-
-**Before**:
-```cpp
-VulkanTexture::VulkanTexture(
-    VulkanDevice& device,
-    VkImage image,
-    VmaAllocation allocation,
-    const RHITextureDesc& desc)
-    : RHITexture(device)
-    , m_Device(device.GetHandle())
-    , m_Image(image)
-    , m_Allocation(allocation)
-{
-    // ... create m_DefaultView (Stage 2) ...
-}
-```
-
-**After**:
-```cpp
-    // ... create m_DefaultView (Stage 2) ...
-    VulkanSetDebugName(device, VK_OBJECT_TYPE_IMAGE, (u64)m_Image, desc.DebugName);
-}
-```
-
-**`VulkanShader.cpp`** — after `vkCreateShaderModule`:
-
-```cpp
-VulkanSetDebugName(device, VK_OBJECT_TYPE_SHADER_MODULE, (u64)m_ShaderModule, desc.DebugName);
-```
-
-**`VulkanPipeline.cpp`** — after `vkCreateGraphicsPipelines` succeeds.
-Replace the existing `XENGINE_LOG_INFO("Pipeline created: %s", desc.DebugName);` line:
-
-**Before**:
-```cpp
-XENGINE_LOG_INFO("Pipeline created: %s", desc.DebugName);
-```
-
-**After**:
-```cpp
-VulkanSetDebugName(device, VK_OBJECT_TYPE_PIPELINE, (u64)m_Pipeline, desc.DebugName);
-if (desc.DebugName != nullptr) { /* keep the LOG_INFO at INFO level if desired */ }
-```
-
-For layout, do similarly in `VulkanBindGroupLayout::Create`:
-
-**Before**:
-```cpp
-XENGINE_LOG_INFO("Bind group layout created: %s", desc.DebugName);
-```
-
-**After**:
-```cpp
-VulkanSetDebugName(device, VK_OBJECT_TYPE_PIPELINE_LAYOUT, (u64)m_PipelineLayout, desc.DebugName);
-```
-
-**`VulkanSampler.cpp`** — after `vkCreateSampler`:
-
-```cpp
-VulkanSetDebugName(device, VK_OBJECT_TYPE_SAMPLER, (u64)m_Sampler, desc.DebugName);
-```
-
-**`VulkanTextureView.cpp`** — after `vkCreateImageView`:
-
-```cpp
-VulkanSetDebugName(device, VK_OBJECT_TYPE_IMAGE_VIEW, (u64)m_ImageView, desc.DebugName);
-```
-
-**`VulkanDescriptor.cpp`** — after `vkAllocateDescriptorSets` succeeds:
-
-```cpp
-VulkanSetDebugName(device, VK_OBJECT_TYPE_DESCRIPTOR_SET, (u64)m_Set, desc.DebugName);
-```
-
-### 5.20 Modify: `Private/Vulkan/VulkanSampler.cpp` — wire anisotropy
-
-**Before** (the `vkCreateSampler` call):
-
-```cpp
-samplerInfo.anisotropyEnable = VK_FALSE;     // "anisotropy not wired in Stage 6A"
-// ...
-samplerInfo.maxAnisotropy = 1.0f;
-```
-
-**After**:
-
-```cpp
-const RHICapabilities& caps = device.GetCapabilities();
-const bool useAniso = (desc.MaxAnisotropy > 1.0f) && (caps.MaxSamplerAnisotropy > 1);
-samplerInfo.anisotropyEnable = useAniso ? VK_TRUE : VK_FALSE;
-samplerInfo.maxAnisotropy = useAniso
-    ? std::min(desc.MaxAnisotropy, static_cast<float>(caps.MaxSamplerAnisotropy))
+const auto& caps = device.GetCapabilities();
+const bool useAnisotropy =
+    desc.MaxAnisotropy > 1.0f && caps.SupportsSamplerAnisotropy;
+
+samplerInfo.anisotropyEnable = useAnisotropy ? VK_TRUE : VK_FALSE;
+samplerInfo.maxAnisotropy = useAnisotropy
+    ? std::min(desc.MaxAnisotropy, caps.MaxSamplerAnisotropy)
     : 1.0f;
 ```
 
-Add at the top of `VulkanSampler.cpp`:
+If the request is above 1 but the feature is disabled, either reject it in the
+factory or log a single clear warning and normalize to 1. Choose one policy and
+test it; do not enable a device feature merely because the limit is non-zero.
+
+## 7. Stage 7B — Vulkan Debug Names
+
+Add one backend-private helper:
 
 ```cpp
-#include <algorithm>
-#include "XEngine/RHI/RHICapabilities.h"
+void VulkanSetDebugName(
+    VulkanDevice& device,
+    VkObjectType objectType,
+    u64 objectHandle,
+    const char* debugName);
 ```
 
-### 5.21 CMake
+The helper no-ops for null names/handles or when debug utils are unavailable.
+Load the device command after logical-device creation (or use Volk's loaded
+device function) and call it only when `VK_EXT_debug_utils` was enabled.
 
-No edits. All new files are picked up by `GLOB_RECURSE`:
+Apply names after successful creation:
+
+| RHI object | Vulkan object type |
+|---|---|
+| buffer | `VK_OBJECT_TYPE_BUFFER` |
+| texture | `VK_OBJECT_TYPE_IMAGE` |
+| texture view | `VK_OBJECT_TYPE_IMAGE_VIEW` |
+| sampler | `VK_OBJECT_TYPE_SAMPLER` |
+| shader | `VK_OBJECT_TYPE_SHADER_MODULE` |
+| pipeline | `VK_OBJECT_TYPE_PIPELINE` |
+| pipeline layout | `VK_OBJECT_TYPE_PIPELINE_LAYOUT` |
+| bind-group layout | `VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT` |
+| bind group | `VK_OBJECT_TYPE_DESCRIPTOR_SET` |
+
+Do not label a descriptor-set layout as a pipeline layout. If one RHI object
+owns multiple Vulkan handles, derive stable suffixes such as
+`"ForwardOpaque.Layout"` rather than assigning the same name to all handles.
+
+`DebugName` is borrowed during creation. Backend objects must not assume the
+`const char*` remains valid unless the descriptor stores an owned string; the
+Vulkan naming call itself copies the name.
+
+## 8. Files
+
+Add:
 
 ```text
 Public/XEngine/RHI/RHICapabilities.h
-Private/RHIDeferredDeleter.h
-Private/RHIDeferredDeleter.cpp
-Private/Vulkan/VulkanCapabilities.h
-Private/Vulkan/VulkanCapabilities.cpp
 Private/Vulkan/VulkanDebugName.h
 Private/Vulkan/VulkanDebugName.cpp
 ```
 
-## 6. Implementation Order
+Modify:
 
-1. Add `RHICapabilities.h` and `RHIUtils` format helpers.
-2. Add `VulkanCapabilities` and populate it in `VulkanDevice::Initialize`.
-3. Add `RHIDevice::GetCapabilities()` and `GetDeferredDeleter()`.
-4. Add `RHIDeferredDeleter` and `VulkanDevice::BeginFrame` drains it.
-5. Add `VulkanDebugName` helper and wire every Vulkan constructor to call
-   it. Remove redundant `XENGINE_LOG_INFO(desc.DebugName)` lines.
-6. Extend `RHIResourceFactory` validation one descriptor at a time
-   (`CreateTexture`, `CreateTextureView`, `CreateBindGroupLayout`,
-   `CreateGraphicsPipeline`).
-7. Compile and run Editor + Sandbox. RenderDoc should show meaningful
-   names on every Vulkan object.
+```text
+Public/XEngine/RHI/RHI.h
+Public/XEngine/RHI/RHIDevice.h
+Public/XEngine/RHI/RHIUtils.h
+Private/RHIUtils.cpp
+Private/RHIResourceFactory.cpp
+Private/Vulkan/VulkanDevice.h/.cpp
+Private/Vulkan/VulkanResourceFactory.cpp
+Private/Vulkan/VulkanBuffer.cpp
+Private/Vulkan/VulkanTexture.cpp
+Private/Vulkan/VulkanTextureView.cpp
+Private/Vulkan/VulkanSampler.cpp
+Private/Vulkan/VulkanShader.cpp
+Private/Vulkan/VulkanPipeline.cpp
+Private/Vulkan/VulkanDescriptor.cpp
+```
 
-## 7. Verification
+Do not add `RHIDeferredDeleter.*` in this stage.
 
-- **Build:** Compiles. No public ABI break.
-- **Editor / Sandbox smoke test:** Identical rendering.
-- **Vulkan validation:** No new validation-layer warnings.
-- **RenderDoc:** Every Vulkan object (image, buffer, sampler, pipeline,
-  layout, descriptor set) should have a debug name from the descriptor.
-- **Capabilities:** Add a temporary `XE_LOG_INFO` of every field at
-  startup. Confirm values are non-zero for a real GPU.
-- **Anisotropy sanity:** Set `RHISamplerDesc::MaxAnisotropy > 1.0f` and
-  confirm the sampler is created with `anisotropyEnable = VK_TRUE` and
-  `maxAnisotropy` clamped to `caps.MaxSamplerAnisotropy`. Replace the
-  existing "anisotropy not wired in Stage 6A" warning.
-- **Deferred deleter:** Add a temporary `Enqueue([] { XE_LOG_INFO("flush"); });`
-  test in `BeginFrame`. Confirm the log fires once per frame.
+## 9. Implementation Order
 
-## 8. Common Mistakes
+1. Add the minimal capability struct and populate it from real Vulkan state.
+2. Add format helpers for formats that currently exist.
+3. Harden texture and view validation/normalization.
+4. Harden bind-group and pipeline validation.
+5. Wire anisotropy using enabled-feature state.
+6. Build and run validation tests (Stage 7A checkpoint).
+7. Add the debug-name helper and name each successfully created handle.
+8. Verify names in RenderDoc (Stage 7B checkpoint).
 
-- Reading `VkPhysicalDeviceProperties` after `volkInitialize` but before
-  `vkCreateDevice`. Capabilities must be captured **before** the device
-  is created or after both device and physical device are alive.
-- Forgetting to refresh capabilities after a swapchain recreate (the
-  swapchain can affect `MaxBindGroups` indirectly — in practice it does
-  not, but if any capability ever depends on a created object, document
-  the refresh rule).
-- Passing `debugName == nullptr` to `vkSetDebugUtilsObjectNameEXT` —
-  Vulkan spec allows null but the helper should no-op.
-- Using `RHICapabilities` to silently shrink user request sizes (e.g.
-  `ArrayLayers = std::min(desc.ArrayLayers, caps.MaxTextureArrayLayers)`).
-  The factory must reject instead.
-- Putting the deferred deleter drain **after** `vkAcquireNextImageKHR`
-  in `BeginFrame`. It must run before the user submits new commands.
+## 10. Verification
 
-## 9. What This Stage Intentionally Does Not Do
+- Capability values match `VkPhysicalDeviceProperties` on the selected GPU.
+- Invalid mip/layer ranges, aspects, dimensions, usage combinations, and
+  cross-device resources are rejected before backend creation.
+- `MipCount == 0` / `ArrayLayerCount == 0` are stored normalized.
+- A fixed descriptor array is not rejected merely because bindless is absent.
+- Anisotropy never becomes enabled unless the logical-device feature is on.
+- RenderDoc shows correct names and object types.
+- No deferred-deletion API or unused queue was introduced.
 
-- Does **not** route resource destruction through `RHIDeferredDeleter`.
-  Future stage.
-- Does **not** implement bindless. Capabilities reserve the flag, but the
-  factory still rejects `Count > 1` bindings.
-- Does **not** implement MSAA / multi-view / conservative raster paths.
-  Capabilities reserve the flags.
-- Does **not** implement a full resource-state tracker. Capabilities are
-  read-only.
-- Does **not** remove `RHITexture::GetNativeImageView` or the
-  `RHIDevice::CreateX` wrappers. Stage 8.
-- Does **not** migrate the editor ImGui backend. Stage 8.
-- Does **not** add an `RHIDevice::WaitIdle` semantic change. Existing
-  behaviour stays.
+## 11. Out of Scope
+
+- Deferred destruction and frame-fence retirement.
+- Bindless/descriptor indexing/update-after-bind.
+- Mutable-format images and view reinterpretation.
+- Compressed formats.
+- MRT, MSAA, multiview, and conservative rasterization.
+- Full resource-state tracking.

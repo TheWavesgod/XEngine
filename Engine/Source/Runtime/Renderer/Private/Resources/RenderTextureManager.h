@@ -4,6 +4,7 @@
 #include <XEngine/Core/Types.h>
 #include <XEngine/Renderer/Texture.h>
 #include <XEngine/RHI/Resources/RHITexture.h>
+#include <XEngine/RHI/Resources/RHITextureView.h>
 
 #include <memory>
 #include <string>
@@ -20,6 +21,7 @@ namespace XEngine
     {
         std::string Path;
         std::shared_ptr<RHITexture> Texture;
+        std::shared_ptr<RHITextureView> SampledView;
         u32 Generation = 0;
     };
 
