@@ -1,10 +1,6 @@
 #include "VulkanDevice.h"
 
-#include "VulkanBuffer.h"
-#include "VulkanDescriptor.h"
-#include "VulkanPipeline.h"
-#include "VulkanSampler.h"
-#include "VulkanShader.h"
+#include "VulkanResourceFactory.h"
 #include "VulkanUtils.h"
 
 #include <XEngine/Logging/Log.h>
@@ -167,6 +163,8 @@ namespace XEngine
         {
             return false;
         }
+
+        m_ResourceFactory = std::make_unique<VulkanResourceFactory>(*this);
 
         m_EnableVSync = createInfo.EnableVSync;
         m_PendingResizeWidth = createInfo.Width;
@@ -502,185 +500,6 @@ namespace XEngine
         XENGINE_LOG_INFO(message);
     }
 
-    std::shared_ptr<RHIShader> VulkanDevice::CreateShader(const RHIShaderDesc& desc)
-    {
-        auto vulkanShader = std::make_shared<VulkanShader>(*this, desc);
-        if (!vulkanShader->IsValid())
-        {
-            return nullptr;
-        }
-
-        std::shared_ptr<RHIShader> shader = vulkanShader;
-        return shader;
-    }
-
-    std::shared_ptr<RHIBuffer> VulkanDevice::CreateBuffer(
-        const RHIBufferDesc& desc,
-        const void* initialData,
-        std::size_t initialDataSize)
-    {
-        auto buffer = std::make_shared<VulkanBuffer>(*this, m_Allocator.GetHandle(), desc, initialData, initialDataSize);
-        if (!buffer->IsValid())
-        {
-            return nullptr;
-        }
-
-        return buffer;
-    }
-
-    std::shared_ptr<RHITexture> VulkanDevice::CreateTexture(
-        const RHITextureDesc& desc,
-        const void* initialData,
-        std::size_t initialDataSize)
-    {
-        auto texture = std::make_shared<VulkanTexture>(*this, m_Allocator.GetHandle(), desc);
-        if (!texture->IsValid())
-        {
-            return nullptr;
-        }
-
-        if (initialData != nullptr && initialDataSize > 0)
-        {
-            RHIBufferDesc stagingDesc;
-            stagingDesc.Size = initialDataSize;
-            stagingDesc.Usage = RHIBufferUsage::TransferSrc;
-            stagingDesc.MemoryUsage = RHIMemoryUsage::CPUToGPU;
-            stagingDesc.DebugName = "Texture upload staging buffer";
-
-            VulkanBuffer stagingBuffer(*this, m_Allocator.GetHandle(), stagingDesc, initialData, initialDataSize);
-            if (!stagingBuffer.IsValid())
-            {
-                XENGINE_LOG_ERROR("Failed to create texture upload staging buffer");
-                return nullptr;
-            }
-
-            // TODO Stage 8/10:
-            // Replace immediate submit upload path with RHIUploadManager / transfer queue / async upload.
-            ImmediateSubmit([&](VkCommandBuffer commandBuffer)
-            {
-                VkImageSubresourceRange range {};
-                range.aspectMask = GetTextureAspectMask(desc.Format);
-                range.baseMipLevel = 0;
-                range.levelCount = 1;
-                range.baseArrayLayer = 0;
-                range.layerCount = desc.ArrayLayers;
-
-                VkImageMemoryBarrier toTransfer {};
-                toTransfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-                toTransfer.srcAccessMask = 0;
-                toTransfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-                toTransfer.oldLayout = *texture->GetLayoutPtr();
-                toTransfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                toTransfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                toTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                toTransfer.image = texture->GetImage();
-                toTransfer.subresourceRange = range;
-
-                vkCmdPipelineBarrier(
-                    commandBuffer,
-                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                    VK_PIPELINE_STAGE_TRANSFER_BIT,
-                    0,
-                    0,
-                    nullptr,
-                    0,
-                    nullptr,
-                    1,
-                    &toTransfer);
-
-                VkBufferImageCopy copyRegion {};
-                copyRegion.bufferOffset = 0;
-                copyRegion.bufferRowLength = 0;
-                copyRegion.bufferImageHeight = 0;
-                copyRegion.imageSubresource.aspectMask = range.aspectMask;
-                copyRegion.imageSubresource.mipLevel = 0;
-                copyRegion.imageSubresource.baseArrayLayer = 0;
-                copyRegion.imageSubresource.layerCount = desc.ArrayLayers;
-                copyRegion.imageOffset = { 0, 0, 0 };
-                copyRegion.imageExtent = { desc.Width, desc.Height, 1 };
-
-                vkCmdCopyBufferToImage(
-                    commandBuffer,
-                    stagingBuffer.GetHandle(),
-                    texture->GetImage(),
-                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                    1,
-                    &copyRegion);
-
-                VkImageMemoryBarrier toShaderRead {};
-                toShaderRead.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-                toShaderRead.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-                toShaderRead.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-                toShaderRead.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                toShaderRead.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                toShaderRead.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                toShaderRead.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                toShaderRead.image = texture->GetImage();
-                toShaderRead.subresourceRange = range;
-
-                vkCmdPipelineBarrier(
-                    commandBuffer,
-                    VK_PIPELINE_STAGE_TRANSFER_BIT,
-                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                    0,
-                    0,
-                    nullptr,
-                    0,
-                    nullptr,
-                    1,
-                    &toShaderRead);
-            });
-
-            *texture->GetLayoutPtr() = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        }
-
-        return texture;
-    }
-
-    std::shared_ptr<RHISampler> VulkanDevice::CreateSampler(const RHISamplerDesc& desc)
-    {
-        auto sampler = std::make_shared<VulkanSampler>(*this, desc);
-        if (!sampler->IsValid())
-        {
-            return nullptr;
-        }
-
-        return sampler;
-    }
-
-    std::shared_ptr<RHIBindGroupLayout> VulkanDevice::CreateBindGroupLayout(const RHIBindGroupLayoutDesc& desc)
-    {
-        auto layout = std::make_shared<VulkanBindGroupLayout>();
-        if (!layout->Create(*this, desc))
-        {
-            return nullptr;
-        }
-
-        return layout;
-    }
-
-    std::shared_ptr<RHIBindGroup> VulkanDevice::CreateBindGroup(const RHIBindGroupDesc& desc)
-    {
-        auto bindGroup = std::make_shared<VulkanBindGroup>();
-        if (!bindGroup->Create(*this, m_DescriptorPool, desc))
-        {
-            return nullptr;
-        }
-
-        return bindGroup;
-    }
-
-    std::shared_ptr<RHIPipeline> VulkanDevice::CreateGraphicsPipeline(const RHIGraphicsPipelineDesc& desc)
-    {
-        auto pipeline = std::make_shared<VulkanPipeline>(*this, desc);
-        if (!pipeline->IsValid())
-        {
-            return nullptr;
-        }
-
-        return pipeline;
-    }
-
     RHIFormat VulkanDevice::GetSwapchainFormat() const
     {
         return VulkanFormatToRHIFormat(m_Swapchain.GetImageFormat());
@@ -784,6 +603,18 @@ namespace XEngine
         }
 
         vkDeviceWaitIdle(m_Device);
+    }
+
+    RHIResourceFactory& VulkanDevice::GetResourceFactory()
+    {
+        XENGINE_ASSERT(m_ResourceFactory != nullptr, "Vulkan Resource Factory is null");
+        return *m_ResourceFactory;
+    }
+
+    const RHIResourceFactory& VulkanDevice::GetResourceFactory() const
+    {
+        XENGINE_ASSERT(m_ResourceFactory != nullptr, "Vulkan Resource Factory is null");
+        return *m_ResourceFactory;
     }
 
     bool VulkanDevice::CreateDepthTexture()

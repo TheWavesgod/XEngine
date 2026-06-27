@@ -6,13 +6,15 @@
 
 namespace XEngine
 {
+    class VulkanDevice;
+
     class VulkanBindGroupLayout final : public RHIBindGroupLayout
     {
     public:
         VulkanBindGroupLayout() = default;
         ~VulkanBindGroupLayout() override;
 
-        bool Create(class VulkanDevice& device, const RHIBindGroupLayoutDesc& desc);
+        bool Create(VulkanDevice& device, const RHIBindGroupLayoutDesc& desc);
         void Destroy();
 
         VkDescriptorSetLayout GetHandle() const;
@@ -31,7 +33,7 @@ namespace XEngine
         ~VulkanBindGroup() override;
 
         bool Create(
-            class VulkanDevice& device,
+            VulkanDevice& device,
             VkDescriptorPool descriptorPool,
             const RHIBindGroupDesc& desc);
 

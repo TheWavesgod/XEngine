@@ -13,6 +13,19 @@ Allow `RHIGraphicsPipelineDesc` to describe a depth-only pipeline:
 This is required for Stage 9 ShadowDepthPass but it is intentionally a
 self-contained RHI change so Stage 9 is purely a Renderer-side concern.
 
+> Current-source correction (2026-06-25): the checked-in
+> `RHIGraphicsPipelineDesc` already has `bool HasColorAttachment`. Prefer
+> extending that path for Stage 6:
+>
+> - `HasColorAttachment == false` maps to Vulkan dynamic rendering
+>   `colorAttachmentCount = 0`.
+> - `HasColorAttachment == true` maps to the existing single-colour path.
+> - Add depth-bias fields if needed by shadow pipelines.
+>
+> If `ColorAttachmentCount` is still desired for future MRT, make Stage 6 an
+> explicit rename from `HasColorAttachment` to `ColorAttachmentCount`; do not
+> leave both fields in the descriptor.
+
 ## 2. Current Code Audit
 
 Relevant existing files:
@@ -84,6 +97,14 @@ Engine/Source/Runtime/RHI/Private/RHIResourceFactory.cpp  (Stage 3 file;
 ## 5. Detailed Code Plan
 
 ### 5.1 Modify: `Resources/RHIPipeline.h` — add `ColorAttachmentCount` and helper
+
+For the current source baseline, read this section as one of two valid
+alternatives:
+
+1. Minimal Stage 6: keep `HasColorAttachment` and add only the depth-bias
+   fields plus Vulkan handling for `HasColorAttachment == false`.
+2. MRT-ready Stage 6: replace `HasColorAttachment` with
+   `ColorAttachmentCount`. Update all existing call sites in the same commit.
 
 **Before** (lines 56–75 of `RHIPipeline.h`, the body of `RHIGraphicsPipelineDesc`):
 

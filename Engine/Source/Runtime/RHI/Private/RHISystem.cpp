@@ -8,6 +8,7 @@
 #include <XEngine/Platform/PlatformSystem.h>
 #include <XEngine/Platform/Window.h>
 #include <XEngine/RHI/RHIDevice.h>
+#include <XEngine/RHI/RHIResourceFactory.h>
 
 #if defined(XENGINE_ENABLE_VULKAN)
     #include "Vulkan/VulkanDevice.h"
@@ -163,6 +164,8 @@ namespace XEngine
             return;
         }
 
+        auto& resourceFactory = m_Device->GetResourceFactory();
+
         RHITextureDesc textureDesc;
         textureDesc.Width = 1;
         textureDesc.Height = 1;
@@ -174,7 +177,7 @@ namespace XEngine
         textureDesc.DebugName = "DefaultWhiteTexture";
 
         const u8 whitePixel[] = { 255, 255, 255, 255 };
-        m_DefaultWhiteTexture = m_Device->CreateTexture(textureDesc, whitePixel, sizeof(whitePixel));
+        m_DefaultWhiteTexture = resourceFactory.CreateTexture(textureDesc, whitePixel, sizeof(whitePixel));
         if (!m_DefaultWhiteTexture)
         {
             XENGINE_LOG_ERROR("Failed to create DefaultWhiteTexture validation resource");
@@ -183,7 +186,7 @@ namespace XEngine
 
         textureDesc.DebugName = "DefaultNormalTexture";
         const u8 normalPixel[] = { 128, 128, 255, 255 };
-        m_DefaultNormalTexture = m_Device->CreateTexture(textureDesc, normalPixel, sizeof(normalPixel));
+        m_DefaultNormalTexture = resourceFactory.CreateTexture(textureDesc, normalPixel, sizeof(normalPixel));
         if (!m_DefaultNormalTexture)
         {
             XENGINE_LOG_ERROR("Failed to create DefaultNormalTexture validation resource");
@@ -198,7 +201,7 @@ namespace XEngine
         samplerDesc.AddressW = RHIAddressMode::Repeat;
         samplerDesc.DebugName = "DefaultLinearRepeatSampler";
 
-        m_DefaultLinearRepeatSampler = m_Device->CreateSampler(samplerDesc);
+        m_DefaultLinearRepeatSampler = resourceFactory.CreateSampler(samplerDesc);
         if (!m_DefaultLinearRepeatSampler)
         {
             XENGINE_LOG_ERROR("Failed to create DefaultLinearRepeatSampler validation resource");

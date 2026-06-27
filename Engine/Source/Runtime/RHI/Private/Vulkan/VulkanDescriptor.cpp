@@ -5,6 +5,7 @@
 #include "VulkanDevice.h"
 #include "VulkanSampler.h"
 #include "VulkanTexture.h"
+#include "VulkanTextureView.h"
 #include "VulkanUtils.h"
 
 #include <XEngine/Logging/Log.h>
@@ -145,15 +146,17 @@ namespace XEngine
                 auto* texture = CheckedVulkanCast<VulkanTexture>(resource.Texture, deviceRef);
                 auto* sampler = CheckedVulkanCast<VulkanSampler>(resource.Sampler, deviceRef);
                 if (texture == nullptr || sampler == nullptr ||
-                    texture->GetImageView() == VK_NULL_HANDLE || sampler->GetHandle() == VK_NULL_HANDLE)
+                    texture->GetDefaultView() == nullptr || sampler->GetHandle() == VK_NULL_HANDLE)
                 {
                     XENGINE_LOG_ERROR("Combined image sampler binding requires a valid Vulkan texture and sampler");
                     return false;
                 }
 
+                auto* view = CheckedVulkanCast<VulkanTextureView>(texture->GetDefaultView(), deviceRef);
+
                 VkDescriptorImageInfo imageInfo {};
                 imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfo.imageView = texture->GetImageView();
+                imageInfo.imageView = view->GetHandle();
                 imageInfo.sampler = sampler->GetHandle();
                 imageInfos.push_back(imageInfo);
 

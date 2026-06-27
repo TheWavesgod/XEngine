@@ -9,6 +9,19 @@ The goal is **a clean cut** that is still safe to ship: every transitional
 wrapper has a clearly named replacement, every consumer is updated, and the
 new API is the only one that remains.
 
+> Current-source correction (2026-06-25): apply this checklist to the current
+> checked-in baseline:
+>
+> - Replace `ColorTarget` / `DepthTarget` with `ColorTargetView` /
+>   `DepthTargetView`.
+> - Do not search for `ColorTexture` / `DepthTexture` as existing fields; they
+>   are not present in the current `RHIRenderOutputDesc`.
+> - Keep `std::shared_ptr` return types unless a separate ownership migration
+>   has already landed.
+> - Use `RHIPipeline`, not `RHIGraphicsPipeline`.
+> - If Stage 2 kept `GetNativeImageView`, migrate from that spelling. If Stage 2
+>   renamed it to `GetNativeView`, use that spelling consistently.
+
 ## 2. Transitional APIs That This Stage Removes
 
 These were added in earlier stages purely as compatibility shims:

@@ -25,6 +25,18 @@ stage robust:
   command buffer. This stage does **not** wire any resource into it yet —
   it only sets up the API.
 
+> Safety correction (2026-06-25): a single static queue drained at the top of
+> `BeginFrame` is not sufficient for Vulkan resource lifetime safety. Deferred
+> destruction must be tied to frame-slot/fence completion. For Stage 7 either:
+>
+> - add only a private placeholder type and do not expose
+>   `RHIDevice::GetDeferredDeleter()` yet, or
+> - implement a per-frame queue and drain only after the frame slot's fence is
+>   known to be complete.
+>
+> Do not route real resource destruction through a queue that flushes before
+> acquire/fence handling.
+
 ## 2. Current Code Audit
 
 Relevant existing files:
@@ -383,6 +395,23 @@ Add the include at the top:
 ```
 
 ### 5.8 New file: `Private/RHIDeferredDeleter.h` — full content
+
+For the current cleanup, prefer a fence-aware shape over the simple queue shown
+below. Minimal acceptable API:
+
+```cpp
+class RHIDeferredDeleter
+{
+public:
+    void Enqueue(u32 frameSlot, std::function<void()> destroy);
+    void FlushCompletedFrame(u32 frameSlot);
+    bool IsEmpty() const;
+};
+```
+
+`VulkanDevice` should call `FlushCompletedFrame(frameSlot)` only after waiting
+or confirming the fence for that slot. If that frame-slot information is not
+available yet, keep this class private and unused in Stage 7.
 
 ```cpp
 // Engine/Source/Runtime/RHI/Private/RHIDeferredDeleter.h

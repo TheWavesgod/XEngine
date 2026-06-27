@@ -1,7 +1,6 @@
 #pragma once
 
 #include <XEngine/RHI/Resources/RHITexture.h>
-
 #include <volk.h>
 #include <vk_mem_alloc.h>
 

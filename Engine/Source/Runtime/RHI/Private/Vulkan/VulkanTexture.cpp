@@ -91,34 +91,12 @@ namespace XEngine
             XENGINE_LOG_ERROR(message);
             return;
         }
-
-        VkImageViewCreateInfo viewCreateInfo {};
-        viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewCreateInfo.image = m_Image;
-        viewCreateInfo.viewType = GetImageViewType(m_Desc.Dimension);
-        viewCreateInfo.format = format;
-        viewCreateInfo.subresourceRange.aspectMask = GetAspectMask(m_Desc.Format);
-        viewCreateInfo.subresourceRange.baseMipLevel = 0;
-        viewCreateInfo.subresourceRange.levelCount = m_Desc.MipLevels;
-        viewCreateInfo.subresourceRange.baseArrayLayer = 0;
-        viewCreateInfo.subresourceRange.layerCount = m_Desc.ArrayLayers;
-
-        result = vkCreateImageView(m_Device, &viewCreateInfo, nullptr, &m_ImageView);
-        if (result != VK_SUCCESS)
-        {
-            std::string message = "Failed to create Vulkan image view: ";
-            message += VulkanResultToString(result);
-            XENGINE_LOG_ERROR(message);
-        }
     }
 
     VulkanTexture::~VulkanTexture()
     {
-        if (m_Device != VK_NULL_HANDLE && m_ImageView != VK_NULL_HANDLE)
-        {
-            vkDestroyImageView(m_Device, m_ImageView, nullptr);
-            m_ImageView = VK_NULL_HANDLE;
-        }
+        // Drop the default view first — its VkImageView depends on this image.
+        m_DefaultView.reset();
 
         if (m_Allocator != VK_NULL_HANDLE && m_Image != VK_NULL_HANDLE)
         {
@@ -130,7 +108,7 @@ namespace XEngine
 
     bool VulkanTexture::IsValid() const
     {
-        return m_Image != VK_NULL_HANDLE && m_ImageView != VK_NULL_HANDLE;
+        return m_Image != VK_NULL_HANDLE;
     }
 
     const RHITextureDesc& VulkanTexture::GetDesc() const
@@ -143,14 +121,30 @@ namespace XEngine
         return m_Image;
     }
 
-    VkImageView VulkanTexture::GetDefaultView() const
+    RHITextureView* VulkanTexture::GetDefaultView() const
     {
-        return m_ImageView;
+        if (!m_DefaultView)
+        {
+            RHITextureViewDesc viewDesc;
+            viewDesc.Texture = this;
+            viewDesc.Usage = RHITextureViewUsageFlags::Sampled;
+            viewDesc.Aspect = m_Desc.Format == RHIFormat::D32Float ? 
+                RHITextureAspectFlags::Depth : RHITextureAspectFlags::Color;
+            viewDesc.BaseMipLevel = 0;
+            viewDesc.MipCount = m_Desc.MipLevels;
+            viewDesc.BaseArrayLayer = 0;
+            viewDesc.ArrayLayerCount = m_Desc.ArrayLayers;
+            viewDesc.DebugName = m_Desc.DebugName;
+
+            m_DefaultView = static_cast<VulkanDevice&>(GetOwnerDevice())
+                                .CreateTextureView(viewDesc);
+        }
+        return m_DefaultView.get();
     }
 
     void* VulkanTexture::GetNativeDefaultView(RHIBackend backend) const
     {
-        return backend == RHIBackend::Vulkan ? m_ImageView : nullptr;
+        return backend == RHIBackend::Vulkan ? m_DefaultView->GetNativeView(backend) : nullptr;
     }
 
     VkImageLayout* VulkanTexture::GetLayoutPtr()

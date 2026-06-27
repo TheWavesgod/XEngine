@@ -91,6 +91,22 @@ Stage 8  Migration Checklist                       │  Switch Renderer to new A
 Each stage must compile and run the existing Renderer + Sandbox + Editor scenes
 without behavioural change before the next stage begins.
 
+> Current-source correction (2026-06-25): the checked-in code is already in a
+> partial RHIC state. Treat the current names as the migration baseline:
+>
+> - `RHIDevice::CreateX` returns `std::shared_ptr<T>`, not `std::unique_ptr<T>`.
+>   Keep `shared_ptr` throughout this cleanup unless a dedicated ownership
+>   migration stage is added.
+> - The pipeline type is `RHIPipeline`, not `RHIGraphicsPipeline`.
+> - `RHIGraphicsPipelineDesc` currently has `HasColorAttachment`; Stage 6 may
+>   either keep it or explicitly replace it with `ColorAttachmentCount`, but the
+>   two fields must not coexist.
+> - `RHIRenderOutputDesc` currently contains `ColorTarget` and `DepthTarget`,
+>   not `ColorTexture` / `DepthTexture`. Stage 5/8 migration should rename them
+>   to `ColorTargetView` / `DepthTargetView`.
+> - `RHITextureView` currently uses `GetNativeImageView`; if Stage 2 renames it
+>   to `GetNativeView`, all later stages must use the renamed spelling.
+
 Stage 5 depends on Stage 2 (view abstraction) and Stage 3 (factory), so it
 must come after both. Stage 6 is independent of Stage 5. Stage 7 can be split
 across the whole timeline if desired. Stage 8 is the final migration

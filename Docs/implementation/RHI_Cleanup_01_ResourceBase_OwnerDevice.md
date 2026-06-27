@@ -137,7 +137,7 @@ namespace XEngine
         explicit RHIResource(RHIDevice& ownerDevice);
 
         // Optional debug-time verification that backend matches expectation.
-        // Compiled to no-op in release if XE_ASSERT is empty there.
+        // Compiled to no-op in release if XENGINE_ASSERT is empty there.
         void XE_AssertBackendMatches(RHIBackend expected) const;
 
     private:
@@ -163,7 +163,7 @@ namespace XEngine
 
     RHIDevice& RHIResource::GetOwnerDevice() const
     {
-        XE_ASSERT(m_OwnerDevice != nullptr);
+        XENGINE_ASSERT(m_OwnerDevice != nullptr, "RHIResource must be created with a valid owner RHIDevice");
         return *m_OwnerDevice;
     }
 
@@ -174,7 +174,7 @@ namespace XEngine
 
     void RHIResource::XE_AssertBackendMatches(RHIBackend expected) const
     {
-        XE_ASSERT(GetBackend() == expected);
+        XENGINE_ASSERT(GetBackend() == expected, "Resource's backend is not expected");
     }
 }
 ```
@@ -235,18 +235,18 @@ namespace XEngine
     template <typename VulkanType, typename RHIType>
     VulkanType* CheckedVulkanCast(RHIType* resource, const VulkanDevice& expectedDevice)
     {
-        XE_ASSERT(resource != nullptr);
-        XE_ASSERT(&resource->GetOwnerDevice() == &expectedDevice);
-        XE_ASSERT(resource->GetBackend() == RHIBackend::Vulkan);
+        XENGINE_ASSERT(resource != nullptr, "RHIResource is not valid");
+        XENGINE_ASSERT(&resource->GetOwnerDevice() == &expectedDevice, "Resource owner device does not match expected device");
+        XENGINE_ASSERT(resource->GetBackend() == RHIBackend::Vulkan, "Resource backend is not Vulkan");
         return static_cast<VulkanType*>(resource);
     }
 
     template <typename VulkanType, typename RHIType>
     const VulkanType* CheckedVulkanCast(const RHIType* resource, const VulkanDevice& expectedDevice)
     {
-        XE_ASSERT(resource != nullptr);
-        XE_ASSERT(&resource->GetOwnerDevice() == &expectedDevice);
-        XE_ASSERT(resource->GetBackend() == RHIBackend::Vulkan);
+        XENGINE_ASSERT(resource != nullptr, "RHIResource is not valid");
+        XENGINE_ASSERT(&resource->GetOwnerDevice() == &expectedDevice, "Resource owner device does not match expected device");
+        XENGINE_ASSERT(resource->GetBackend() == RHIBackend::Vulkan, "Resource backend is not Vulkan");
         return static_cast<const VulkanType*>(resource);
     }
 }
@@ -1022,7 +1022,7 @@ if (vulkanPipeline == nullptr || !vulkanPipeline->IsValid())
 
 After:
 ```cpp
-XE_ASSERT(m_Device != nullptr);
+XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
 auto* vulkanPipeline = CheckedVulkanCast<VulkanPipeline>(pipeline, *m_Device);
 if (!vulkanPipeline->IsValid())
 ```
@@ -1036,9 +1036,9 @@ if (colorTexture == nullptr || !colorTexture->IsValid())
 
 After:
 ```cpp
-XE_ASSERT(m_Device != nullptr);
+XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
 colorTexture = CheckedVulkanCast<VulkanTexture>(m_RenderOutput.ColorTarget, *m_Device);
-depthTexture = CheckedVulkanTexture>(m_RenderOutput.DepthTarget, *m_Device);
+depthTexture = CheckedVulkanCast<VulkanTexture>(m_RenderOutput.DepthTarget, *m_Device);
 if (colorTexture == nullptr || !colorTexture->IsValid())
 ```
 
@@ -1062,7 +1062,7 @@ if (vulkanTexture == nullptr)
 
 After:
 ```cpp
-XE_ASSERT(m_Device != nullptr);
+XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
 auto* vulkanTexture = CheckedVulkanCast<VulkanTexture>(texture, *m_Device);
 ```
 
@@ -1076,7 +1076,7 @@ if (vulkanBindGroup == nullptr || vulkanBindGroup->GetHandle() == VK_NULL_HANDLE
 
 After:
 ```cpp
-XE_ASSERT(m_Device != nullptr);
+XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
 auto* vulkanBindGroup = CheckedVulkanCast<VulkanBindGroup>(bindGroup, *m_Device);
 if (vulkanBindGroup->GetHandle() == VK_NULL_HANDLE)
 ```
@@ -1091,7 +1091,7 @@ if (vulkanBuffer == nullptr || !vulkanBuffer->IsValid())
 
 After:
 ```cpp
-XE_ASSERT(m_Device != nullptr);
+XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
 auto* vulkanBuffer = CheckedVulkanCast<VulkanBuffer>(buffer, *m_Device);
 if (!vulkanBuffer->IsValid())
 ```
@@ -1106,7 +1106,7 @@ if (vulkanBuffer == nullptr || !vulkanBuffer->IsValid())
 
 After:
 ```cpp
-XE_ASSERT(m_Device != nullptr);
+XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
 auto* vulkanBuffer = CheckedVulkanCast<VulkanBuffer>(buffer, *m_Device);
 if (!vulkanBuffer->IsValid())
 ```
@@ -1130,7 +1130,7 @@ if (vertexShader == nullptr || fragmentShader == nullptr ||
 extracted from one of the shaders:
 
 ```cpp
-XE_ASSERT(desc.VertexShader != nullptr && desc.FragmentShader != nullptr);
+XENGINE_ASSERT(desc.VertexShader != nullptr && desc.FragmentShader != nullptr, "Vulkan graphics pipeline requires non-null vertex and fragment shaders");
 VulkanDevice& device = static_cast<VulkanDevice&>(desc.VertexShader->GetOwnerDevice());
 auto* vertexShader = CheckedVulkanCast<VulkanShader>(desc.VertexShader, device);
 auto* fragmentShader = CheckedVulkanCast<VulkanShader>(desc.FragmentShader, device);
@@ -1217,7 +1217,7 @@ if (texture == nullptr || sampler == nullptr ||
 **After**:
 
 ```cpp
-XE_ASSERT(resource.Texture != nullptr && resource.Sampler != nullptr);
+XENGINE_ASSERT(resource.Texture != nullptr && resource.Sampler != nullptr, "Combined image sampler binding requires non-null texture and sampler");
 VulkanDevice& device = static_cast<VulkanDevice&>(resource.Texture->GetOwnerDevice());
 auto* texture = CheckedVulkanCast<VulkanTexture>(resource.Texture, device);
 auto* sampler = CheckedVulkanCast<VulkanSampler>(resource.Sampler, device);
@@ -1234,7 +1234,7 @@ if (buffer == nullptr || buffer->GetHandle() == VK_NULL_HANDLE)
 **After**:
 
 ```cpp
-XE_ASSERT(resource.Buffer != nullptr);
+XENGINE_ASSERT(resource.Buffer != nullptr, "Buffer binding requires a non-null RHIBuffer");
 VulkanDevice& device = static_cast<VulkanDevice&>(resource.Buffer->GetOwnerDevice());
 auto* buffer = CheckedVulkanCast<VulkanBuffer>(resource.Buffer, device);
 if (buffer->GetHandle() == VK_NULL_HANDLE)
@@ -1414,7 +1414,7 @@ Small, sequential steps inside Stage 1:
   `XENGINE_VK_CHECK` macro path is unchanged.
 - **Runtime check:** On debug builds, deliberately pass an `RHITexture`
   belonging to a different (hypothetical) second `RHIDevice` into
-  `SetVertexBuffer`. Confirm `XE_ASSERT` fires.
+  `SetVertexBuffer`. Confirm `XENGINE_ASSERT` fires.
 - **RenderDoc / shader debugger:** Capture the same frame as before. The
   draw call list and descriptor set contents should be byte-identical.
 
@@ -1433,8 +1433,8 @@ Small, sequential steps inside Stage 1:
   stored in the base. Keep it — Vulkan destroys natives via the
   `VkDevice`, not via `RHIDevice`. The two are intentionally separate
   references.
-- Adding `XE_ASSERT` that is **not** compiled out in release. Verify the
-  existing `XE_ASSERT` definition behaviour before relying on it.
+- Adding `XENGINE_ASSERT` that is **not** compiled out in release. Verify the
+  existing `XENGINE_ASSERT` definition behaviour before relying on it.
 - Forgetting `friend class RHIDevice;` (or future `friend class
   RHIResourceFactory;`) and getting a "protected constructor not
   accessible" error.
@@ -1454,3 +1454,26 @@ Small, sequential steps inside Stage 1:
 - No migration of the editor's `GetNativeImageView` call. That is Stage 8.
 - No changes to the public Vulkan handle structures
   (`VulkanNativeContext`). Stage 7 will add `RHICapabilities`.
+
+## 10. What Comes Next
+
+After Stage 1 lands and the Editor + Sandbox + Renderer still build and run
+unchanged, the next stage is:
+
+[**Stage 2 — RHITextureView**](RHI_Cleanup_02_TextureView.md)
+
+Stage 2 builds directly on the `RHIResource` base introduced here:
+
+- It adds `RHITextureView : public RHIResource` and
+  `RHITextureViewDesc` (mip / layer range, aspect, usage flags).
+- It splits `VulkanTexture` so the `VkImage` is owned by the texture and
+  each `VkImageView` is owned by a `VulkanTextureView` cached on the
+  texture.
+- It introduces `RHIDevice::CreateTextureView` (a Stage-1-style
+  transitional virtual; Stage 3 moves it onto `RHIResourceFactory`).
+- It is the prerequisite for Stage 5 (view-based render pass) and the
+  Stage 9 CSM cascade work.
+
+No new public API of `RHIResource` itself is needed for Stage 2 — the
+`GetOwnerDevice()` / `GetBackend()` contract established here is
+sufficient.

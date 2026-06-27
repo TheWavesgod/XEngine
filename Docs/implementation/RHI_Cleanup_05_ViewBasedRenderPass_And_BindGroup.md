@@ -13,6 +13,18 @@ Switch every "texture" reference at the RHI rendering boundary from
 - `RHICommandList::SetBindGroup` continues to take an `RHIBindGroup*`
   whose resources are now `RHITextureView*`.
 
+> Current-source correction (2026-06-25): the checked-in baseline is already
+> partially migrated. `RHIRenderOutputDesc` currently has `ColorTarget`
+> (`RHITexture*`) and `DepthTarget` (`RHITextureView*`). This stage should
+> converge both names to `ColorTargetView` / `DepthTargetView` and make both
+> fields `RHITextureView*`. Do not introduce temporary `ColorTexture` /
+> `DepthTexture` fields unless a local compatibility window truly requires
+> them.
+>
+> Also keep `RHITexture`'s destructor public. The engine currently stores RHI
+> resources in `std::shared_ptr`; making `~RHITexture()` protected breaks normal
+> deletion through `shared_ptr<RHITexture>`.
+
 This makes the CSM shadow case first-class:
 
 ```text
@@ -394,6 +406,24 @@ protected:
 
 private:
     mutable std::unique_ptr<detail::ViewCache> m_ViewCache;     // NEW
+};
+```
+
+Correction for the current ownership model: keep the destructor public. Use
+this shape instead of the protected destructor above:
+
+```cpp
+class RHITexture : public RHIResource
+{
+public:
+    ~RHITexture() override;
+    // ...
+
+protected:
+    explicit RHITexture(RHIDevice& ownerDevice);
+
+private:
+    mutable std::unique_ptr<detail::ViewCache> m_ViewCache;
 };
 ```
 

@@ -21,6 +21,8 @@
 
 namespace XEngine
 {
+    class RHIResourceFactory; 
+
     struct VulkanDeviceCreateInfo
     {
         NativeWindowHandle NativeWindow;
@@ -46,26 +48,22 @@ namespace XEngine
         void ClearSwapchain(const RHIColor& color) override;
         void EndFrame() override;
         void RequestResize(u32 width, u32 height) override;
-        std::shared_ptr<RHIShader> CreateShader(const RHIShaderDesc& desc) override;
-        std::shared_ptr<RHIBuffer> CreateBuffer(
-            const RHIBufferDesc& desc,
-            const void* initialData,
-            std::size_t initialDataSize) override;
-        std::shared_ptr<RHITexture> CreateTexture(
-            const RHITextureDesc& desc,
-            const void* initialData,
-            std::size_t initialDataSize) override;
-        std::shared_ptr<RHISampler> CreateSampler(
-            const RHISamplerDesc& desc) override;
-        std::shared_ptr<RHIBindGroupLayout> CreateBindGroupLayout(
-            const RHIBindGroupLayoutDesc& desc) override;
-        std::shared_ptr<RHIBindGroup> CreateBindGroup(
-            const RHIBindGroupDesc& desc) override;
-        std::shared_ptr<RHIPipeline> CreateGraphicsPipeline(const RHIGraphicsPipelineDesc& desc) override;
+        
         RHIFormat GetSwapchainFormat() const override;
         bool GetVulkanNativeContext(VulkanNativeContext& outContext) const override;
         void RenderVulkanOverlay(const std::function<void(RHINativeCommandBuffer)>& callback) override;
         void WaitIdle() override;
+
+        // NEW: accessors used by VulkanResourceFactory and VulkanUploadManager.
+        VmaAllocator GetVmaAllocator() const { return m_Allocator.GetHandle(); }
+        VkDescriptorPool GetDescriptorPool() const { return m_DescriptorPool; }
+
+        // Immediate submit is now used by both VulkanResourceFactory (Stage 3
+        // texture upload) and VulkanUploadManager (Stage 4).
+        void ImmediateSubmit(const std::function<void(VkCommandBuffer)>& function);
+
+        RHIResourceFactory& GetResourceFactory() override;
+        const RHIResourceFactory& GetResourceFactory() const override;
 
         inline VkDevice GetHandle() const { return m_Device; }
 
@@ -77,7 +75,6 @@ namespace XEngine
         bool CreateDepthTexture();
         void DestroyDepthTexture();
         void RecreateSwapchain(u32 width, u32 height);
-        void ImmediateSubmit(const std::function<void(VkCommandBuffer)>& function);
 
         VulkanInstance m_Instance;
         VulkanSurface m_Surface;
@@ -85,6 +82,7 @@ namespace XEngine
         VulkanSwapchain m_Swapchain;
         VulkanFrameResources m_FrameResources;
         VulkanCommandList m_CommandList;
+        std::unique_ptr<RHIResourceFactory> m_ResourceFactory;
         std::unique_ptr<VulkanTexture> m_DepthTexture;
 
         VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
