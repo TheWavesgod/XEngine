@@ -5,6 +5,7 @@
 
 #include <XEngine/Logging/Log.h>
 
+#include <algorithm>
 #include <string>
 
 namespace XEngine
@@ -27,8 +28,13 @@ namespace XEngine
         createInfo.addressModeU = ToVulkanAddressMode(m_Desc.AddressU);
         createInfo.addressModeV = ToVulkanAddressMode(m_Desc.AddressV);
         createInfo.addressModeW = ToVulkanAddressMode(m_Desc.AddressW);
-        createInfo.anisotropyEnable = VK_FALSE;
-        createInfo.maxAnisotropy = 1.0f;
+        const RHICapabilities& capabilities = device.GetCapabilities();
+        const bool useAnisotropy =
+            m_Desc.MaxAnisotropy > 1.0f && capabilities.SupportsSamplerAnisotropy;
+        createInfo.anisotropyEnable = useAnisotropy ? VK_TRUE : VK_FALSE;
+        createInfo.maxAnisotropy = useAnisotropy
+            ? std::min(m_Desc.MaxAnisotropy, capabilities.MaxSamplerAnisotropy)
+            : 1.0f;
         createInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
         createInfo.unnormalizedCoordinates = VK_FALSE;
         createInfo.compareEnable = VK_FALSE;
@@ -38,9 +44,9 @@ namespace XEngine
         createInfo.minLod = 0.0f;
         createInfo.maxLod = VK_LOD_CLAMP_NONE;
 
-        if (m_Desc.MaxAnisotropy > 1.0f)
+        if (m_Desc.MaxAnisotropy > 1.0f && !capabilities.SupportsSamplerAnisotropy)
         {
-            XENGINE_LOG_WARN("Sampler anisotropy feature query is not wired in Stage 6A. Creating sampler without anisotropy.");
+            XENGINE_LOG_WARN("Sampler anisotropy was requested but is not enabled on the RHI device");
         }
 
         const VkResult result = vkCreateSampler(m_Device, &createInfo, nullptr, &m_Sampler);
@@ -76,8 +82,4 @@ namespace XEngine
         return m_Sampler;
     }
 
-    void* VulkanSampler::GetNativeSampler(RHIBackend backend) const
-    {
-        return backend == RHIBackend::Vulkan ? m_Sampler : nullptr;
-    }
 }

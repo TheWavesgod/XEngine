@@ -1,6 +1,9 @@
 #include "VulkanDevice.h"
 
 #include "VulkanResourceFactory.h"
+#include "VulkanCheckedCast.h"
+#include "VulkanSampler.h"
+#include "VulkanTextureView.h"
 #include "VulkanUploadManager.h"
 #include "VulkanUtils.h"
 
@@ -13,6 +16,7 @@
 #include <iterator>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace XEngine
@@ -21,6 +25,19 @@ namespace XEngine
     {
         constexpr u32 InvalidQueueFamily = 0xffffffffu;
         constexpr const char* SwapchainExtensionName = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+
+        template <typename Handle>
+        std::uintptr_t PackVulkanHandle(Handle handle)
+        {
+            if constexpr (std::is_pointer_v<Handle>)
+            {
+                return reinterpret_cast<std::uintptr_t>(handle);
+            }
+            else
+            {
+                return static_cast<std::uintptr_t>(handle);
+            }
+        }
 
         struct VulkanQueueFamilyIndices
         {
@@ -103,10 +120,6 @@ namespace XEngine
             return 100;
         }
 
-        VkImageAspectFlags GetTextureAspectMask(RHIFormat format)
-        {
-            return format == RHIFormat::D32Float ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-        }
     }
 
     VulkanDevice::VulkanDevice() = default;
@@ -154,6 +167,16 @@ namespace XEngine
         {
             return false;
         }
+
+        VkPhysicalDeviceProperties physicalDeviceProperties {};
+        vkGetPhysicalDeviceProperties(m_PhysicalDevice, &physicalDeviceProperties);
+        m_Capabilities.MaxTextureDimension2D = physicalDeviceProperties.limits.maxImageDimension2D;
+        m_Capabilities.MaxTextureArrayLayers = physicalDeviceProperties.limits.maxImageArrayLayers;
+        m_Capabilities.MaxPushConstantSize = physicalDeviceProperties.limits.maxPushConstantsSize;
+        m_Capabilities.MaxBoundDescriptorSets = physicalDeviceProperties.limits.maxBoundDescriptorSets;
+        m_Capabilities.SupportsSamplerAnisotropy = false;
+        m_Capabilities.MaxSamplerAnisotropy = 1.0f;
+        m_Capabilities.SupportsDynamicRendering = true;
 
         if (!m_Allocator.Create(m_Instance.GetHandle(), m_PhysicalDevice, m_Device))
         {
@@ -210,10 +233,9 @@ namespace XEngine
 
         WaitIdle();
 
-        m_UploadManager.reset();     
-        m_ResourceFactory.reset();
-
         DestroyDepthTexture();
+        m_UploadManager.reset();
+        m_ResourceFactory.reset();
         m_FrameResources.Destroy();
         m_Swapchain.Destroy();
         DestroyDescriptorPool();
@@ -335,7 +357,7 @@ namespace XEngine
             m_Swapchain.GetImageView(m_CurrentImageIndex),
             m_Swapchain.GetExtent(),
             &m_CurrentSwapchainImageLayout,
-            m_DepthTexture.get());
+            m_DepthTextureView.get());
 
         return &m_CommandList;
     }
@@ -517,15 +539,39 @@ namespace XEngine
             return false;
         }
 
-        outContext.Instance = m_Instance.GetHandle();
-        outContext.PhysicalDevice = m_PhysicalDevice;
-        outContext.Device = m_Device;
-        outContext.GraphicsQueue = m_GraphicsQueue.GetHandle();
+        outContext.Instance = PackVulkanHandle(m_Instance.GetHandle());
+        outContext.PhysicalDevice = PackVulkanHandle(m_PhysicalDevice);
+        outContext.Device = PackVulkanHandle(m_Device);
+        outContext.GraphicsQueue = PackVulkanHandle(m_GraphicsQueue.GetHandle());
         outContext.GraphicsQueueFamilyIndex = m_GraphicsQueue.GetFamilyIndex();
         outContext.MinImageCount = m_Swapchain.GetImageCount();
         outContext.ImageCount = m_Swapchain.GetImageCount();
-        outContext.ColorFormat = m_Swapchain.GetImageFormat();
-        outContext.DepthFormat = VK_FORMAT_D32_SFLOAT;
+        outContext.ColorFormat = static_cast<u32>(m_Swapchain.GetImageFormat());
+        outContext.DepthFormat = static_cast<u32>(VK_FORMAT_D32_SFLOAT);
+        return true;
+    }
+
+    bool VulkanDevice::GetVulkanNativeTextureBinding(
+        const RHISampler& sampler,
+        const RHITextureView& textureView,
+        VulkanNativeTextureBinding& outBinding) const
+    {
+        if (!IsValid())
+        {
+            return false;
+        }
+
+        const auto* vulkanSampler = CheckedVulkanCast<VulkanSampler>(&sampler, *this);
+        const auto* vulkanTextureView = CheckedVulkanCast<VulkanTextureView>(&textureView, *this);
+        if (vulkanSampler == nullptr || vulkanTextureView == nullptr ||
+            vulkanSampler->GetHandle() == VK_NULL_HANDLE ||
+            vulkanTextureView->GetHandle() == VK_NULL_HANDLE)
+        {
+            return false;
+        }
+
+        outBinding.Sampler = PackVulkanHandle(vulkanSampler->GetHandle());
+        outBinding.ImageView = PackVulkanHandle(vulkanTextureView->GetHandle());
         return true;
     }
 
@@ -596,7 +642,7 @@ namespace XEngine
         // Editor UI is rendered after the scene and before present so it overlays
         // the final swapchain image without becoming part of runtime scene rendering.
         vkCmdBeginRendering(commandBuffer, &renderingInfo);
-        callback(static_cast<RHINativeCommandBuffer>(commandBuffer));
+        callback(PackVulkanHandle(commandBuffer));
         vkCmdEndRendering(commandBuffer);
     }
 
@@ -634,6 +680,11 @@ namespace XEngine
         return *m_UploadManager;
     }
 
+    const RHICapabilities& VulkanDevice::GetCapabilities() const
+    {
+        return m_Capabilities;
+    }
+
     bool VulkanDevice::CreateDepthTexture()
     {
         const VkExtent2D extent = m_Swapchain.GetExtent();
@@ -649,13 +700,28 @@ namespace XEngine
         desc.Usage = RHITextureUsageFlags::DepthStencilAttachment;
         desc.DebugName = "Swapchain depth";
 
-        auto depthTexture = std::make_unique<VulkanTexture>(*this, m_Allocator.GetHandle(), desc);
-        if (!depthTexture->IsValid())
+        auto depthTexture = GetResourceFactory().CreateTexture(desc);
+        if (!depthTexture)
+        {
+            return false;
+        }
+
+        RHITextureViewDesc viewDesc;
+        viewDesc.Texture = depthTexture.get();
+        viewDesc.Usage = RHITextureViewUsageFlags::DepthAttachment;
+        viewDesc.ViewDimension = RHITextureViewDimension::Texture2D;
+        viewDesc.Aspect = RHITextureAspectFlags::Depth;
+        viewDesc.Format = RHIFormat::D32Float;
+        viewDesc.DebugName = "Swapchain depth view";
+
+        auto depthView = GetResourceFactory().CreateTextureView(viewDesc);
+        if (!depthView)
         {
             return false;
         }
 
         m_DepthTexture = std::move(depthTexture);
+        m_DepthTextureView = std::move(depthView);
         return true;
     }
 
@@ -701,6 +767,7 @@ namespace XEngine
 
     void VulkanDevice::DestroyDepthTexture()
     {
+        m_DepthTextureView.reset();
         m_DepthTexture.reset();
     }
 

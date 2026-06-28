@@ -1,21 +1,12 @@
 #pragma once
 
-#include <XEngine/Core/Types.h>
-#include <XEngine/RHI/RHITypes.h>
 #include <XEngine/RHI/RHIResource.h>
+#include <XEngine/RHI/RHITypes.h>
 
 #include <cstddef>
 
 namespace XEngine
 {
-    struct RHIBufferDesc
-    {
-        std::size_t Size = 0;
-        RHIBufferUsage Usage = RHIBufferUsage::None;
-        RHIMemoryUsage MemoryUsage = RHIMemoryUsage::GPUOnly;
-        const char* DebugName = nullptr;
-    };
-
     class RHIBuffer : public RHIResource
     {
     public:

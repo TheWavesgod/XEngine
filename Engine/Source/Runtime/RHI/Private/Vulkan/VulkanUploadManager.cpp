@@ -1,6 +1,7 @@
 #include "VulkanUploadManager.h"
 
 #include "VulkanBuffer.h"
+#include "VulkanCheckedCast.h"
 #include "VulkanDevice.h"
 #include "VulkanTexture.h"
 #include "VulkanUtils.h"
@@ -10,21 +11,6 @@
 
 namespace XEngine
 {
-    namespace
-    {
-        VkBufferUsageFlags ToVulkanBufferUsage(RHIBufferUsage usage)
-        {
-            VkBufferUsageFlags flags = 0;
-            if (HasFlag(usage, RHIBufferUsage::Vertex)) { flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; }
-            if (HasFlag(usage, RHIBufferUsage::Index)) { flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT; }
-            if (HasFlag(usage, RHIBufferUsage::Uniform)) { flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT; }
-            if (HasFlag(usage, RHIBufferUsage::Storage)) { flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT; }
-            if (HasFlag(usage, RHIBufferUsage::TransferSrc)) { flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT; }
-            if (HasFlag(usage, RHIBufferUsage::TransferDst)) { flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT; }
-            return flags;
-        }
-    }
-
      VulkanUploadManager::VulkanUploadManager(VulkanDevice& ownerDevice)
         : m_Device(ownerDevice)
         , m_Allocator(ownerDevice.GetVmaAllocator())
@@ -50,7 +36,8 @@ namespace XEngine
         std::size_t offset)
     {
         // CPU-mapped buffer path — forward to RHIBuffer::Update.
-        destination.Update(data, size, offset);
+        auto* buffer = CheckedVulkanCast<VulkanBuffer>(&destination, m_Device);
+        buffer->Update(data, size, offset);
     }
 
     void VulkanUploadManager::UploadTexture(
@@ -61,7 +48,7 @@ namespace XEngine
     {
         XENGINE_ASSERT(data != nullptr && size > 0, "");
 
-        auto* vkTexture = static_cast<VulkanTexture*>(&destination);
+        auto* vkTexture = CheckedVulkanCast<VulkanTexture>(&destination, m_Device);
         const RHITextureDesc& desc = destination.GetDesc();
 
         // Stage 4 only handles the base-mip full-extent case.

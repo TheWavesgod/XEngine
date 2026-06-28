@@ -16,6 +16,11 @@
 
 namespace XEngine
 {
+    VulkanBindGroupLayout::VulkanBindGroupLayout(VulkanDevice& device)
+        : RHIBindGroupLayout(device)
+    {
+    }
+
     VulkanBindGroupLayout::~VulkanBindGroupLayout()
     {
         Destroy();
@@ -93,6 +98,11 @@ namespace XEngine
         Destroy();
     }
 
+    VulkanBindGroup::VulkanBindGroup(VulkanDevice& device)
+        : RHIBindGroup(device)
+    {
+    }
+
     bool VulkanBindGroup::Create(
         VulkanDevice& device,
         VkDescriptorPool descriptorPool,
@@ -105,8 +115,7 @@ namespace XEngine
             return false;
         }
 
-        VulkanDevice& deviceRef = static_cast<VulkanDevice&>(desc.Layout->GetOwnerDevice());
-        auto* layout = CheckedVulkanCast<VulkanBindGroupLayout>(desc.Layout, deviceRef);
+        auto* layout = CheckedVulkanCast<VulkanBindGroupLayout>(desc.Layout, device);
         if (layout == nullptr || layout->GetHandle() == VK_NULL_HANDLE)
         {
             XENGINE_LOG_ERROR("Vulkan bind group requires a valid Vulkan bind group layout");
@@ -140,23 +149,29 @@ namespace XEngine
 
         for (const RHIBindingResource& resource : desc.Resources)
         {
-            if (resource.Type == RHIBindingType::CombinedImageSampler)
+            if (resource.Type == RHIBindingType::CombinedImageSampler ||
+                resource.Type == RHIBindingType::SampledTexture ||
+                resource.Type == RHIBindingType::Sampler)
             {
-                XENGINE_ASSERT(resource.TextureView != nullptr && resource.Sampler != nullptr, "Combined image sampler binding requires non-null texture and sampler");
-                VulkanDevice& deviceRef = static_cast<VulkanDevice&>(resource.TextureView->GetOwnerDevice());
-                auto* view = CheckedVulkanCast<VulkanTextureView>(resource.TextureView, deviceRef);
-                auto* sampler = CheckedVulkanCast<VulkanSampler>(resource.Sampler, deviceRef);
-                if (view == nullptr || sampler == nullptr ||
-                    view->GetHandle() == VK_NULL_HANDLE || sampler->GetHandle() == VK_NULL_HANDLE)
+                VulkanTextureView* view = resource.TextureView != nullptr
+                    ? CheckedVulkanCast<VulkanTextureView>(resource.TextureView, device)
+                    : nullptr;
+                VulkanSampler* sampler = resource.Sampler != nullptr
+                    ? CheckedVulkanCast<VulkanSampler>(resource.Sampler, device)
+                    : nullptr;
+                if ((view != nullptr && view->GetHandle() == VK_NULL_HANDLE) ||
+                    (sampler != nullptr && sampler->GetHandle() == VK_NULL_HANDLE))
                 {
-                    XENGINE_LOG_ERROR("Combined image sampler binding requires a valid Vulkan texture and sampler");
+                    XENGINE_LOG_ERROR("Image binding requires valid Vulkan resources");
                     return false;
                 }
 
                 VkDescriptorImageInfo imageInfo {};
-                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfo.imageView = view->GetHandle();
-                imageInfo.sampler = sampler->GetHandle();
+                imageInfo.imageLayout = view != nullptr
+                    ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                    : VK_IMAGE_LAYOUT_UNDEFINED;
+                imageInfo.imageView = view != nullptr ? view->GetHandle() : VK_NULL_HANDLE;
+                imageInfo.sampler = sampler != nullptr ? sampler->GetHandle() : VK_NULL_HANDLE;
                 imageInfos.push_back(imageInfo);
 
                 VkWriteDescriptorSet write {};
@@ -164,7 +179,7 @@ namespace XEngine
                 write.dstSet = m_Set;
                 write.dstBinding = resource.Binding;
                 write.descriptorCount = 1;
-                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                write.descriptorType = ToVulkanDescriptorType(resource.Type);
                 write.pImageInfo = &imageInfos.back();
                 writes.push_back(write);
                 continue;
@@ -173,8 +188,7 @@ namespace XEngine
             if (resource.Type == RHIBindingType::UniformBuffer || resource.Type == RHIBindingType::StorageBuffer)
             {
                 XENGINE_ASSERT(resource.Buffer != nullptr, "Buffer binding requires a non-null RHIBuffer");
-                VulkanDevice& deviceRef = static_cast<VulkanDevice&>(resource.Buffer->GetOwnerDevice());
-                auto* buffer = CheckedVulkanCast<VulkanBuffer>(resource.Buffer, deviceRef);
+                auto* buffer = CheckedVulkanCast<VulkanBuffer>(resource.Buffer, device);
                 if (buffer == nullptr || buffer->GetHandle() == VK_NULL_HANDLE)
                 {
                     XENGINE_LOG_ERROR("Buffer binding requires a valid Vulkan buffer");
@@ -183,8 +197,10 @@ namespace XEngine
 
                 VkDescriptorBufferInfo bufferInfo {};
                 bufferInfo.buffer = buffer->GetHandle();
-                bufferInfo.offset = 0;
-                bufferInfo.range = buffer->GetSize();
+                bufferInfo.offset = resource.BufferOffset;
+                bufferInfo.range = resource.BufferSize == 0
+                    ? buffer->GetSize() - resource.BufferOffset
+                    : resource.BufferSize;
                 bufferInfos.push_back(bufferInfo);
 
                 VkWriteDescriptorSet write {};

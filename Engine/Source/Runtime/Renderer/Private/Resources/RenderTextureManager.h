@@ -48,6 +48,8 @@ namespace XEngine
 
         RHITexture* GetTexture(TextureHandle handle);
         const RHITexture* GetTexture(TextureHandle handle) const;
+        RHITextureView* GetTextureView(TextureHandle handle);
+        const RHITextureView* GetTextureView(TextureHandle handle) const;
 
         TextureHandle GetDefaultWhiteTexture() const;
         TextureHandle GetDefaultBlackTexture() const;
@@ -55,7 +57,10 @@ namespace XEngine
         TextureHandle GetMissingTexture() const;
 
     private:
-        TextureHandle AddTextureRecord(std::string path, std::shared_ptr<RHITexture> texture);
+        TextureHandle AddTextureRecord(
+            std::string path,
+            std::shared_ptr<RHITexture> texture,
+            std::shared_ptr<RHITextureView> sampledView);
 
         RHIDevice* m_Device = nullptr;
         std::vector<TextureRecord> m_Textures;

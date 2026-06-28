@@ -11,7 +11,7 @@ namespace XEngine
     class VulkanBindGroupLayout final : public RHIBindGroupLayout
     {
     public:
-        VulkanBindGroupLayout() = default;
+        explicit VulkanBindGroupLayout(VulkanDevice& device);
         ~VulkanBindGroupLayout() override;
 
         bool Create(VulkanDevice& device, const RHIBindGroupLayoutDesc& desc);
@@ -29,7 +29,7 @@ namespace XEngine
     class VulkanBindGroup final : public RHIBindGroup
     {
     public:
-        VulkanBindGroup() = default;
+        explicit VulkanBindGroup(VulkanDevice& device);
         ~VulkanBindGroup() override;
 
         bool Create(

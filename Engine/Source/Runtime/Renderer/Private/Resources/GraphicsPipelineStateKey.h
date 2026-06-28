@@ -3,6 +3,7 @@
 #include <XEngine/Renderer/MaterialTypes.h>
 #include <XEngine/RHI/RHITypes.h>
 
+#include <bit>
 #include <cstddef>
 #include <functional>
 
@@ -50,10 +51,10 @@ namespace XEngine
         {
             std::size_t value = 0;
             
-            auto FloatBits = [](f32 v) 
+            const auto floatBits = [](f32 value)
             {
-                v = (v == 0.0f) ? 0.0f : v;
-                return std::bit_cast<int>(v);
+                value = value == 0.0f ? 0.0f : value;
+                return std::bit_cast<u32>(value);
             };
 
             const auto combine = [&value](std::size_t part)
@@ -72,9 +73,9 @@ namespace XEngine
             combine(std::hash<bool> {}(key.DoubleSided));
             combine(std::hash<bool> {}(key.HasColorAttachment));
             combine(std::hash<bool> {}(key.EnableDepthBias));
-            combine(std::hash<int> {}(key.DepthBiasConstantFactor));
-            combine(std::hash<int> {}(key.DepthBiasClamp));
-            combine(std::hash<int> {}(key.DepthBiasSlopeFactor));
+            combine(std::hash<u32> {}(floatBits(key.DepthBiasConstantFactor)));
+            combine(std::hash<u32> {}(floatBits(key.DepthBiasClamp)));
+            combine(std::hash<u32> {}(floatBits(key.DepthBiasSlopeFactor)));
             combine(std::hash<u32> {}(key.PipelineLayoutVersion));
             return value;
         }

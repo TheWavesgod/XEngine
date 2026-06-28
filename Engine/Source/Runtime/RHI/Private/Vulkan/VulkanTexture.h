@@ -1,19 +1,19 @@
 #pragma once
 
 #include <XEngine/RHI/Resources/RHITexture.h>
+
 #include <volk.h>
 #include <vk_mem_alloc.h>
 
 namespace XEngine
 {
-    class RHITextureView;
-    class VulkanTextureView;
+    class VulkanDevice;
 
     class VulkanTexture final : public RHITexture
     {
     public:
         VulkanTexture() = default;
-        VulkanTexture(class VulkanDevice& device, VmaAllocator allocator, const RHITextureDesc& desc);
+        VulkanTexture(VulkanDevice& device, VmaAllocator allocator, const RHITextureDesc& desc);
         ~VulkanTexture() override;
 
         VulkanTexture(const VulkanTexture&) = delete;
@@ -23,9 +23,6 @@ namespace XEngine
         const RHITextureDesc& GetDesc() const override;
 
         VkImage GetImage() const;
-        RHITextureView* GetDefaultView() const override;
-
-        void* GetNativeDefaultView(RHIBackend backend) const override;
         VkImageLayout* GetLayoutPtr();
 
     private:
@@ -36,7 +33,5 @@ namespace XEngine
         VmaAllocationInfo m_AllocationInfo {};
         VkImageLayout m_Layout = VK_IMAGE_LAYOUT_UNDEFINED;
         RHITextureDesc m_Desc {};
-
-        mutable std::shared_ptr<RHITextureView> m_DefaultView;
     };
 }

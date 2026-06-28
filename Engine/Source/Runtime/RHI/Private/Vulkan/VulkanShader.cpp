@@ -10,24 +10,6 @@
 
 namespace XEngine
 {
-    namespace
-    {
-        VkShaderStageFlagBits ToVulkanShaderStage(ShaderStage stage)
-        {
-            switch (stage)
-            {
-            case ShaderStage::Vertex:
-                return VK_SHADER_STAGE_VERTEX_BIT;
-            case ShaderStage::Fragment:
-                return VK_SHADER_STAGE_FRAGMENT_BIT;
-            case ShaderStage::Compute:
-                return VK_SHADER_STAGE_COMPUTE_BIT;
-            default:
-                return static_cast<VkShaderStageFlagBits>(0);
-            }
-        }
-    }
-
     VulkanShader::VulkanShader(VulkanDevice& device, const RHIShaderDesc& desc)
         : RHIShader(device) 
         , m_Device(device.GetHandle())

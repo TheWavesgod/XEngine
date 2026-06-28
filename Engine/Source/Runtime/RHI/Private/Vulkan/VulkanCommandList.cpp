@@ -23,6 +23,11 @@ namespace XEngine
                 return VK_PIPELINE_STAGE_TRANSFER_BIT;
             case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
                 return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
+                return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                    VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+                return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
             default:
                 return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
             }
@@ -36,6 +41,11 @@ namespace XEngine
                 return VK_ACCESS_TRANSFER_WRITE_BIT;
             case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
                 return VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
+                return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+                return VK_ACCESS_SHADER_READ_BIT;
             default:
                 return 0;
             }
@@ -49,7 +59,7 @@ namespace XEngine
         VkImageView swapchainImageView,
         VkExtent2D swapchainExtent,
         VkImageLayout* swapchainImageLayout,
-        VulkanTexture* depthTexture)
+        RHITextureView* depthTextureView)
     {
         m_Device = &device;   
         m_CommandBuffer = commandBuffer;
@@ -61,7 +71,7 @@ namespace XEngine
         m_RenderOutput.Viewport = m_RenderViewport;
         m_RenderOutput.RenderToSwapchain = true;
         m_SwapchainImageLayout = swapchainImageLayout;
-        m_DepthTexture = depthTexture;
+        m_DepthTextureView = depthTextureView;
         m_BoundGraphicsPipeline = nullptr;
         m_RenderingActive = false;
     }
@@ -76,7 +86,7 @@ namespace XEngine
         m_RenderViewport = {};
         m_RenderOutput = {};
         m_SwapchainImageLayout = nullptr;
-        m_DepthTexture = nullptr;
+        m_DepthTextureView = nullptr;
         m_BoundGraphicsPipeline = nullptr;
         m_RenderingActive = false;
     }
@@ -136,11 +146,16 @@ namespace XEngine
         m_RenderOutput.Viewport = viewport;
     }
 
-    void VulkanCommandList::TransitionTextureToShaderRead(RHITexture* texture)
+    void VulkanCommandList::TransitionTextureToShaderRead(RHITextureView* textureView)
     {
+        if (textureView == nullptr)
+        {
+            return;
+        }
         XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
-        auto* vulkanTexture = CheckedVulkanCast<VulkanTexture>(texture, *m_Device);
-        if (vulkanTexture == nullptr)
+        auto* vulkanView = CheckedVulkanCast<VulkanTextureView>(textureView, *m_Device);
+        auto* vulkanTexture = CheckedVulkanCast<VulkanTexture>(textureView->GetTexture(), *m_Device);
+        if (vulkanView == nullptr || vulkanTexture == nullptr)
         {
             return;
         }
@@ -148,7 +163,14 @@ namespace XEngine
         // Editor viewport color is written as an attachment, then sampled by
         // the editor UI in the same frame.
         EndRenderingIfActive();
-        TransitionColorImage(*vulkanTexture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        if (HasFlag(vulkanView->GetDesc().Aspect, RHITextureAspectFlags::Depth))
+        {
+            TransitionDepthImage(*vulkanTexture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
+        else
+        {
+            TransitionColorImage(*vulkanTexture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
     }
 
     void VulkanCommandList::SetBindGroup(u32 setIndex, RHIBindGroup* bindGroup)
@@ -274,58 +296,77 @@ namespace XEngine
             return;
         }
 
-        VulkanTexture* colorTexture = nullptr;
-        VulkanTexture* depthTexture = m_DepthTexture;
-        VkImageView colorImageView = m_SwapchainImageView;
-        VkImageLayout colorLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        bool renderToSwapchain = m_RenderOutput.RenderToSwapchain;
-        if (!renderToSwapchain)
-        {
-            XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
-            colorTexture = CheckedVulkanCast<VulkanTexture>(m_RenderOutput.ColorTarget, *m_Device);
-            depthTexture = CheckedVulkanCast<VulkanTexture>(m_RenderOutput.DepthTarget, *m_Device);
-            if (colorTexture == nullptr || !colorTexture->IsValid())
-            {
-                XENGINE_LOG_ERROR("Offscreen render output requires a valid Vulkan color texture");
-                return;
-            }
+        XENGINE_ASSERT(m_Device != nullptr, "VulkanCommandList has no owning VulkanDevice");
 
-            colorImageView = CheckedVulkanCast<VulkanTextureView>(colorTexture->GetDefaultView(), *m_Device)->GetHandle();
-        }
-        else if (m_SwapchainImage == VK_NULL_HANDLE || m_SwapchainImageView == VK_NULL_HANDLE)
-        {
-            return;
-        }
+        const bool renderToSwapchain = m_RenderOutput.RenderToSwapchain;
+        RHITextureView* colorView = renderToSwapchain ? nullptr : m_RenderOutput.ColorTargetView;
+        RHITextureView* depthView = renderToSwapchain ? m_DepthTextureView : m_RenderOutput.DepthTargetView;
+
+        VulkanTextureView* vulkanColorView = nullptr;
+        VulkanTextureView* vulkanDepthView = nullptr;
+        VulkanTexture* colorTexture = nullptr;
+        VulkanTexture* depthTexture = nullptr;
 
         if (renderToSwapchain)
         {
-            // Sandbox keeps rendering directly to the swapchain; editor switches
-            // RenderOutputDesc to an offscreen texture.
+            if (m_SwapchainImage == VK_NULL_HANDLE || m_SwapchainImageView == VK_NULL_HANDLE)
+            {
+                return;
+            }
             TransitionSwapchainImage(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         }
-        else
+        else if (colorView != nullptr)
         {
+            vulkanColorView = CheckedVulkanCast<VulkanTextureView>(colorView, *m_Device);
+            colorTexture = CheckedVulkanCast<VulkanTexture>(colorView->GetTexture(), *m_Device);
+            if (!vulkanColorView->IsValid() || !colorTexture->IsValid())
+            {
+                XENGINE_LOG_ERROR("Offscreen color target is invalid");
+                return;
+            }
             TransitionColorImage(*colorTexture, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         }
 
-        if (depthTexture != nullptr)
+        if (depthView != nullptr)
         {
+            vulkanDepthView = CheckedVulkanCast<VulkanTextureView>(depthView, *m_Device);
+            depthTexture = CheckedVulkanCast<VulkanTexture>(depthView->GetTexture(), *m_Device);
+            if (!vulkanDepthView->IsValid() || !depthTexture->IsValid())
+            {
+                XENGINE_LOG_ERROR("Depth target is invalid");
+                return;
+            }
             TransitionDepthImage(*depthTexture, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
         }
 
+        const bool hasColor = renderToSwapchain || vulkanColorView != nullptr;
+        const bool hasDepth = vulkanDepthView != nullptr;
+        if (!hasColor && !hasDepth)
+        {
+            XENGINE_LOG_ERROR("Render output has no attachments");
+            return;
+        }
+
         VkRenderingAttachmentInfo colorAttachment {};
-        colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        colorAttachment.imageView = colorImageView;
-        colorAttachment.imageLayout = colorLayout;
-        colorAttachment.loadOp = renderToSwapchain ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
-        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        colorAttachment.clearValue.color = { { 0.1f, 0.1f, 0.15f, 1.0f } };
+        if (hasColor)
+        {
+            colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            colorAttachment.imageView = renderToSwapchain
+                ? m_SwapchainImageView
+                : vulkanColorView->GetHandle();
+            colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            colorAttachment.loadOp = renderToSwapchain
+                ? VK_ATTACHMENT_LOAD_OP_LOAD
+                : VK_ATTACHMENT_LOAD_OP_CLEAR;
+            colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            colorAttachment.clearValue.color = { { 0.1f, 0.1f, 0.15f, 1.0f } };
+        }
 
         VkRenderingAttachmentInfo depthAttachment {};
-        if (depthTexture != nullptr)
+        if (hasDepth)
         {
             depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-            depthAttachment.imageView = depthTexture->GetImageView();
+            depthAttachment.imageView = vulkanDepthView->GetHandle();
             depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
             depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
             depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -352,9 +393,9 @@ namespace XEngine
         };
         renderingInfo.renderArea.extent = { renderViewport.Width, renderViewport.Height };
         renderingInfo.layerCount = 1;
-        renderingInfo.colorAttachmentCount = 1;
-        renderingInfo.pColorAttachments = &colorAttachment;
-        renderingInfo.pDepthAttachment = depthTexture != nullptr ? &depthAttachment : nullptr;
+        renderingInfo.colorAttachmentCount = hasColor ? 1u : 0u;
+        renderingInfo.pColorAttachments = hasColor ? &colorAttachment : nullptr;
+        renderingInfo.pDepthAttachment = hasDepth ? &depthAttachment : nullptr;
 
         vkCmdBeginRendering(m_CommandBuffer, &renderingInfo);
         m_RenderingActive = true;
@@ -436,9 +477,9 @@ namespace XEngine
         VkImageSubresourceRange range {};
         range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         range.baseMipLevel = 0;
-        range.levelCount = 1;
+        range.levelCount = texture.GetDesc().MipLevels;
         range.baseArrayLayer = 0;
-        range.layerCount = 1;
+        range.layerCount = texture.GetDesc().ArrayLayers;
 
         VkImageMemoryBarrier barrier {};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -477,14 +518,24 @@ namespace XEngine
         VkImageSubresourceRange range {};
         range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         range.baseMipLevel = 0;
-        range.levelCount = 1;
+        range.levelCount = texture.GetDesc().MipLevels;
         range.baseArrayLayer = 0;
-        range.layerCount = 1;
+        range.layerCount = texture.GetDesc().ArrayLayers;
+
+        VkAccessFlags dstAccess =
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        if (newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        {
+            dstAccess = VK_ACCESS_SHADER_READ_BIT;
+            dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        }
 
         VkImageMemoryBarrier barrier {};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        barrier.srcAccessMask = GetSourceAccess(*layout);
+        barrier.dstAccessMask = dstAccess;
         barrier.oldLayout = *layout;
         barrier.newLayout = newLayout;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -494,8 +545,8 @@ namespace XEngine
 
         vkCmdPipelineBarrier(
             m_CommandBuffer,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+            GetSourceStage(*layout),
+            dstStage,
             0,
             0,
             nullptr,

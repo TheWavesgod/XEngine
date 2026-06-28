@@ -107,6 +107,60 @@ namespace XEngine
         return flags;
     }
 
+    VkImageType ToVulkanImageType(RHITextureDimension)
+    {
+        return VK_IMAGE_TYPE_2D;
+    }
+
+    VkImageViewType ToVulkanImageViewType(RHITextureViewDimension dimension)
+    {
+        switch (dimension)
+        {
+        case RHITextureViewDimension::Texture2DArray:
+            return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        case RHITextureViewDimension::TextureCube:
+            return VK_IMAGE_VIEW_TYPE_CUBE;
+        case RHITextureViewDimension::Texture2D:
+        default:
+            return VK_IMAGE_VIEW_TYPE_2D;
+        }
+    }
+
+    VkImageAspectFlags ToVulkanImageAspectFlags(RHITextureAspectFlags aspect)
+    {
+        VkImageAspectFlags flags = 0;
+        if (HasFlag(aspect, RHITextureAspectFlags::Color)) { flags |= VK_IMAGE_ASPECT_COLOR_BIT; }
+        if (HasFlag(aspect, RHITextureAspectFlags::Depth)) { flags |= VK_IMAGE_ASPECT_DEPTH_BIT; }
+        if (HasFlag(aspect, RHITextureAspectFlags::Stencil)) { flags |= VK_IMAGE_ASPECT_STENCIL_BIT; }
+        return flags;
+    }
+
+    VkBufferUsageFlags ToVulkanBufferUsageFlags(RHIBufferUsage usage)
+    {
+        VkBufferUsageFlags flags = 0;
+        if (HasFlag(usage, RHIBufferUsage::Vertex)) { flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; }
+        if (HasFlag(usage, RHIBufferUsage::Index)) { flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT; }
+        if (HasFlag(usage, RHIBufferUsage::Uniform)) { flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT; }
+        if (HasFlag(usage, RHIBufferUsage::Storage)) { flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT; }
+        if (HasFlag(usage, RHIBufferUsage::TransferSrc)) { flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT; }
+        if (HasFlag(usage, RHIBufferUsage::TransferDst)) { flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT; }
+        return flags;
+    }
+
+    VmaMemoryUsage ToVmaMemoryUsage(RHIMemoryUsage usage)
+    {
+        switch (usage)
+        {
+        case RHIMemoryUsage::CPUToGPU:
+            return VMA_MEMORY_USAGE_CPU_TO_GPU;
+        case RHIMemoryUsage::GPUToCPU:
+            return VMA_MEMORY_USAGE_GPU_TO_CPU;
+        case RHIMemoryUsage::GPUOnly:
+        default:
+            return VMA_MEMORY_USAGE_GPU_ONLY;
+        }
+    }
+
     VkFilter ToVulkanFilter(RHIFilter filter)
     {
         switch (filter)
@@ -161,5 +215,20 @@ namespace XEngine
         if (HasFlag(flags, RHIShaderStageFlags::Fragment)) { result |= VK_SHADER_STAGE_FRAGMENT_BIT; }
         if (HasFlag(flags, RHIShaderStageFlags::Compute)) { result |= VK_SHADER_STAGE_COMPUTE_BIT; }
         return result;
+    }
+
+    VkShaderStageFlagBits ToVulkanShaderStage(ShaderStage stage)
+    {
+        switch (stage)
+        {
+        case ShaderStage::Vertex:
+            return VK_SHADER_STAGE_VERTEX_BIT;
+        case ShaderStage::Fragment:
+            return VK_SHADER_STAGE_FRAGMENT_BIT;
+        case ShaderStage::Compute:
+            return VK_SHADER_STAGE_COMPUTE_BIT;
+        default:
+            return static_cast<VkShaderStageFlagBits>(0);
+        }
     }
 }

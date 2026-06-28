@@ -22,6 +22,9 @@
 namespace XEngine
 {
     class RHIResourceFactory; 
+    class RHISampler;
+    class RHITexture;
+    class RHITextureView;
     class RHIUploadManager;  
 
     struct VulkanDeviceCreateInfo
@@ -52,6 +55,10 @@ namespace XEngine
         
         RHIFormat GetSwapchainFormat() const override;
         bool GetVulkanNativeContext(VulkanNativeContext& outContext) const override;
+        bool GetVulkanNativeTextureBinding(
+            const RHISampler& sampler,
+            const RHITextureView& textureView,
+            VulkanNativeTextureBinding& outBinding) const override;
         void RenderVulkanOverlay(const std::function<void(RHINativeCommandBuffer)>& callback) override;
         void WaitIdle() override;
 
@@ -66,8 +73,9 @@ namespace XEngine
         RHIResourceFactory& GetResourceFactory() override;
         const RHIResourceFactory& GetResourceFactory() const override;
 
-        RHIUploadManager& GetUploadManager();
-        const RHIUploadManager& GetUploadManager() const;
+        RHIUploadManager& GetUploadManager() override;
+        const RHIUploadManager& GetUploadManager() const override;
+        const RHICapabilities& GetCapabilities() const override;
 
         inline VkDevice GetHandle() const { return m_Device; }
 
@@ -89,7 +97,9 @@ namespace XEngine
         std::unique_ptr<RHIResourceFactory> m_ResourceFactory;
         std::unique_ptr<RHIUploadManager> m_UploadManager;
 
-        std::unique_ptr<VulkanTexture> m_DepthTexture;
+        std::shared_ptr<RHITexture> m_DepthTexture;
+        std::shared_ptr<RHITextureView> m_DepthTextureView;
+        RHICapabilities m_Capabilities {};
 
         VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
         VkDevice m_Device = VK_NULL_HANDLE;

@@ -1,8 +1,10 @@
 #include "EditorViewportRenderTarget.h"
 
 #include <XEngine/RHI/RHIDevice.h>
+#include <XEngine/RHI/RHIResourceFactory.h>
 
 #include <algorithm>
+#include <utility>
 
 namespace XEngine
 {
@@ -16,26 +18,63 @@ namespace XEngine
             return true;
         }
 
-        m_Width = width;
-        m_Height = height;
+        RHIResourceFactory& factory = device.GetResourceFactory();
 
         RHITextureDesc colorDesc;
-        colorDesc.Width = m_Width;
-        colorDesc.Height = m_Height;
+        colorDesc.Width = width;
+        colorDesc.Height = height;
         colorDesc.Format = RHIFormat::BGRA8Unorm;
         // The editor viewport color target is rendered into, then sampled by
         // ImGui when drawing the Viewport panel.
         colorDesc.Usage = RHITextureUsageFlags::ColorAttachment | RHITextureUsageFlags::Sampled;
         colorDesc.DebugName = "Editor viewport color";
-        m_ColorTexture = device.CreateTexture(colorDesc, nullptr, 0);
+        std::shared_ptr<RHITexture> colorTexture = factory.CreateTexture(colorDesc);
+        if (!colorTexture)
+        {
+            return false;
+        }
+
+        RHITextureViewDesc colorViewDesc;
+        colorViewDesc.Texture = colorTexture.get();
+        colorViewDesc.Usage =
+            RHITextureViewUsageFlags::ColorAttachment |
+            RHITextureViewUsageFlags::Sampled;
+        colorViewDesc.ViewDimension = RHITextureViewDimension::Texture2D;
+        colorViewDesc.Aspect = RHITextureAspectFlags::Color;
+        colorViewDesc.Format = colorDesc.Format;
+        colorViewDesc.DebugName = "Editor viewport color view";
+        std::shared_ptr<RHITextureView> colorView =
+            factory.CreateTextureView(colorViewDesc);
+        if (!colorView)
+        {
+            return false;
+        }
 
         RHITextureDesc depthDesc;
-        depthDesc.Width = m_Width;
-        depthDesc.Height = m_Height;
+        depthDesc.Width = width;
+        depthDesc.Height = height;
         depthDesc.Format = RHIFormat::D32Float;
         depthDesc.Usage = RHITextureUsageFlags::DepthStencilAttachment;
         depthDesc.DebugName = "Editor viewport depth";
-        m_DepthTexture = device.CreateTexture(depthDesc, nullptr, 0);
+        std::shared_ptr<RHITexture> depthTexture = factory.CreateTexture(depthDesc);
+        if (!depthTexture)
+        {
+            return false;
+        }
+
+        RHITextureViewDesc depthViewDesc;
+        depthViewDesc.Texture = depthTexture.get();
+        depthViewDesc.Usage = RHITextureViewUsageFlags::DepthAttachment;
+        depthViewDesc.ViewDimension = RHITextureViewDimension::Texture2D;
+        depthViewDesc.Aspect = RHITextureAspectFlags::Depth;
+        depthViewDesc.Format = depthDesc.Format;
+        depthViewDesc.DebugName = "Editor viewport depth view";
+        std::shared_ptr<RHITextureView> depthView =
+            factory.CreateTextureView(depthViewDesc);
+        if (!depthView)
+        {
+            return false;
+        }
 
         if (m_Sampler == nullptr)
         {
@@ -44,14 +83,27 @@ namespace XEngine
             samplerDesc.AddressV = RHIAddressMode::ClampToEdge;
             samplerDesc.AddressW = RHIAddressMode::ClampToEdge;
             samplerDesc.DebugName = "Editor viewport sampler";
-            m_Sampler = device.CreateSampler(samplerDesc);
+            m_Sampler = factory.CreateSampler(samplerDesc);
         }
 
-        return IsValid() && m_Sampler != nullptr;
+        if (!m_Sampler)
+        {
+            return false;
+        }
+
+        m_ColorTexture = std::move(colorTexture);
+        m_ColorTextureView = std::move(colorView);
+        m_DepthTexture = std::move(depthTexture);
+        m_DepthTextureView = std::move(depthView);
+        m_Width = width;
+        m_Height = height;
+        return true;
     }
 
     void EditorViewportRenderTarget::Reset()
     {
+        m_ColorTextureView.reset();
+        m_DepthTextureView.reset();
         m_ColorTexture.reset();
         m_DepthTexture.reset();
         m_Sampler.reset();
@@ -62,8 +114,8 @@ namespace XEngine
     RHIRenderOutputDesc EditorViewportRenderTarget::BuildRenderOutput() const
     {
         RHIRenderOutputDesc output;
-        output.ColorTarget = m_ColorTexture.get();
-        output.DepthTarget = m_DepthTexture.get();
+        output.ColorTargetView = m_ColorTextureView.get();
+        output.DepthTargetView = m_DepthTextureView.get();
         output.Viewport = RHIRect2D { 0, 0, m_Width, m_Height };
         output.ColorFormat = RHIFormat::BGRA8Unorm;
         output.DepthFormat = RHIFormat::D32Float;

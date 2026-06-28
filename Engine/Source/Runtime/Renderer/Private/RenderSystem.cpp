@@ -247,9 +247,9 @@ namespace XEngine
             Resources.FrameResources->Update(frame, SceneData);
 
             ActivePipeline->Render(frame, SceneData, Resources);
-            if (!output.RenderToSwapchain && output.ColorTarget != nullptr)
+            if (!output.RenderToSwapchain && output.ColorTargetView != nullptr)
             {
-                commandList->TransitionTextureToShaderRead(output.ColorTarget);
+                commandList->TransitionTextureToShaderRead(output.ColorTargetView);
             }
             if (OverlayCallback)
             {

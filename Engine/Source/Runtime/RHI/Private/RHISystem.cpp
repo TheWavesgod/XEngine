@@ -9,6 +9,7 @@
 #include <XEngine/Platform/Window.h>
 #include <XEngine/RHI/RHIDevice.h>
 #include <XEngine/RHI/RHIResourceFactory.h>
+#include <XEngine/RHI/RHIUploadManager.h>
 
 #if defined(XENGINE_ENABLE_VULKAN)
     #include "Vulkan/VulkanDevice.h"
@@ -177,21 +178,25 @@ namespace XEngine
         textureDesc.DebugName = "DefaultWhiteTexture";
 
         const u8 whitePixel[] = { 255, 255, 255, 255 };
-        m_DefaultWhiteTexture = resourceFactory.CreateTexture(textureDesc, whitePixel, sizeof(whitePixel));
+        m_DefaultWhiteTexture = resourceFactory.CreateTexture(textureDesc);
         if (!m_DefaultWhiteTexture)
         {
             XENGINE_LOG_ERROR("Failed to create DefaultWhiteTexture validation resource");
             return;
         }
+        m_Device->GetUploadManager().UploadTexture(
+            *m_DefaultWhiteTexture, whitePixel, sizeof(whitePixel));
 
         textureDesc.DebugName = "DefaultNormalTexture";
         const u8 normalPixel[] = { 128, 128, 255, 255 };
-        m_DefaultNormalTexture = resourceFactory.CreateTexture(textureDesc, normalPixel, sizeof(normalPixel));
+        m_DefaultNormalTexture = resourceFactory.CreateTexture(textureDesc);
         if (!m_DefaultNormalTexture)
         {
             XENGINE_LOG_ERROR("Failed to create DefaultNormalTexture validation resource");
             return;
         }
+        m_Device->GetUploadManager().UploadTexture(
+            *m_DefaultNormalTexture, normalPixel, sizeof(normalPixel));
 
         RHISamplerDesc samplerDesc;
         samplerDesc.MinFilter = RHIFilter::Linear;

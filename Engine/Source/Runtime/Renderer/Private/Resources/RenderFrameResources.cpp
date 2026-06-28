@@ -6,6 +6,8 @@
 #include <XEngine/Math/MathFunctions.h>
 #include <XEngine/Renderer/RenderScene.h>
 #include <XEngine/RHI/RHIDevice.h>
+#include <XEngine/RHI/RHIResourceFactory.h>
+#include <XEngine/RHI/RHIUploadManager.h>
 #include <XEngine/RHI/Resources/RHIBindGroup.h>
 #include <XEngine/RHI/Resources/RHIBuffer.h>
 
@@ -22,6 +24,7 @@ namespace XEngine
         }
 
         m_Device = device;
+        RHIResourceFactory& factory = m_Device->GetResourceFactory();
 
         RHIBindGroupLayoutDesc layoutDesc;
         layoutDesc.DebugName = "GPUFrameData bind group layout";
@@ -31,7 +34,7 @@ namespace XEngine
             RHIShaderStageFlags::AllGraphics,
             1
         });
-        m_FrameBindGroupLayout = m_Device->CreateBindGroupLayout(layoutDesc);
+        m_FrameBindGroupLayout = factory.CreateBindGroupLayout(layoutDesc);
         if (!m_FrameBindGroupLayout)
         {
             XENGINE_LOG_ERROR("Failed to create GPUFrameData bind group layout");
@@ -49,12 +52,16 @@ namespace XEngine
 
             // One GPUFrameData buffer per frame-in-flight to avoid overwriting data
             // that may still be used by the GPU.
-            m_FrameBuffers[index] = m_Device->CreateBuffer(bufferDesc, &initialData, sizeof(initialData));
+            m_FrameBuffers[index] = factory.CreateBuffer(bufferDesc);
             if (!m_FrameBuffers[index])
             {
                 XENGINE_LOG_ERROR("Failed to create GPUFrameData buffer");
                 return false;
             }
+            m_Device->GetUploadManager().UploadBuffer(
+                *m_FrameBuffers[index],
+                &initialData,
+                sizeof(initialData));
 
             RHIBindGroupDesc bindGroupDesc;
             bindGroupDesc.Layout = m_FrameBindGroupLayout.get();
@@ -67,7 +74,7 @@ namespace XEngine
                 m_FrameBuffers[index].get()
             });
 
-            m_FrameBindGroups[index] = m_Device->CreateBindGroup(bindGroupDesc);
+            m_FrameBindGroups[index] = factory.CreateBindGroup(bindGroupDesc);
             if (!m_FrameBindGroups[index])
             {
                 XENGINE_LOG_ERROR("Failed to create GPUFrameData bind group");

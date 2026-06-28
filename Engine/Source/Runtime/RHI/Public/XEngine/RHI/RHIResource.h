@@ -19,9 +19,6 @@ namespace XEngine
     protected:
         explicit RHIResource(RHIDevice& ownerDevice);
 
-         // Helper for derived classes to verify backend correctness before static_cast.
-        void XE_AssertBackendMatches(RHIBackend expected) const;
-
     private:
         RHIDevice* m_OwnerDevice = nullptr;
     };

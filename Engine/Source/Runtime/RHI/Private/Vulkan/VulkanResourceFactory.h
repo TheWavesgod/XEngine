@@ -20,14 +20,10 @@ namespace XEngine
 
     protected:
         std::shared_ptr<RHIBuffer> CreateBufferImpl(
-            const RHIBufferDesc& desc,
-            const void* initialData,
-            std::size_t initialDataSize) override;
+            const RHIBufferDesc& desc) override;
 
         std::shared_ptr<RHITexture> CreateTextureImpl(
-            const RHITextureDesc& desc,
-            const void* initialData,
-            std::size_t initialDataSize) override;
+            const RHITextureDesc& desc) override;
 
         std::shared_ptr<RHITextureView> CreateTextureViewImpl(
             const RHITextureViewDesc& desc) override;
@@ -48,7 +44,7 @@ namespace XEngine
             const RHIGraphicsPipelineDesc& desc) override;
 
     private:
-        VkDevice m_Device = VK_NULL_HANDLE;
+        VulkanDevice& m_OwnerDevice;
         VmaAllocator m_Allocator = VK_NULL_HANDLE;
         VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
     };

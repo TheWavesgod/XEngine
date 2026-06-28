@@ -4,6 +4,8 @@
 #include <XEngine/Core/Assert.h>
 #include <XEngine/Logging/Log.h>
 #include <XEngine/RHI/RHIDevice.h>
+#include <XEngine/RHI/RHIResourceFactory.h>
+#include <XEngine/RHI/RHIUploadManager.h>
 #include <XEngine/RHI/Resources/RHIBuffer.h>
 
 #include <string>
@@ -72,13 +74,15 @@ namespace XEngine
         vertexDesc.MemoryUsage = RHIMemoryUsage::CPUToGPU;
         vertexDesc.DebugName = asset.Name.c_str();
 
-        std::shared_ptr<RHIBuffer> vertexBuffer =
-            m_Device->CreateBuffer(vertexDesc, asset.Vertices.data(), vertexDesc.Size);
+        RHIResourceFactory& factory = m_Device->GetResourceFactory();
+        std::shared_ptr<RHIBuffer> vertexBuffer = factory.CreateBuffer(vertexDesc);
         if (!vertexBuffer)
         {
             XENGINE_LOG_ERROR(std::string("Failed to create vertex buffer for mesh: ") + asset.Name);
             return {};
         }
+        m_Device->GetUploadManager().UploadBuffer(
+            *vertexBuffer, asset.Vertices.data(), vertexDesc.Size);
 
         RHIBufferDesc indexDesc;
         indexDesc.Size = sizeof(u32) * asset.Indices.size();
@@ -86,13 +90,14 @@ namespace XEngine
         indexDesc.MemoryUsage = RHIMemoryUsage::CPUToGPU;
         indexDesc.DebugName = asset.Name.c_str();
 
-        std::shared_ptr<RHIBuffer> indexBuffer =
-            m_Device->CreateBuffer(indexDesc, asset.Indices.data(), indexDesc.Size);
+        std::shared_ptr<RHIBuffer> indexBuffer = factory.CreateBuffer(indexDesc);
         if (!indexBuffer)
         {
             XENGINE_LOG_ERROR(std::string("Failed to create index buffer for mesh: ") + asset.Name);
             return {};
         }
+        m_Device->GetUploadManager().UploadBuffer(
+            *indexBuffer, asset.Indices.data(), indexDesc.Size);
 
         RenderMesh mesh;
         mesh.Name = asset.Name;

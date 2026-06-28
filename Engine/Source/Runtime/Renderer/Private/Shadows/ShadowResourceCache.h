@@ -1,14 +1,20 @@
 #pragma once
 
+#include "RenderShadowType.h"
+
 #include <XEngine/Core/Types.h>
 #include <XEngine/Math/Math.h>
 #include <XEngine/RHI/RHITypes.h>
 #include <XEngine/Renderer/RendererSettings.h>
 
+#include <array>
+#include <memory>
+
 namespace XEngine
 {
     class RHIDevice;
     class RHITexture;
+    class RHITextureView;
     class RHISampler;
 
     struct DirectionalShadowResourceDesc 
@@ -22,12 +28,10 @@ namespace XEngine
 
     struct DirectionalShadowResources 
     {
-        RHITexture* Texture = nullptr; 
-        //RHITextureView* SampledView = nullptr; // TODO: need implement RHITexture
-
-        //std::array<RHITextureView*, MaxShadowCascades> LayerDepthViews {}; 
-
-        RHISampler* Sampler = nullptr; 
+        std::shared_ptr<RHITexture> Texture;
+        std::shared_ptr<RHITextureView> SampledView;
+        std::array<std::shared_ptr<RHITextureView>, MaxShadowCascades> LayerDepthViews {};
+        std::shared_ptr<RHISampler> Sampler;
         u32 Resolution = 0; 
         u32 CascadeCount = 0; 
         RHIFormat Format = RHIFormat::Undefined;

@@ -10,41 +10,10 @@
 
 namespace XEngine
 {
-    namespace
-    {
-        VkBufferUsageFlags ToVulkanBufferUsage(RHIBufferUsage usage)
-        {
-            VkBufferUsageFlags flags = 0;
-            if (HasFlag(usage, RHIBufferUsage::Vertex)) { flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; }
-            if (HasFlag(usage, RHIBufferUsage::Index)) { flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT; }
-            if (HasFlag(usage, RHIBufferUsage::Uniform)) { flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT; }
-            if (HasFlag(usage, RHIBufferUsage::Storage)) { flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT; }
-            if (HasFlag(usage, RHIBufferUsage::TransferSrc)) { flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT; }
-            if (HasFlag(usage, RHIBufferUsage::TransferDst)) { flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT; }
-            return flags;
-        }
-
-        VmaMemoryUsage ToVmaMemoryUsage(RHIMemoryUsage usage)
-        {
-            switch (usage)
-            {
-            case RHIMemoryUsage::CPUToGPU:
-                return VMA_MEMORY_USAGE_CPU_TO_GPU;
-            case RHIMemoryUsage::GPUToCPU:
-                return VMA_MEMORY_USAGE_GPU_TO_CPU;
-            case RHIMemoryUsage::GPUOnly:
-            default:
-                return VMA_MEMORY_USAGE_GPU_ONLY;
-            }
-        }
-    }
-
     VulkanBuffer::VulkanBuffer(
         VulkanDevice& device,
         VmaAllocator allocator,
-        const RHIBufferDesc& desc,
-        const void* initialData,
-        std::size_t initialDataSize)
+        const RHIBufferDesc& desc)
         : RHIBuffer(device)
         , m_Device(device.GetHandle())
         , m_Allocator(allocator)
@@ -59,7 +28,7 @@ namespace XEngine
         VkBufferCreateInfo bufferCreateInfo {};
         bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferCreateInfo.size = desc.Size;
-        bufferCreateInfo.usage = ToVulkanBufferUsage(desc.Usage);
+        bufferCreateInfo.usage = ToVulkanBufferUsageFlags(desc.Usage);
         bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
         VmaAllocationCreateInfo allocationCreateInfo {};
@@ -84,20 +53,6 @@ namespace XEngine
             return;
         }
 
-        if (initialData != nullptr && initialDataSize > 0)
-        {
-            void* mappedData = nullptr;
-            result = vmaMapMemory(m_Allocator, m_Allocation, &mappedData);
-            if (result == VK_SUCCESS)
-            {
-                std::memcpy(mappedData, initialData, initialDataSize < desc.Size ? initialDataSize : desc.Size);
-                vmaUnmapMemory(m_Allocator, m_Allocation);
-            }
-            else
-            {
-                XENGINE_LOG_ERROR("Failed to map Vulkan buffer for initial data upload");
-            }
-        }
     }
 
     VulkanBuffer::~VulkanBuffer()

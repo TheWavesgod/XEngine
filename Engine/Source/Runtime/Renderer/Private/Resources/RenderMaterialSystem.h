@@ -67,7 +67,7 @@ namespace XEngine
         GPUMaterialData BuildGPUMaterialData(const MaterialDesc& desc) const;
         std::shared_ptr<RHIBindGroup> CreateBaseColorBindGroup(const MaterialDesc& desc) const;
         std::shared_ptr<RHIBindGroup> CreatePBRBindGroup(const MaterialDesc& desc) const;
-        RHITexture* ResolveRHITexture(TextureHandle texture, TextureHandle fallback) const;
+        RHITextureView* ResolveRHITextureView(TextureHandle texture, TextureHandle fallback) const;
         TextureHandle ResolveTexture(TextureHandle texture, TextureHandle fallback) const;
 
         RHIDevice* m_Device = nullptr;

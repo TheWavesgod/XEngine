@@ -3,12 +3,13 @@
 #include <XEngine/RHI/Native/VulkanNativeContext.h>
 
 #include <imgui.h>
+#include <volk.h>
 
 namespace XEngine
 {
     class RHIDevice;
     class RHISampler;
-    class RHITexture;
+    class RHITextureView;
 
     class ImGuiVulkanBackend
     {
@@ -16,7 +17,7 @@ namespace XEngine
         bool Initialize(RHIDevice& device);
         void Shutdown();
         void RenderDrawData();
-        ImTextureID RegisterTexture(RHISampler& sampler, RHITexture& texture);
+        ImTextureID RegisterTexture(RHISampler& sampler, RHITextureView& textureView);
         void UnregisterTexture(ImTextureID textureId);
 
         bool IsInitialized() const { return m_Initialized; }

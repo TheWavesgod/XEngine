@@ -292,9 +292,11 @@ namespace XEngine
         return m_Initialized && ImGui::GetIO().WantCaptureKeyboard;
     }
 
-    ImTextureID ImGuiLayer::RegisterTexture(RHISampler& sampler, RHITexture& texture)
+    ImTextureID ImGuiLayer::RegisterTexture(
+        RHISampler& sampler,
+        RHITextureView& textureView)
     {
-        return m_VulkanBackend.RegisterTexture(sampler, texture);
+        return m_VulkanBackend.RegisterTexture(sampler, textureView);
     }
 
     void ImGuiLayer::UnregisterTexture(ImTextureID textureId)

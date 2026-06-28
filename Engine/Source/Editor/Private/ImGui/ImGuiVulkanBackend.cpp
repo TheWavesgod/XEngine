@@ -3,12 +3,13 @@
 #include <XEngine/Logging/Log.h>
 #include <XEngine/RHI/RHIDevice.h>
 #include <XEngine/RHI/Resources/RHISampler.h>
-#include <XEngine/RHI/Resources/RHITexture.h>
+#include <XEngine/RHI/Resources/RHITextureView.h>
 
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
 
 #include <string>
+#include <type_traits>
 
 namespace XEngine
 {
@@ -19,6 +20,19 @@ namespace XEngine
             if (result != VK_SUCCESS)
             {
                 XENGINE_LOG_ERROR(std::string("ImGui Vulkan backend error: ") + std::to_string(result));
+            }
+        }
+
+        template <typename Handle>
+        Handle UnpackVulkanHandle(std::uintptr_t handle)
+        {
+            if constexpr (std::is_pointer_v<Handle>)
+            {
+                return reinterpret_cast<Handle>(handle);
+            }
+            else
+            {
+                return static_cast<Handle>(handle);
             }
         }
     }
@@ -50,7 +64,8 @@ namespace XEngine
         poolInfo.poolSizeCount = static_cast<u32>(std::size(poolSizes));
         poolInfo.pPoolSizes = poolSizes;
 
-        if (vkCreateDescriptorPool(context.Device, &poolInfo, nullptr, &m_DescriptorPool) != VK_SUCCESS)
+        const VkDevice deviceHandle = UnpackVulkanHandle<VkDevice>(context.Device);
+        if (vkCreateDescriptorPool(deviceHandle, &poolInfo, nullptr, &m_DescriptorPool) != VK_SUCCESS)
         {
             XENGINE_LOG_ERROR("Failed to create ImGui Vulkan descriptor pool");
             return false;
@@ -59,17 +74,18 @@ namespace XEngine
         VkPipelineRenderingCreateInfoKHR pipelineRendering {};
         pipelineRendering.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
         pipelineRendering.colorAttachmentCount = 1;
-        pipelineRendering.pColorAttachmentFormats = &context.ColorFormat;
+        const VkFormat colorFormat = static_cast<VkFormat>(context.ColorFormat);
+        pipelineRendering.pColorAttachmentFormats = &colorFormat;
         pipelineRendering.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
         pipelineRendering.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
         ImGui_ImplVulkan_InitInfo initInfo {};
         initInfo.ApiVersion = VK_API_VERSION_1_3;
-        initInfo.Instance = context.Instance;
-        initInfo.PhysicalDevice = context.PhysicalDevice;
-        initInfo.Device = context.Device;
+        initInfo.Instance = UnpackVulkanHandle<VkInstance>(context.Instance);
+        initInfo.PhysicalDevice = UnpackVulkanHandle<VkPhysicalDevice>(context.PhysicalDevice);
+        initInfo.Device = deviceHandle;
         initInfo.QueueFamily = context.GraphicsQueueFamilyIndex;
-        initInfo.Queue = context.GraphicsQueue;
+        initInfo.Queue = UnpackVulkanHandle<VkQueue>(context.GraphicsQueue);
         initInfo.DescriptorPool = m_DescriptorPool;
         initInfo.MinImageCount = context.MinImageCount;
         initInfo.ImageCount = context.ImageCount;
@@ -81,12 +97,12 @@ namespace XEngine
         if (!ImGui_ImplVulkan_Init(&initInfo))
         {
             XENGINE_LOG_ERROR("Failed to initialize ImGui Vulkan backend");
-            vkDestroyDescriptorPool(context.Device, m_DescriptorPool, nullptr);
+            vkDestroyDescriptorPool(deviceHandle, m_DescriptorPool, nullptr);
             m_DescriptorPool = VK_NULL_HANDLE;
             return false;
         }
 
-        m_Device = context.Device;
+        m_Device = deviceHandle;
         m_RHIDevice = &device;
         m_Initialized = true;
         XENGINE_LOG_INFO("ImGui Vulkan backend initialized");
@@ -123,17 +139,24 @@ namespace XEngine
         m_RHIDevice->RenderVulkanOverlay(
             [drawData](RHINativeCommandBuffer commandBuffer)
             {
-                ImGui_ImplVulkan_RenderDrawData(drawData, static_cast<VkCommandBuffer>(commandBuffer));
+                ImGui_ImplVulkan_RenderDrawData(
+                    drawData,
+                    UnpackVulkanHandle<VkCommandBuffer>(commandBuffer));
             });
     }
 
-    ImTextureID ImGuiVulkanBackend::RegisterTexture(RHISampler& sampler, RHITexture& texture)
+    ImTextureID ImGuiVulkanBackend::RegisterTexture(
+        RHISampler& sampler,
+        RHITextureView& textureView)
     {
-        VkSampler vkSampler = static_cast<VkSampler>(sampler.GetNativeSampler(RHIBackend::Vulkan));
-        VkImageView imageView = static_cast<VkImageView>(texture.GetNativeImageView(RHIBackend::Vulkan));
-        if (!m_Initialized ||
-            vkSampler == VK_NULL_HANDLE ||
-            imageView == VK_NULL_HANDLE)
+        if (!m_Initialized || m_RHIDevice == nullptr)
+        {
+            return ImTextureID_Invalid;
+        }
+
+        VulkanNativeTextureBinding binding;
+        if (!m_RHIDevice->GetVulkanNativeTextureBinding(
+                sampler, textureView, binding))
         {
             return ImTextureID_Invalid;
         }
@@ -141,8 +164,8 @@ namespace XEngine
         // Editor-private bridge from RHI resources to ImGui's Vulkan texture
         // descriptor. Runtime renderer never includes ImGui headers.
         VkDescriptorSet descriptorSet = ImGui_ImplVulkan_AddTexture(
-            vkSampler,
-            imageView,
+            UnpackVulkanHandle<VkSampler>(binding.Sampler),
+            UnpackVulkanHandle<VkImageView>(binding.ImageView),
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         return reinterpret_cast<ImTextureID>(descriptorSet);
     }

@@ -19,7 +19,6 @@ namespace XEngine
         bool IsValid() const;
         const RHISamplerDesc& GetDesc() const override;
         VkSampler GetHandle() const;
-        void* GetNativeSampler(RHIBackend backend) const override;
 
     private:
         VkDevice m_Device = VK_NULL_HANDLE;

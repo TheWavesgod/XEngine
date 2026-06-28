@@ -10,6 +10,7 @@ namespace XEngine
     class VulkanBindGroup;
     class VulkanPipeline;
     class VulkanTexture;
+    class VulkanTextureView;
 
     class VulkanCommandList final : public RHICommandList
     {
@@ -24,7 +25,7 @@ namespace XEngine
             VkImageView swapchainImageView,
             VkExtent2D swapchainExtent,
             VkImageLayout* swapchainImageLayout,
-            VulkanTexture* depthTexture);
+            RHITextureView* depthTextureView);
 
         void Reset();
         void EndRenderingIfActive();
@@ -32,7 +33,7 @@ namespace XEngine
         void SetRenderOutput(const RHIRenderOutputDesc& output) override;
         void SetGraphicsPipeline(RHIPipeline* pipeline) override;
         void SetRenderViewport(const RHIRect2D& viewport) override;
-        void TransitionTextureToShaderRead(RHITexture* texture) override;
+        void TransitionTextureToShaderRead(RHITextureView* textureView) override;
         void SetBindGroup(u32 setIndex, RHIBindGroup* bindGroup) override;
         void SetVertexBuffer(RHIBuffer* buffer, u64 offset = 0) override;
         void SetIndexBuffer(RHIBuffer* buffer, RHIIndexFormat format, u64 offset = 0) override;
@@ -68,7 +69,7 @@ namespace XEngine
         RHIRect2D m_RenderViewport {};
         RHIRenderOutputDesc m_RenderOutput {};
         VkImageLayout* m_SwapchainImageLayout = nullptr;
-        VulkanTexture* m_DepthTexture = nullptr;
+        RHITextureView* m_DepthTextureView = nullptr;
         VulkanPipeline* m_BoundGraphicsPipeline = nullptr;
         bool m_RenderingActive = false;
     };

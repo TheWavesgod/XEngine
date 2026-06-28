@@ -2,6 +2,7 @@
 
 #include <XEngine/Logging/Log.h>
 #include <XEngine/RHI/RHIDevice.h>
+#include <XEngine/RHI/RHIResourceFactory.h>
 #include <XEngine/RHI/Resources/RHIShader.h>
 #include <XEngine/Shader/ShaderModule.h>
 #include <XEngine/Shader/ShaderSystem.h>
@@ -90,7 +91,8 @@ namespace XEngine
         shaderDesc.CodeSize = compiled.Bytecode.size();
         shaderDesc.DebugName = debugName.c_str();
 
-        std::shared_ptr<RHIShader> shader = m_Device->CreateShader(shaderDesc);
+        std::shared_ptr<RHIShader> shader =
+            m_Device->GetResourceFactory().CreateShader(shaderDesc);
         if (!shader)
         {
             XENGINE_LOG_ERROR(std::string("Failed to create RHI shader: ") + debugName);

@@ -1,11 +1,29 @@
 #include "XEngine/RHI/RHIResourceFactory.h"
 
 #include "XEngine/RHI/RHIDevice.h"
+#include "XEngine/RHI/RHIUtils.h"
 #include "XEngine/Core/Assert.h"
 #include "XEngine/Logging/Log.h"
 
 namespace XEngine
 {
+    namespace
+    {
+        const RHIBindGroupLayoutEntry* FindLayoutEntry(
+            const RHIBindGroupLayoutDesc& layout,
+            u32 binding)
+        {
+            for (const RHIBindGroupLayoutEntry& entry : layout.Entries)
+            {
+                if (entry.Binding == binding)
+                {
+                    return &entry;
+                }
+            }
+            return nullptr;
+        }
+    }
+
     RHIResourceFactory::RHIResourceFactory(RHIDevice& ownerDevice)
         : m_Device(&ownerDevice)
     {
@@ -20,13 +38,11 @@ namespace XEngine
     // ---- Buffer ----
 
     std::shared_ptr<RHIBuffer> RHIResourceFactory::CreateBuffer(
-        const RHIBufferDesc& desc,
-        const void* initialData,
-        std::size_t initialDataSize)
+        const RHIBufferDesc& desc)
     {
-        if (desc.Size == 0)
+        if (desc.Size == 0 || desc.Usage == RHIBufferUsage::None)
         {
-            XENGINE_LOG_ERROR("Cannot create RHI buffer with zero size");
+            XENGINE_LOG_ERROR("Cannot create RHI buffer with zero size or no usage flags");
             return nullptr;
         }
         RHIBufferDesc normalized = desc;
@@ -34,26 +50,14 @@ namespace XEngine
         {
             normalized.DebugName = "RHIBuffer";
         }
-        return CreateBufferImpl(normalized, initialData, initialDataSize);
+        return CreateBufferImpl(normalized);
     }
 
     // ---- Texture ----
 
     std::shared_ptr<RHITexture> RHIResourceFactory::CreateTexture(
-        const RHITextureDesc& desc,
-        const void* initialData,
-        std::size_t initialDataSize)
+        const RHITextureDesc& desc)
     {
-        if (desc.Width == 0 || desc.Height == 0)
-        {
-            XENGINE_LOG_ERROR("Cannot create RHI texture with zero extent");
-            return nullptr;
-        }
-        if (desc.Dimension == RHITextureDimension::TextureCube && desc.ArrayLayers != 6)
-        {
-            XENGINE_LOG_ERROR("TextureCube requires exactly 6 array layers");
-            return nullptr;
-        }
         RHITextureDesc normalized = desc;
         if (normalized.GenerateMips)
         {
@@ -65,7 +69,12 @@ namespace XEngine
         {
             normalized.DebugName = "RHITexture";
         }
-        return CreateTextureImpl(normalized, initialData, initialDataSize);
+        if (!ValidateTextureDesc(normalized, GetDevice().GetCapabilities()))
+        {
+            XENGINE_LOG_ERROR("Invalid RHI texture descriptor");
+            return nullptr;
+        }
+        return CreateTextureImpl(normalized);
     }
 
     // ---- TextureView ----
@@ -78,26 +87,23 @@ namespace XEngine
             XENGINE_LOG_ERROR("Cannot create RHI texture view with null texture");
             return nullptr;
         }
+        if (&desc.Texture->GetOwnerDevice() != &GetDevice())
+        {
+            XENGINE_LOG_ERROR("RHI texture view source belongs to another device");
+            return nullptr;
+        }
         const RHITextureDesc& texDesc = desc.Texture->GetDesc();
 
-        RHITextureViewDesc normalized = desc;
-        if (normalized.MipCount == 0)
+        RHITextureViewDesc normalized;
+        if (!NormalizeTextureViewDesc(texDesc, desc, normalized) ||
+            !ValidateTextureViewDesc(texDesc, normalized, GetDevice().GetCapabilities()))
         {
-            normalized.MipCount = texDesc.MipLevels - normalized.BaseMipLevel;
-        }
-        if (normalized.ArrayLayerCount == 0)
-        {
-            normalized.ArrayLayerCount = texDesc.ArrayLayers - normalized.BaseArrayLayer;
-        }
-        if (normalized.BaseMipLevel + normalized.MipCount > texDesc.MipLevels)
-        {
-            XENGINE_LOG_ERROR("RHI texture view mip range exceeds source texture");
+            XENGINE_LOG_ERROR("Invalid RHI texture view descriptor");
             return nullptr;
         }
-        if (normalized.BaseArrayLayer + normalized.ArrayLayerCount > texDesc.ArrayLayers)
+        if (normalized.DebugName == nullptr)
         {
-            XENGINE_LOG_ERROR("RHI texture view array layer range exceeds source texture");
-            return nullptr;
+            normalized.DebugName = "RHITextureView";
         }
         return CreateTextureViewImpl(normalized);
     }
@@ -131,6 +137,24 @@ namespace XEngine
             XENGINE_LOG_ERROR("RHI bind group layout desc has no entries");
             return nullptr;
         }
+        for (std::size_t i = 0; i < desc.Entries.size(); ++i)
+        {
+            const RHIBindGroupLayoutEntry& entry = desc.Entries[i];
+            if (entry.Type == RHIBindingType::Unknown || entry.Count != 1 ||
+                entry.Visibility == RHIShaderStageFlags::None)
+            {
+                XENGINE_LOG_ERROR("Invalid or unsupported RHI bind group layout entry");
+                return nullptr;
+            }
+            for (std::size_t j = i + 1; j < desc.Entries.size(); ++j)
+            {
+                if (entry.Binding == desc.Entries[j].Binding)
+                {
+                    XENGINE_LOG_ERROR("Duplicate RHI bind group layout binding");
+                    return nullptr;
+                }
+            }
+        }
         return CreateBindGroupLayoutImpl(desc);
     }
 
@@ -144,6 +168,75 @@ namespace XEngine
             XENGINE_LOG_ERROR("RHI bind group desc requires a non-null layout");
             return nullptr;
         }
+        if (&desc.Layout->GetOwnerDevice() != &GetDevice())
+        {
+            XENGINE_LOG_ERROR("RHI bind group layout belongs to another device");
+            return nullptr;
+        }
+        const RHIBindGroupLayoutDesc& layoutDesc = desc.Layout->GetDesc();
+        if (desc.Resources.size() != layoutDesc.Entries.size())
+        {
+            XENGINE_LOG_ERROR("RHI bind group resources do not match its layout");
+            return nullptr;
+        }
+        for (std::size_t i = 0; i < desc.Resources.size(); ++i)
+        {
+            const RHIBindingResource& resource = desc.Resources[i];
+            const RHIBindGroupLayoutEntry* entry = FindLayoutEntry(layoutDesc, resource.Binding);
+            if (entry == nullptr || entry->Type != resource.Type)
+            {
+                XENGINE_LOG_ERROR("RHI bind group binding does not match its layout");
+                return nullptr;
+            }
+            for (std::size_t j = i + 1; j < desc.Resources.size(); ++j)
+            {
+                if (resource.Binding == desc.Resources[j].Binding)
+                {
+                    XENGINE_LOG_ERROR("Duplicate RHI bind group resource binding");
+                    return nullptr;
+                }
+            }
+            if ((resource.Type == RHIBindingType::CombinedImageSampler &&
+                 (resource.TextureView == nullptr || resource.Sampler == nullptr)) ||
+                (resource.Type == RHIBindingType::SampledTexture &&
+                 resource.TextureView == nullptr) ||
+                (resource.Type == RHIBindingType::Sampler &&
+                 resource.Sampler == nullptr) ||
+                ((resource.Type == RHIBindingType::UniformBuffer ||
+                  resource.Type == RHIBindingType::StorageBuffer) &&
+                 resource.Buffer == nullptr))
+            {
+                XENGINE_LOG_ERROR("RHI bind group resource is incomplete");
+                return nullptr;
+            }
+            if ((resource.TextureView != nullptr &&
+                 &resource.TextureView->GetOwnerDevice() != &GetDevice()) ||
+                (resource.Sampler != nullptr &&
+                 &resource.Sampler->GetOwnerDevice() != &GetDevice()) ||
+                (resource.Buffer != nullptr &&
+                 &resource.Buffer->GetOwnerDevice() != &GetDevice()))
+            {
+                XENGINE_LOG_ERROR("RHI bind group resource belongs to another device");
+                return nullptr;
+            }
+            if (resource.Buffer != nullptr)
+            {
+                const u64 bufferSize = static_cast<u64>(resource.Buffer->GetSize());
+                if (resource.BufferOffset > bufferSize)
+                {
+                    XENGINE_LOG_ERROR("RHI bind group buffer offset is invalid");
+                    return nullptr;
+                }
+                const u64 rangeSize = resource.BufferSize == 0
+                    ? bufferSize - resource.BufferOffset
+                    : resource.BufferSize;
+                if (rangeSize == 0 || rangeSize > bufferSize - resource.BufferOffset)
+                {
+                    XENGINE_LOG_ERROR("RHI bind group buffer range is invalid");
+                    return nullptr;
+                }
+            }
+        }
         return CreateBindGroupImpl(desc);
     }
 
@@ -155,6 +248,13 @@ namespace XEngine
         if (desc.VertexShader == nullptr)
         {
             XENGINE_LOG_ERROR("RHI graphics pipeline requires vertex shaders");
+            return nullptr;
+        }
+        if (&desc.VertexShader->GetOwnerDevice() != &GetDevice() ||
+            (desc.FragmentShader != nullptr &&
+             &desc.FragmentShader->GetOwnerDevice() != &GetDevice()))
+        {
+            XENGINE_LOG_ERROR("RHI graphics pipeline shader belongs to another device");
             return nullptr;
         }
 
@@ -178,6 +278,23 @@ namespace XEngine
             desc.DepthFormat == RHIFormat::Undefined)
         {
             return nullptr;
+        }
+        const RHICapabilities& caps = GetDevice().GetCapabilities();
+        if ((caps.MaxPushConstantSize > 0 &&
+             desc.PushConstantSize > caps.MaxPushConstantSize) ||
+            (caps.MaxBoundDescriptorSets > 0 &&
+             desc.BindGroupLayouts.size() > caps.MaxBoundDescriptorSets))
+        {
+            XENGINE_LOG_ERROR("RHI graphics pipeline exceeds device capabilities");
+            return nullptr;
+        }
+        for (RHIBindGroupLayout* layout : desc.BindGroupLayouts)
+        {
+            if (layout == nullptr || &layout->GetOwnerDevice() != &GetDevice())
+            {
+                XENGINE_LOG_ERROR("RHI graphics pipeline has an invalid bind group layout");
+                return nullptr;
+            }
         }
         return CreateGraphicsPipelineImpl(desc);
     }

@@ -373,7 +373,15 @@ namespace XEngine
                 0.0f);
 
             // World bounds: the 8 cascade frustum corners.
-            cascade.WorldBounds = AABB::FromPoints(cascadeCorners.data(), 8);
+            AABB worldBounds;
+            worldBounds.Min = Vec3( std::numeric_limits<float>::infinity());
+            worldBounds.Max = Vec3(-std::numeric_limits<float>::infinity());
+            for (const Vec3& corner : cascadeCorners)
+            {
+                worldBounds.Min = Math::Min(worldBounds.Min, corner);
+                worldBounds.Max = Math::Max(worldBounds.Max, corner);
+            }
+            cascade.WorldBounds = worldBounds;
 
             // Light-space bounds: transform corners into light space and re-fit.
             Vec3 lightSpaceMin( std::numeric_limits<float>::infinity());

@@ -5,16 +5,21 @@
 #include <XEngine/RHI/RHIClipSpace.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 
 namespace XEngine
 {
     class RHICommandList;
+    class RHIBindGroup;
     class RHIResourceFactory;
+    class RHISampler;
+    class RHITextureView;
     class RHIUploadManager;
     struct VulkanNativeContext;
-    using RHINativeCommandBuffer = void*;
+    struct VulkanNativeTextureBinding;
+    using RHINativeCommandBuffer = std::uintptr_t;
 
     class RHIDevice
     {
@@ -32,20 +37,22 @@ namespace XEngine
 
         virtual void RequestResize(u32 width, u32 height) = 0;
 
-        // Update an existing bind group's sampled-texture binding in-place.
-        // Used by RenderFrameResources to swap shadow texture / sampler when
-        // ShadowResourceCache rebuilds the shadow array.
-        virtual void UpdateBindGroupSampledTexture(
-            RHIBindGroup* bindGroup,
-            u32 binding,
-            RHITextureView* view,
-            RHISampler* sampler) = 0;  // TODO: is really needed to do it here
-
         virtual RHIFormat GetSwapchainFormat() const = 0;
 
         virtual bool GetVulkanNativeContext(VulkanNativeContext& outContext) const
         {
             (void)outContext;
+            return false;
+        }
+
+        virtual bool GetVulkanNativeTextureBinding(
+            const RHISampler& sampler,
+            const RHITextureView& textureView,
+            VulkanNativeTextureBinding& outBinding) const
+        {
+            (void)sampler;
+            (void)textureView;
+            (void)outBinding;
             return false;
         }
 
@@ -61,5 +68,7 @@ namespace XEngine
 
         virtual RHIUploadManager& GetUploadManager() = 0;             
         virtual const RHIUploadManager& GetUploadManager() const = 0; 
+
+        virtual const RHICapabilities& GetCapabilities() const = 0;
     };
 }

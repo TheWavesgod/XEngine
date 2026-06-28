@@ -23,15 +23,9 @@ namespace XEngine
     public:
         virtual ~RHIResourceFactory() = default;
 
-        std::shared_ptr<RHIBuffer> CreateBuffer(
-            const RHIBufferDesc& desc,
-            const void* initialData = nullptr,
-            std::size_t initialDataSize = 0);
+        std::shared_ptr<RHIBuffer> CreateBuffer(const RHIBufferDesc& desc);
 
-        std::shared_ptr<RHITexture> CreateTexture(
-            const RHITextureDesc& desc,
-            const void* initialData = nullptr,
-            std::size_t initialDataSize = 0);
+        std::shared_ptr<RHITexture> CreateTexture(const RHITextureDesc& desc);
 
         std::shared_ptr<RHITextureView> CreateTextureView(
             const RHITextureViewDesc& desc);
@@ -53,14 +47,10 @@ namespace XEngine
         explicit RHIResourceFactory(RHIDevice& ownerDevice);
 
         virtual std::shared_ptr<RHIBuffer> CreateBufferImpl(
-            const RHIBufferDesc& desc,
-            const void* initialData,
-            std::size_t initialDataSize) = 0;
+            const RHIBufferDesc& desc) = 0;
 
         virtual std::shared_ptr<RHITexture> CreateTextureImpl(
-            const RHITextureDesc& desc,
-            const void* initialData,
-            std::size_t initialDataSize) = 0;
+            const RHITextureDesc& desc) = 0;
 
         virtual std::shared_ptr<RHITextureView> CreateTextureViewImpl(
             const RHITextureViewDesc& desc) = 0;

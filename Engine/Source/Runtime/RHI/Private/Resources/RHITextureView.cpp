@@ -9,7 +9,7 @@ namespace XEngine
     {
     }
 
-    const RHITexture* RHITextureView::GetTexture() const
+    RHITexture* RHITextureView::GetTexture() const
     {
         return GetDesc().Texture;
     }

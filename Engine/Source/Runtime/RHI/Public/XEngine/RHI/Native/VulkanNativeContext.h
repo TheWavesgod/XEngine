@@ -2,22 +2,28 @@
 
 #include <XEngine/Core/Types.h>
 
-#include <volk.h>
+#include <cstdint>
 
 namespace XEngine
 {
-    // Backend-specific bridge for editor integration. It exposes native Vulkan
-    // handles without making Runtime Renderer depend on editor UI libraries.
+    // Narrow editor/backend bridge. Core RHI public headers remain free of
+    // Vulkan headers and Vulkan types.
     struct VulkanNativeContext
     {
-        VkInstance Instance = VK_NULL_HANDLE;
-        VkPhysicalDevice PhysicalDevice = VK_NULL_HANDLE;
-        VkDevice Device = VK_NULL_HANDLE;
-        VkQueue GraphicsQueue = VK_NULL_HANDLE;
+        std::uintptr_t Instance = 0;
+        std::uintptr_t PhysicalDevice = 0;
+        std::uintptr_t Device = 0;
+        std::uintptr_t GraphicsQueue = 0;
         u32 GraphicsQueueFamilyIndex = 0;
         u32 MinImageCount = 0;
         u32 ImageCount = 0;
-        VkFormat ColorFormat = VK_FORMAT_UNDEFINED;
-        VkFormat DepthFormat = VK_FORMAT_UNDEFINED;
+        u32 ColorFormat = 0;
+        u32 DepthFormat = 0;
+    };
+
+    struct VulkanNativeTextureBinding
+    {
+        std::uintptr_t Sampler = 0;
+        std::uintptr_t ImageView = 0;
     };
 }

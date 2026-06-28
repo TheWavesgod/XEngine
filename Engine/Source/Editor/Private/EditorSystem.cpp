@@ -346,14 +346,15 @@ namespace XEngine
             return;
         }
 
-        RHITexture* colorTexture = m_ViewportRenderTarget->GetColorTexture();
+        RHITextureView* colorTextureView = m_ViewportRenderTarget->GetColorTextureView();
         RHISampler* sampler = m_ViewportRenderTarget->GetSampler();
-        if (colorTexture == nullptr || sampler == nullptr)
+        if (colorTextureView == nullptr || sampler == nullptr)
         {
             return;
         }
 
-        m_ViewportTextureId = static_cast<u64>(m_ImGuiLayer->RegisterTexture(*sampler, *colorTexture));
+        m_ViewportTextureId = static_cast<u64>(
+            m_ImGuiLayer->RegisterTexture(*sampler, *colorTextureView));
         m_Context.ViewportTextureId = m_ViewportTextureId;
     }
 }

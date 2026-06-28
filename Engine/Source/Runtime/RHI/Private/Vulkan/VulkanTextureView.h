@@ -23,7 +23,6 @@ namespace XEngine
         const RHITextureViewDesc& GetDesc() const override;
         
         VkImageView GetHandle() const;
-        void* GetNativeView(RHIBackend backend) const override;
 
     private:
         VkDevice m_Device = VK_NULL_HANDLE;

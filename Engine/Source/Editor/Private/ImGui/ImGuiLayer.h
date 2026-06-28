@@ -8,7 +8,7 @@ namespace XEngine
 {
     class RHIDevice;
     class RHISampler;
-    class RHITexture;
+    class RHITextureView;
     class InspectorPanel;
     class MainMenuBar;
     class RendererDebugPanel;
@@ -36,7 +36,7 @@ namespace XEngine
 
         bool WantCaptureMouse() const;
         bool WantCaptureKeyboard() const;
-        ImTextureID RegisterTexture(RHISampler& sampler, RHITexture& texture);
+        ImTextureID RegisterTexture(RHISampler& sampler, RHITextureView& textureView);
         void UnregisterTexture(ImTextureID textureId);
         bool IsInitialized() const { return m_Initialized; }
 

@@ -26,14 +26,16 @@ namespace XEngine
             return;
         }
 
-        XENGINE_ASSERT(desc.VertexShader != nullptr && desc.FragmentShader != nullptr, "Vulkan graphics pipeline requires non-null vertex and fragment shaders");
+        XENGINE_ASSERT(desc.VertexShader != nullptr, "Vulkan graphics pipeline requires a vertex shader");
         XENGINE_ASSERT(&desc.VertexShader->GetOwnerDevice() == &device, "Vulkan graphics pipeline shaders must belong to the owning device");
         auto* vertexShader = CheckedVulkanCast<VulkanShader>(desc.VertexShader, device);
-        auto* fragmentShader = CheckedVulkanCast<VulkanShader>(desc.FragmentShader, device);
-        if (vertexShader == nullptr || fragmentShader == nullptr ||
-            !vertexShader->IsValid() || !fragmentShader->IsValid())
+        VulkanShader* fragmentShader = desc.FragmentShader != nullptr
+            ? CheckedVulkanCast<VulkanShader>(desc.FragmentShader, device)
+            : nullptr;
+        if (vertexShader == nullptr || !vertexShader->IsValid() ||
+            (fragmentShader != nullptr && !fragmentShader->IsValid()))
         {
-            XENGINE_LOG_ERROR("Vulkan graphics pipeline requires valid Vulkan vertex and fragment shaders");
+            XENGINE_LOG_ERROR("Vulkan graphics pipeline received an invalid shader");
             return;
         }
 
@@ -77,17 +79,19 @@ namespace XEngine
             return;
         }
 
-        const std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = {
-            VkPipelineShaderStageCreateInfo {
-                VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                nullptr,
-                0,
-                vertexShader->GetVulkanStage(),
-                vertexShader->GetHandle(),
-                vertexShader->GetEntryPoint().c_str(),
-                nullptr
-            },
-            VkPipelineShaderStageCreateInfo {
+        std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+        shaderStages.push_back(VkPipelineShaderStageCreateInfo {
+            VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            nullptr,
+            0,
+            vertexShader->GetVulkanStage(),
+            vertexShader->GetHandle(),
+            vertexShader->GetEntryPoint().c_str(),
+            nullptr
+        });
+        if (fragmentShader != nullptr)
+        {
+            shaderStages.push_back(VkPipelineShaderStageCreateInfo {
                 VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                 nullptr,
                 0,
@@ -95,8 +99,8 @@ namespace XEngine
                 fragmentShader->GetHandle(),
                 fragmentShader->GetEntryPoint().c_str(),
                 nullptr
-            }
-        };
+            });
+        }
 
         std::vector<VkVertexInputBindingDescription> bindings;
         std::vector<VkVertexInputAttributeDescription> attributes;
@@ -179,9 +183,11 @@ namespace XEngine
         dynamicState.dynamicStateCount = static_cast<u32>(dynamicStates.size());
         dynamicState.pDynamicStates = dynamicStates.data();
 
-        const VkFormat colorFormat = RHIFormatToVulkanFormat(desc.ColorFormat);
+        const VkFormat colorFormat = desc.HasColorAttachment
+            ? RHIFormatToVulkanFormat(desc.ColorFormat)
+            : VK_FORMAT_UNDEFINED;
         const VkFormat depthFormat = RHIFormatToVulkanFormat(desc.DepthFormat);
-        if (colorFormat == VK_FORMAT_UNDEFINED)
+        if (desc.HasColorAttachment && colorFormat == VK_FORMAT_UNDEFINED)
         {
             XENGINE_LOG_ERROR("Vulkan graphics pipeline received an unsupported color format");
             return;
@@ -189,8 +195,10 @@ namespace XEngine
 
         VkPipelineRenderingCreateInfo renderingCreateInfo {};
         renderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-        renderingCreateInfo.colorAttachmentCount = 1;
-        renderingCreateInfo.pColorAttachmentFormats = &colorFormat;
+        renderingCreateInfo.colorAttachmentCount = desc.HasColorAttachment ? 1u : 0u;
+        renderingCreateInfo.pColorAttachmentFormats = desc.HasColorAttachment
+            ? &colorFormat
+            : nullptr;
         renderingCreateInfo.depthAttachmentFormat = depthFormat;
 
         VkGraphicsPipelineCreateInfo pipelineCreateInfo {};

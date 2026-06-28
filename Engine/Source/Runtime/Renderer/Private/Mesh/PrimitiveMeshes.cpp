@@ -2,6 +2,8 @@
 
 #include <XEngine/Math/MathFunctions.h>
 #include <XEngine/RHI/RHIDevice.h>
+#include <XEngine/RHI/RHIResourceFactory.h>
+#include <XEngine/RHI/RHIUploadManager.h>
 
 #include <array>
 
@@ -33,20 +35,31 @@ namespace XEngine
         mesh.VertexCount = static_cast<u32>(vertices.size());
         mesh.IndexCount = static_cast<u32>(indices.size());
         mesh.IndexFormat = RHIIndexFormat::UInt32;
+        RHIResourceFactory& factory = device.GetResourceFactory();
 
         RHIBufferDesc vertexDesc;
         vertexDesc.Size = sizeof(LegacyMeshVertex) * vertices.size();
         vertexDesc.Usage = RHIBufferUsage::Vertex;
         vertexDesc.MemoryUsage = RHIMemoryUsage::CPUToGPU;
         vertexDesc.DebugName = "Cube vertices";
-        mesh.VertexBuffer = device.CreateBuffer(vertexDesc, vertices.data(), vertexDesc.Size);
+        mesh.VertexBuffer = factory.CreateBuffer(vertexDesc);
+        if (mesh.VertexBuffer)
+        {
+            device.GetUploadManager().UploadBuffer(
+                *mesh.VertexBuffer, vertices.data(), vertexDesc.Size);
+        }
 
         RHIBufferDesc indexDesc;
         indexDesc.Size = sizeof(u32) * indices.size();
         indexDesc.Usage = RHIBufferUsage::Index;
         indexDesc.MemoryUsage = RHIMemoryUsage::CPUToGPU;
         indexDesc.DebugName = "Cube indices";
-        mesh.IndexBuffer = device.CreateBuffer(indexDesc, indices.data(), indexDesc.Size);
+        mesh.IndexBuffer = factory.CreateBuffer(indexDesc);
+        if (mesh.IndexBuffer)
+        {
+            device.GetUploadManager().UploadBuffer(
+                *mesh.IndexBuffer, indices.data(), indexDesc.Size);
+        }
 
         return mesh;
     }

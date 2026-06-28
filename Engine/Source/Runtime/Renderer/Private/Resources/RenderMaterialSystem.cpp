@@ -8,6 +8,7 @@
 #include <XEngine/Core/Assert.h>
 #include <XEngine/Logging/Log.h>
 #include <XEngine/RHI/RHIDevice.h>
+#include <XEngine/RHI/RHIResourceFactory.h>
 
 #include <utility>
 
@@ -95,6 +96,7 @@ namespace XEngine
 
         m_TextureManager = textureManager;
         m_Device = device;
+        RHIResourceFactory& factory = m_Device->GetResourceFactory();
 
         RHIBindGroupLayoutDesc layoutDesc;
         layoutDesc.DebugName = "Material base color bind group layout";
@@ -106,7 +108,7 @@ namespace XEngine
             RHIShaderStageFlags::Fragment,
             1
         });
-        m_BaseColorBindGroupLayout = m_Device->CreateBindGroupLayout(layoutDesc);
+        m_BaseColorBindGroupLayout = factory.CreateBindGroupLayout(layoutDesc);
         if (!m_BaseColorBindGroupLayout)
         {
             XENGINE_LOG_ERROR("Failed to create material base color bind group layout");
@@ -139,7 +141,7 @@ namespace XEngine
             RHIShaderStageFlags::Fragment,
             1
         });
-        m_PBRMaterialBindGroupLayout = m_Device->CreateBindGroupLayout(pbrLayoutDesc);
+        m_PBRMaterialBindGroupLayout = factory.CreateBindGroupLayout(pbrLayoutDesc);
         if (!m_PBRMaterialBindGroupLayout)
         {
             XENGINE_LOG_ERROR("Failed to create PBR material bind group layout");
@@ -153,7 +155,7 @@ namespace XEngine
         samplerDesc.AddressV = RHIAddressMode::Repeat;
         samplerDesc.AddressW = RHIAddressMode::Repeat;
         samplerDesc.DebugName = "Material default linear repeat sampler";
-        m_DefaultSampler = m_Device->CreateSampler(samplerDesc);
+        m_DefaultSampler = factory.CreateSampler(samplerDesc);
         if (!m_DefaultSampler)
         {
             XENGINE_LOG_ERROR("Failed to create material default sampler");
@@ -465,13 +467,13 @@ namespace XEngine
             return nullptr;
         }
 
-        RHITexture* baseColorTexture = m_TextureManager->GetTexture(desc.BaseColorTexture);
-        if (baseColorTexture == nullptr)
+        RHITextureView* baseColorView = m_TextureManager->GetTextureView(desc.BaseColorTexture);
+        if (baseColorView == nullptr)
         {
-            baseColorTexture = m_TextureManager->GetTexture(m_TextureManager->GetMissingTexture());
+            baseColorView = m_TextureManager->GetTextureView(m_TextureManager->GetMissingTexture());
         }
 
-        if (baseColorTexture == nullptr)
+        if (baseColorView == nullptr)
         {
             XENGINE_LOG_ERROR("Failed to resolve base color texture for material bind group");
             return nullptr;
@@ -483,13 +485,13 @@ namespace XEngine
         bindGroupDesc.Resources.push_back(RHIBindingResource {
             0,
             RHIBindingType::CombinedImageSampler,
-            baseColorTexture,
+            baseColorView,
             m_DefaultSampler.get(),
             nullptr
         });
 
         // TODO Stage 10/11: move toward reflection-driven layouts and bindless texture indices.
-        return m_Device->CreateBindGroup(bindGroupDesc);
+        return m_Device->GetResourceFactory().CreateBindGroup(bindGroupDesc);
     }
 
     std::shared_ptr<RHIBindGroup> RenderMaterialSystem::CreatePBRBindGroup(const MaterialDesc& desc) const
@@ -500,15 +502,15 @@ namespace XEngine
             return nullptr;
         }
 
-        RHITexture* baseColorTexture = ResolveRHITexture(desc.BaseColorTexture, m_TextureManager->GetDefaultWhiteTexture());
-        RHITexture* normalTexture = ResolveRHITexture(desc.NormalTexture, m_TextureManager->GetDefaultNormalTexture());
-        RHITexture* metallicRoughnessTexture = ResolveRHITexture(
+        RHITextureView* baseColorView = ResolveRHITextureView(desc.BaseColorTexture, m_TextureManager->GetDefaultWhiteTexture());
+        RHITextureView* normalView = ResolveRHITextureView(desc.NormalTexture, m_TextureManager->GetDefaultNormalTexture());
+        RHITextureView* metallicRoughnessView = ResolveRHITextureView(
             desc.MetallicRoughnessTexture,
             m_TextureManager->GetDefaultWhiteTexture());
-        RHITexture* aoTexture = ResolveRHITexture(desc.AOTexture, m_TextureManager->GetDefaultWhiteTexture());
+        RHITextureView* aoView = ResolveRHITextureView(desc.AOTexture, m_TextureManager->GetDefaultWhiteTexture());
 
-        if (baseColorTexture == nullptr || normalTexture == nullptr ||
-            metallicRoughnessTexture == nullptr || aoTexture == nullptr)
+        if (baseColorView == nullptr || normalView == nullptr ||
+            metallicRoughnessView == nullptr || aoView == nullptr)
         {
             XENGINE_LOG_ERROR("Failed to resolve one or more textures for PBR material bind group");
             return nullptr;
@@ -520,28 +522,28 @@ namespace XEngine
         bindGroupDesc.Resources.push_back(RHIBindingResource {
             0,
             RHIBindingType::CombinedImageSampler,
-            baseColorTexture,
+            baseColorView,
             m_DefaultSampler.get(),
             nullptr
         });
         bindGroupDesc.Resources.push_back(RHIBindingResource {
             1,
             RHIBindingType::CombinedImageSampler,
-            normalTexture,
+            normalView,
             m_DefaultSampler.get(),
             nullptr
         });
         bindGroupDesc.Resources.push_back(RHIBindingResource {
             2,
             RHIBindingType::CombinedImageSampler,
-            metallicRoughnessTexture,
+            metallicRoughnessView,
             m_DefaultSampler.get(),
             nullptr
         });
         bindGroupDesc.Resources.push_back(RHIBindingResource {
             3,
             RHIBindingType::CombinedImageSampler,
-            aoTexture,
+            aoView,
             m_DefaultSampler.get(),
             nullptr
         });
@@ -549,23 +551,25 @@ namespace XEngine
         // TODO Stage 7:
         // glTF metallic-roughness channel convention should be handled carefully.
         // TODO Stage 11: replace per-material descriptors with bindless texture indices.
-        return m_Device->CreateBindGroup(bindGroupDesc);
+        return m_Device->GetResourceFactory().CreateBindGroup(bindGroupDesc);
     }
 
-    RHITexture* RenderMaterialSystem::ResolveRHITexture(TextureHandle texture, TextureHandle fallback) const
+    RHITextureView* RenderMaterialSystem::ResolveRHITextureView(
+        TextureHandle texture,
+        TextureHandle fallback) const
     {
         if (m_TextureManager == nullptr)
         {
             return nullptr;
         }
 
-        RHITexture* resolvedTexture = m_TextureManager->GetTexture(texture);
-        if (resolvedTexture != nullptr)
+        RHITextureView* resolvedView = m_TextureManager->GetTextureView(texture);
+        if (resolvedView != nullptr)
         {
-            return resolvedTexture;
+            return resolvedView;
         }
 
-        return m_TextureManager->GetTexture(fallback);
+        return m_TextureManager->GetTextureView(fallback);
     }
 
     TextureHandle RenderMaterialSystem::ResolveTexture(TextureHandle texture, TextureHandle fallback) const

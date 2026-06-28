@@ -8,6 +8,7 @@
 #include <XEngine/Logging/Log.h>
 #include <XEngine/Asset/Assets/MeshAsset.h>
 #include <XEngine/RHI/RHIDevice.h>
+#include <XEngine/RHI/RHIResourceFactory.h>
 #include <XEngine/RHI/Resources/RHIPipeline.h>
 
 #include <cstddef>
@@ -100,8 +101,13 @@ namespace XEngine
         desc.FragmentShader = fragmentShader;
         desc.ColorFormat = key.ColorFormat;
         desc.DepthFormat = key.DepthFormat;
+        desc.HasColorAttachment = key.HasColorAttachment;
         desc.EnableDepthTest = key.DepthTestEnabled;
         desc.EnableDepthWrite = key.DepthWriteEnabled;
+        desc.EnableDepthBias = key.EnableDepthBias;
+        desc.DepthBiasConstantFactor = key.DepthBiasConstantFactor;
+        desc.DepthBiasClamp = key.DepthBiasClamp;
+        desc.DepthBiasSlopeFactor = key.DepthBiasSlopeFactor;
         desc.VertexLayout.Stride = sizeof(MeshVertex);
         desc.VertexLayout.Attributes = {
             RHIVertexAttributeDesc { 0, RHIFormat::R32G32B32Float, static_cast<u32>(offsetof(MeshVertex, Position)) },
@@ -118,7 +124,8 @@ namespace XEngine
         desc.PushConstantStages = RHIShaderStageFlags::AllGraphics;
         desc.DebugName = "Forward opaque graphics pipeline";
 
-        std::shared_ptr<RHIPipeline> pipeline = m_Device->CreateGraphicsPipeline(desc);
+        std::shared_ptr<RHIPipeline> pipeline =
+            m_Device->GetResourceFactory().CreateGraphicsPipeline(desc);
         if (pipeline)
         {
             XENGINE_LOG_INFO("RenderPipelineStateCache cached ForwardOpaque pipeline");
