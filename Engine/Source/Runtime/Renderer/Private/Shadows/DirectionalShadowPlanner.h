@@ -12,27 +12,26 @@ namespace XEngine
     { 
         const RenderLight* Light = nullptr; 
 
-        Mat4 CameraView = Mat4(1.0f); 
-        Mat4 CameraProjection = Mat4(1.0f); 
-        float CameraNear = 0.1f; 
-        float CameraFar = 1000.0f; 
-        Vec3 CameraPosition = Vec3(0.0f); 
+        Mat4 CameraView         = Mat4(1.0f); 
+        Mat4 CameraProjection   = Mat4(1.0f); 
+        float CameraNear        = 0.1f; 
+        float CameraFar         = 1000.0f; 
+        Vec3 CameraPosition     = Vec3(0.0f); 
         
         // Aggregate world-space AABB of all shadow-casting OpaqueObjects.
         // RenderShadowManager builds this by CombineAABB'ing every
         // RenderObject.WorldBounds where object.CastShadow == true.
         AABB SceneBounds; 
         
-        u32 CascadeCount = 4; 
-        u32 Resolution = 2048; 
+        u32 CascadeCount    = 4; 
+        u32 Resolution      = 2048; 
 
-        float SplitLambda = 0.5f; 
-        float DepthBias = 0.003f; 
-        float NormalBias = 0.0f; 
+        float SplitLambda   = 0.5f; 
+        float DepthBias     = 0.003f; 
+        float NormalBias    = 0.0f; 
         
         bool StabilizeCascades = true; 
-
-        bool ReverseZ = true;
+        bool ReverseZ       = true;
     };
 
 /*

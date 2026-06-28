@@ -140,9 +140,9 @@ namespace XEngine
 
     struct LightBasis
     {
-        Vec3 Forward;  // -Z in light space (look direction)
-        Vec3 Up;       // +Y in light space
-        Vec3 Right;    // +X in light space
+        Vec3 Forward;  // +X in light space (look direction)
+        Vec3 Up;       // +Z in light space
+        Vec3 Right;    // +Y in light space
     };
 
     static LightBasis BuildLightBasis(const Vec3& directionToLight)
@@ -156,6 +156,8 @@ namespace XEngine
             ? Vec3(0.0f, 1.0f, 0.0f)
             : Vec3(0.0f, 0.0f, 1.0f);
 
+        // For a left-handed basis where Cross(Right, Up) = Forward,
+        // Right = Cross(worldUp, Forward) and Up = Cross(Forward, Right).
         basis.Right = Math::Normalize(Math::Cross(basis.Forward, worldUp));
         basis.Up    = Math::Normalize(Math::Cross(basis.Right,  basis.Forward));
         return basis;

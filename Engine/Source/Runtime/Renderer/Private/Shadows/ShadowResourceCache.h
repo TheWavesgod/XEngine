@@ -32,8 +32,8 @@ namespace XEngine
         std::shared_ptr<RHITextureView> SampledView;
         std::array<std::shared_ptr<RHITextureView>, MaxShadowCascades> LayerDepthViews {};
         std::shared_ptr<RHISampler> Sampler;
-        u32 Resolution = 0; 
         u32 CascadeCount = 0; 
+        u32 Resolution = 0; 
         RHIFormat Format = RHIFormat::Undefined;
     };
 
@@ -44,11 +44,13 @@ namespace XEngine
     {
     public: 
         void Initialize(RHIDevice& device); 
-        void Shutdown(RHIDevice& device); 
+        void Shutdown(); 
 
-        DirectionalShadowResources& GetOrCreateDirectionalShadowResources( RHIDevice& device, const DirectionalShadowResourceDesc& desc); 
+        DirectionalShadowResources& GetOrCreateDirectionalShadowResources( 
+            const DirectionalShadowResourceDesc& desc); 
 
-    private: 
+    private:
+        RHIDevice* m_Device = nullptr;  
         DirectionalShadowResources m_Directional;
     };
 } // namespace XEngine

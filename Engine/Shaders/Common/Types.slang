@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Lighting/LightingTypes.slang"
+#include "../Lighting/ShadowTypes.slang"
 
 struct VSInput
 {
@@ -39,4 +40,5 @@ struct GPUFrameData
 {
     GPUCameraData Camera;
     GPULightingData Lighting;
+    GPUShadowData Shadow;
 };

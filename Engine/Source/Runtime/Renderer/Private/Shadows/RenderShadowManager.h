@@ -42,11 +42,20 @@ namespace XEngine
             const ShadowDebugSettings& debugSettings); 
     
     private: 
+        // Per-frame shadow state. Recomputed every frame unless FreezeShadowMatrices is on.
         RenderShadowFrameData m_FrameData; 
+
+        // Pure math; stateless. Owned by value.
         DirectionalShadowPlanner m_DirectionalPlanner; 
+
+        // Owns shadow GPU resources (texture array, sampled view, per-layer depth views, sampler).
         ShadowResourceCache m_ResourceCache; 
 
+        // True after the user enables FreezeShadowMatrices and we have captured one frame of data.
         bool m_HasFrozenData = false; 
+
+        // Snapshot of m_FrameData taken when FreezeShadowMatrices was enabled. 
+        // Used to keep matrices stable across frames while the toggle is on.
         RenderShadowFrameData m_FrozenFrameData;   
     };
 }
