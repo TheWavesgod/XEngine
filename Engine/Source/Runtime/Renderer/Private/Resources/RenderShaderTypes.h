@@ -22,9 +22,21 @@ namespace XEngine
         Mat4 ModelViewProjection { 1.0f };
     };
 
+    struct alignas(16) ShadowDepthPushConstants
+    {
+        Mat4 Model;                  // object world matrix
+        Mat4 LightViewProjection;    // cascade's light view-projection
+        u32  CascadeIndex;           // not used by depth-only VS, kept for future
+        u32  _pad0;
+        u32  _pad1;
+        u32  _pad2;
+    };
+
     static_assert(std::is_standard_layout_v<PBRPushConstants>);
     static_assert(offsetof(PBRPushConstants, BaseColorFactor) == sizeof(Mat4));
     static_assert(offsetof(PBRPushConstants, MaterialFactors) == sizeof(Mat4) + sizeof(Vec4));
     static_assert(sizeof(PBRPushConstants) == sizeof(float) * 24);
     static_assert(sizeof(MeshPushConstants) == sizeof(float) * 16);
+    static_assert(sizeof(ShadowDepthPushConstants) % 16 == 0,
+              "Push constants must be 16-byte aligned");
 }

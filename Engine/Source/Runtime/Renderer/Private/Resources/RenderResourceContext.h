@@ -13,6 +13,7 @@ namespace XEngine
     class RenderShaderLibrary;
     class RenderPipelineStateCache;
     class RenderFrameResources;
+    class RenderShadowManager;
 
     struct RenderResourceContext
     {
@@ -22,6 +23,7 @@ namespace XEngine
         RenderShaderLibrary* Shaders = nullptr;
         RenderPipelineStateCache* PipelineStates = nullptr;
         RenderFrameResources* FrameResources = nullptr;
+        RenderShadowManager* ShadowManager = nullptr;
 
         bool IsValid() const
         {
@@ -30,7 +32,8 @@ namespace XEngine
                 && Materials != nullptr
                 && Shaders != nullptr
                 && PipelineStates != nullptr
-                && FrameResources != nullptr;
+                && FrameResources != nullptr
+                && ShadowManager != nullptr;
         }
     };
 }

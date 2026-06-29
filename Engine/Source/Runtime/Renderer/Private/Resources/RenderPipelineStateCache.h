@@ -24,6 +24,7 @@ namespace XEngine
         void Shutdown();
 
         RHIPipeline* GetOrCreateGraphicsPipeline(const GraphicsPipelineStateKey& key);
+        RHIPipeline* GetOrCreateShadowDepthPipeline(RHIFormat colorFormat, RHIFormat depthFormat);
 
     private:
         std::shared_ptr<RHIPipeline> CreateGraphicsPipeline(const GraphicsPipelineStateKey& key);

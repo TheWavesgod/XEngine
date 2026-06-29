@@ -136,4 +136,22 @@ namespace XEngine
         }
         return pipeline;
     }
+
+    RHIPipeline* RenderPipelineStateCache::GetOrCreateShadowDepthPipeline(
+    RHIFormat colorFormat, RHIFormat depthFormat)
+    {
+        GraphicsPipelineStateKey key;
+        key.PassKind         = RenderPassKind::ShadowDepth;
+        key.ShadingModel     = MaterialShadingModel::Unlit;     // depth-only is unlit
+        key.AlphaMode        = MaterialAlphaMode::Opaque;
+        key.VertexLayout     = VertexLayoutKind::MeshVertex;
+        key.ColorFormat      = colorFormat;     // typically Undefined
+        key.DepthFormat      = depthFormat;     // typically D32Float
+        key.DepthTestEnabled = true;
+        key.DepthWriteEnabled = true;
+        key.BlendEnabled     = false;
+        key.DoubleSided      = false;
+        key.HasColorAttachment = false;        // depth-only
+        return GetOrCreateGraphicsPipeline(key);
+    }
 }

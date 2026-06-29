@@ -26,7 +26,7 @@ namespace XEngine
     {
     public: 
         void Initialize(RHIDevice& device); 
-        void Shutdown(RHIDevice& device);
+        void Shutdown();
 
         void PrepareFrame(RHIDevice& device, const RenderScene& scene, 
             const RenderFrameContext& frame, const ShadowSettings& settings, 

@@ -19,7 +19,7 @@ namespace XEngine
         XENGINE_LOG_INFO("RenderShadowManager initialized");
     }
 
-    void RenderShadowManager::Shutdown(RHIDevice& device)
+    void RenderShadowManager::Shutdown()
     {
         m_ResourceCache.Shutdown();
         m_FrameData = {};

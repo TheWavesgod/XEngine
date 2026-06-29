@@ -12,6 +12,7 @@
 #include "Resources/RenderShaderLibrary.h"
 #include "Resources/RenderTextureManager.h"
 #include "Scene/RenderExtraction.h"
+#include "Shadows/RenderShadowManager.h"
 
 #include <XEngine/Asset/AssetSystem.h>
 #include <XEngine/Core/Assert.h>
@@ -47,6 +48,7 @@ namespace XEngine
         std::unique_ptr<RenderShaderLibrary> Shaders;
         std::unique_ptr<RenderFrameResources> FrameResources;
         std::unique_ptr<RenderPipelineStateCache> PipelineStates;
+        std::unique_ptr<RenderShadowManager> ShadowManager;
         RenderResourceContext Resources;
 
         std::unique_ptr<RenderPipeline> ActivePipeline;
@@ -86,6 +88,11 @@ namespace XEngine
             {
                 PipelineStates->Shutdown();
                 PipelineStates.reset();
+            }
+            if (ShadowManager)
+            {
+                ShadowManager->Shutdown();
+                ShadowManager.reset();
             }
             if (Shaders)
             {
@@ -330,12 +337,16 @@ namespace XEngine
             return;
         }
 
+        impl.ShadowManager = std::make_unique<RenderShadowManager>();
+        impl.ShadowManager->Initialize(*device);
+
         impl.Resources.Textures = impl.Textures.get();
         impl.Resources.Meshes = impl.Meshes.get();
         impl.Resources.Materials = impl.Materials.get();
         impl.Resources.Shaders = impl.Shaders.get();
         impl.Resources.PipelineStates = impl.PipelineStates.get();
         impl.Resources.FrameResources = impl.FrameResources.get();
+        impl.Resources.ShadowManager = impl.ShadowManager.get();
 
         impl.ActivePipeline = std::make_unique<ForwardRenderPipeline>();
         if (!impl.ActivePipeline->Initialize(impl.Resources))

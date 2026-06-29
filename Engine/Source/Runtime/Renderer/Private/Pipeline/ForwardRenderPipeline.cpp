@@ -4,6 +4,7 @@
 #include "../Passes/ClearPass.h"
 #include "../Passes/ForwardOpaquePass.h"
 #include "../Passes/PresentPass.h"
+#include "../Passes/ShadowDepthPass.h"
 #include "../RenderGraph/RenderGraphContext.h"
 #include "../Resources/RenderResourceContext.h"
 
@@ -60,6 +61,7 @@ namespace XEngine
             // graph clears the backbuffer before drawing.
             AddClearPass(m_Graph, clearColor);
         }
+        AddShadowDepthPass(m_Graph, frame, scene, resources);
         AddForwardOpaquePass(m_Graph, frame, scene, resources);
         // TODO Stage 8B/8C/8D: add lighting and shadow passes to this same graph.
         if (frame.Output.RenderToSwapchain)
