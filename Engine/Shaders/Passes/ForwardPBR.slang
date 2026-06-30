@@ -1,10 +1,11 @@
-#include "../Common/Types.slang"
 #include "../Common/Math.slang"
-#include "../Materials/MaterialTypes.slang"
-#include "../Materials/PBRMaterial.slang"
-#include "../Lighting/LightingTypes.slang"
+#include "../Common/Types.slang"
 #include "../Lighting/BRDF.slang"
 #include "../Lighting/Lighting.slang"
+#include "../Lighting/LightingTypes.slang"
+#include "../Lighting/ShadowSampling.slang"
+#include "../Materials/MaterialTypes.slang"
+#include "../Materials/PBRMaterial.slang"
 
 struct PushConstants
 {

@@ -29,11 +29,15 @@ namespace XEngine
         RHIBindGroupLayoutDesc layoutDesc;
         layoutDesc.DebugName = "GPUFrameData bind group layout";
         layoutDesc.Entries.push_back(RHIBindGroupLayoutEntry {
-            0,
-            RHIBindingType::UniformBuffer,
-            RHIShaderStageFlags::AllGraphics,
-            1
+            0, RHIBindingType::UniformBuffer, RHIShaderStageFlags::AllGraphics, 1
         });
+        layoutDesc.Entries.push_back(RHIBindGroupLayoutEntry{
+            1, RHIBindingType::SampledTexture, RHIShaderStageFlags::Fragment, 1
+        });
+        layoutDesc.Entries.push_back(RHIBindGroupLayoutEntry {
+            2, RHIBindingType::Sampler, RHIShaderStageFlags::Fragment, 1
+        });
+
         m_FrameBindGroupLayout = factory.CreateBindGroupLayout(layoutDesc);
         if (!m_FrameBindGroupLayout)
         {
@@ -73,6 +77,13 @@ namespace XEngine
                 nullptr,
                 m_FrameBuffers[index].get()
             });
+            bindGroupDesc.Resources.push_back(RHIBindingResource {
+                1, RHIBindingType::SampledTexture, shadowSampledView, nullptr, nullptr, 0, 0
+            });
+            bindGroupDesc.Resources.push_back(RHIBindingResource {
+                2, RHIBindingType::Sampler, nullptr, shadowSampler, nullptr, 0, 0
+            }); // TODO: sure the shadow resource descriptor should be handled here? 
+
 
             m_FrameBindGroups[index] = factory.CreateBindGroup(bindGroupDesc);
             if (!m_FrameBindGroups[index])
@@ -118,6 +129,8 @@ namespace XEngine
         {
             XENGINE_LOG_ERROR("Failed to update GPUFrameData buffer");
         }
+
+        
     }
 
     RHIBuffer* RenderFrameResources::GetFrameBuffer(u32 frameIndex) const
