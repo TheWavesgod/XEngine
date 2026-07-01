@@ -72,15 +72,60 @@ float4 fragmentMain(VSOutput input) : SV_Target0
     float roughness = Saturate(g_PushConstants.materialFactors.y * metallicRoughnessSample.g);
     SurfaceData surface = MakeSurfaceData(baseColor, metallic, roughness, N, ao);
 
+    // Compute view-space depth for cascade selection.
+    float4 viewPos4 = mul(g_FrameData.Camera.View, float4(input.worldPosition, 1.0));
+    float viewDepth = viewPos4.x; // XEngine: camera forward is +X in view space.
+
+    // Compute per-light shadow factors. Stage 8C has a small fixed-size light
+    // array; in V0 only the first directional light is shadow-casting.
+    float shadowFactors[MAX_GPU_LIGHTS];
+    [unroll]
+    for (uint li = 0; li < MAX_GPU_LIGHTS; ++li)
+    {
+        shadowFactors[li] = 1.0;
+    }
+
+    uint lightCount = (uint)g_FrameData.Lighting.LightCountAndPadding.x;
+    [unroll]
+    for (uint li = 0; li < MAX_GPU_LIGHTS && li < lightCount; ++li)
+    {
+        GPULight light = g_FrameData.Lighting.Lights[li];
+        if (light.DirectionType.w == LIGHT_TYPE_DIRECTIONAL && // directional
+            light.SpotAnglesShadow.z > 0.5) // CastShadow
+        {
+            float NdotL = saturate(dot(surface.Normal, light.DirectionType.xyz));
+            int filterMode = (g_FrameData.Shadow.ShadowParams.y > 0.0) ? 1 : 0;
+            shadowFactors[li] = ComputeShadowFactor(
+                g_FrameData.Shadow,
+                filterMode,
+                input.worldPosition,
+                viewDepth,
+                NdotL);
+        }
+    }
+
     float3 color = EvaluateSceneLighting(
         g_FrameData.Lighting,
         surface,
         input.worldPosition,
         surface.Normal,
-        V);
+        V,
+        shadowFactors);
 
     // TODO Stage 9:
     // Move HDR output and tonemapping into a dedicated post-process path.
     color = pow(Saturate3(color), float3(1.0 / 2.2));
+
+    // This is a debug overlay. It is applied after the main lighting evaluation and overrides the final color.
+    if (g_FrameData.Shadow.ShadowParams.w > 0.5)
+    {
+        int cascadeIndex = SelectCascadeIndex(viewDepth, g_FrameData.Shadow);
+        float3 cascadeColor = float3(
+            cascadeIndex == 0 ? 1.0 : 0.0,
+            cascadeIndex == 1 ? 1.0 : 0.0,
+            cascadeIndex == 2 ? 1.0 : 0.0);
+        return float4(cascadeColor, 1.0);
+    }
+
     return float4(color, baseColor.a);
 }
