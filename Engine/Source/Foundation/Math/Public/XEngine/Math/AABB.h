@@ -49,6 +49,20 @@ namespace XEngine
 
 namespace XEngine::Math
 {
+    // Transform an axis-aligned AABB by a 4x4 matrix and return the
+    // smallest axis-aligned AABB that contains the transformed corners.
+    //
+    // Preconditions:
+    //   - The input AABB is an axis-aligned model-space box.
+    //   - The transform must be affine (no per-vertex perspective bake into the box).
+    //
+    // Limitations:
+    //   - For non-uniform scale or negative scale, the resulting AABB is
+    //     axis-aligned (potentially much larger than the true tight box).
+    //     CSM and shadow caster bounds that have negative/mirrored scale must
+    //     inflate `radius` accordingly or use an OBB-fit instead.
+    //   - For skew transforms the 8-corner encapsulating AABB is correct but
+    //     loose; downstream frustum culling may benefit from an OBB instead.
     inline AABB TransformAABB(const AABB& bounds, const Mat4& transform)
     {
         const Vec3 corners[] = {

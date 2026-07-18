@@ -84,11 +84,6 @@ namespace XEngine::Math
         return glm::max(lhs, rhs);
     }
 
-    inline Mat4 Perspective(float fovRadians, float aspect, float nearPlane, float farPlane)
-    {
-        return PerspectiveLH_ZO(fovRadians, aspect, nearPlane, farPlane);
-    }
-
     inline Mat4 LookAt(const Vec3& eye, const Vec3& center, const Vec3& up)
     {
         return LookAtLH_XForward(eye, center, up);
@@ -152,8 +147,7 @@ namespace XEngine
     using Math::LookAt;
     using Math::Max;
     using Math::Min;
-    using Math::Normalize;
-    using Math::Perspective;
+    using Math::PerspectiveLH_ZO;
     using Math::Radians;
     using Math::Rotate;
     using Math::Scale;

@@ -10,12 +10,27 @@
 
 namespace XEngine::Math
 {
+    // Stored as degrees. Roll/Pitch/Yaw rotate around +X/+Y/+Z respectively.
+    // Rotation order in ToQuat is qYawZ * qPitchY * qRollX.
     struct Rotator
     {
-        // Degrees. Roll/Pitch/Yaw rotate around +X/+Y/+Z respectively.
         float Roll = 0.0f;
         float Pitch = 0.0f;
         float Yaw = 0.0f;
+
+        // Explicit constructor enforcing the degree unit.
+        constexpr Rotator(float rollDegrees, float pitchDegrees, float yawDegrees)
+            : Roll(rollDegrees), Pitch(pitchDegrees), Yaw(yawDegrees)
+        {
+        }
+
+        constexpr Rotator() = default;
+
+        // Factory alias for call sites that want to be loud about the unit.
+        static constexpr Rotator MakeDegrees(float roll, float pitch, float yaw)
+        {
+            return Rotator(roll, pitch, yaw);
+        }
     };
 
     inline Quat ToQuat(const Rotator& rotator)
