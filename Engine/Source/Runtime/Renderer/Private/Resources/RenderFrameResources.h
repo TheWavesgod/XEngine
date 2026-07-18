@@ -13,8 +13,11 @@ namespace XEngine
     class RHIBindGroupLayout;
     class RHIBuffer;
     class RHIDevice;
+    class RHISampler;
+    class RHITextureView;
     struct RenderFrameContext;
     struct RenderScene;
+    class RenderShadowManager;
 
     static constexpr u32 RendererMaxFramesInFlight = 3;
 
@@ -23,17 +26,20 @@ namespace XEngine
     class RenderFrameResources
     {
     public:
-        bool Initialize(RHIDevice* device);
+        bool Initialize(
+            RHIDevice* device,
+            RHITextureView* shadowSampledView = nullptr,
+            RHISampler* shadowSampler = nullptr);
         void Shutdown();
 
-        void Update(const RenderFrameContext& frame, const RenderScene& scene);
+        void Update(const RenderFrameContext& frame, const RenderScene& scene, const RenderShadowManager& shadowManager);
 
         RHIBuffer* GetFrameBuffer(u32 frameIndex) const;
         RHIBindGroup* GetFrameBindGroup(u32 frameIndex) const;
         RHIBindGroupLayout* GetFrameBindGroupLayout() const;
 
     private:
-        GPUFrameData BuildGPUFrameData(const RenderFrameContext& frame, const RenderScene& scene) const;
+        GPUFrameData BuildGPUFrameData(const RenderFrameContext& frame, const RenderScene& scene, const RenderShadowManager& shadowManager) const;
         GPULightingData BuildGPULightingData(const RenderScene& scene) const;
         u32 GetResourceIndex(u32 frameIndex) const;
 
@@ -43,5 +49,10 @@ namespace XEngine
 
         std::array<std::shared_ptr<RHIBuffer>, RendererMaxFramesInFlight> m_FrameBuffers;
         std::array<std::shared_ptr<RHIBindGroup>, RendererMaxFramesInFlight> m_FrameBindGroups;
+
+        // Captured at Initialize() so Set 0 binding 1/2 (sampled texture / sampler)
+        // references the same persistent shadow resources across frames.
+        RHITextureView* m_ShadowSampledView = nullptr;
+        RHISampler* m_ShadowSampler = nullptr;
     };
 }

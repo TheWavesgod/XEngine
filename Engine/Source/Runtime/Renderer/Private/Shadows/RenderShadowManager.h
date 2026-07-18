@@ -7,7 +7,7 @@
 namespace XEngine
 {
     class RHIDevice;
-    class RenderScene;
+    struct RenderScene; // RenderScene is defined in XEngine/Renderer/RenderScene.h
     struct RenderFrameContext;
     struct ShadowSettings;
     struct ShadowDebugSettings;

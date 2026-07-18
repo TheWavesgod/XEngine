@@ -70,7 +70,7 @@ namespace XEngine
         m_Directional.Resolution   = desc.Resolution;
         m_Directional.Format       = desc.DepthFormat;
 
-        auto factory = m_Device->GetResourceFactory();
+        RHIResourceFactory& factory = m_Device->GetResourceFactory();
 
         // Request whole shadow texture (2d array depth).
         RHITextureDesc texDesc {};

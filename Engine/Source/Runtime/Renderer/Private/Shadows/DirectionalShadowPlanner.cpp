@@ -17,6 +17,24 @@ namespace XEngine
     // 5. Optional texel snapping.
     // 6. Filling RenderShadowCascade data.
 
+    // Cascades use a fixed 4x depth-bias slack multiplier on the ortho extents;
+    // centralize it so changing the bias multiplier in one place propagates to
+    // every projection and texel-snap site.
+    static constexpr float CascadeDepthBiasSlackMultiplier = 4.0f;
+
+    // Build the cascade's orthographic projection. Reverse-Z is the Vulkan default:
+    // we swap near/far so depth comparison `>=` keeps the standard reverse-Z contract.
+    // When reverseZ is false, near < far and the projection matches classic forward depth.
+    static Mat4 MakeCascadeProjection(float radius, float depthBias, bool reverseZ)
+    {
+        const float half = radius + depthBias * CascadeDepthBiasSlackMultiplier;
+        if (reverseZ)
+        {
+            return Math::OrthographicLH_ZO(-half, half, -half, half, half, -half);
+        }
+        return Math::OrthographicLH_ZO(-half, half, -half, half, -half, half);
+    }
+
     static void ComputeCascadeSplits(
         float cameraNear,
         float cameraFar,
@@ -304,54 +322,18 @@ namespace XEngine
             lightView     = Math::Inverse(lightView);
 
             // Apply texel snap to keep cascades from swimming (Step 1's StabilizeCascades).
+            // The snap projection must match the final cascade projection exactly,
+            // so we delegate to the same MakeCascadeProjection helper used below.
             if (desc.StabilizeCascades)
             {
-                Mat4 tmpProj = Mat4(1.0f);
-                if (desc.ReverseZ)
-                {
-                    // Reverse-Z ortho: near plane at +Z, far at -Z (in light space pre-proj).
-                    tmpProj = Math::OrthographicLH_ZO(
-                        -radius, radius, -radius, radius,
-                        -radius - desc.DepthBias * 4.0f,
-                        radius + desc.DepthBias * 4.0f);
-                    // Math::OrthographicLH_ZO in XEngine produces a 0..1 depth range.
-                    // To make it reverse-Z, swap near/far at the call site OR post-multiply
-                    // by a flip matrix. Easiest: pass near/far in reversed order:
-                    tmpProj = Math::OrthographicLH_ZO(
-                        -radius, radius, -radius, radius,
-                        radius + desc.DepthBias * 4.0f,
-                        -radius - desc.DepthBias * 4.0f);
-                }
-                else
-                {
-                    tmpProj = Math::OrthographicLH_ZO(
-                        -radius, radius, -radius, radius,
-                        -radius - desc.DepthBias * 4.0f,
-                        radius + desc.DepthBias * 4.0f);
-                }
+                const Mat4 tmpProj = MakeCascadeProjection(radius, desc.DepthBias, desc.ReverseZ);
 
                 const Vec3 snap = ComputeTexelSnapOffset(center, lightView, tmpProj, texelSize);
                 lightView[3] -= Vec4(snap, 0.0f);
             }
 
-            // Final light projection (orthographic). Re-derived here so the
-            // texel-snap path applies the snap with the same projection.
-            Mat4 lightProjection = Mat4(1.0f);
-            if (desc.ReverseZ)
-            {
-                lightProjection = Math::OrthographicLH_ZO(
-                    -radius, radius, -radius, radius,
-                    radius + desc.DepthBias * 4.0f,
-                    -radius - desc.DepthBias * 4.0f);
-            }
-            else
-            {
-                lightProjection = Math::OrthographicLH_ZO(
-                    -radius, radius, -radius, radius,
-                    -radius - desc.DepthBias * 4.0f,
-                    radius + desc.DepthBias * 4.0f);
-            }
-
+            // Final light projection (orthographic).
+            const Mat4 lightProjection = MakeCascadeProjection(radius, desc.DepthBias, desc.ReverseZ);
             const Mat4 lightViewProj = lightProjection * lightView;
 
             // Fill the cascade slot.

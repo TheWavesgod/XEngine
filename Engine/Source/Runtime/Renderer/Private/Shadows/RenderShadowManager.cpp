@@ -121,7 +121,7 @@ namespace XEngine
             break;
         }
 
-        if (shadowLight = nullptr)
+        if (shadowLight == nullptr)
         {
             return;
         }

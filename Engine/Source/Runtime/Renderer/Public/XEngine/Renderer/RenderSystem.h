@@ -2,6 +2,7 @@
 
 #include <XEngine/Engine/Subsystem.h>
 #include <XEngine/Renderer/RendererDebugSettings.h>
+#include <XEngine/Renderer/RendererSettings.h>
 #include <XEngine/Renderer/RenderView.h>
 #include <XEngine/RHI/RHITypes.h>
 
@@ -25,6 +26,9 @@ namespace XEngine
         void SetOutputProvider(std::function<bool(RHIRenderOutputDesc&)> provider);
         RendererDebugSettings& GetDebugSettings();
         const RendererDebugSettings& GetDebugSettings() const;
+
+        RendererSettings& GetSettings();
+        const RendererSettings& GetSettings() const;
 
     private:
         struct Impl;

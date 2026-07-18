@@ -1,6 +1,7 @@
 #include "RenderFrameResources.h"
 
 #include "../Pipeline/RenderFrameContext.h"
+#include "../Shadows/RenderShadowManager.h"
 
 #include <XEngine/Logging/Log.h>
 #include <XEngine/Math/MathFunctions.h>
@@ -10,12 +11,17 @@
 #include <XEngine/RHI/RHIUploadManager.h>
 #include <XEngine/RHI/Resources/RHIBindGroup.h>
 #include <XEngine/RHI/Resources/RHIBuffer.h>
+#include <XEngine/RHI/Resources/RHISampler.h>
+#include <XEngine/RHI/Resources/RHITextureView.h>
 
 #include <algorithm>
 
 namespace XEngine
 {
-    bool RenderFrameResources::Initialize(RHIDevice* device)
+    bool RenderFrameResources::Initialize(
+        RHIDevice* device,
+        RHITextureView* shadowSampledView,
+        RHISampler* shadowSampler)
     {
         if (device == nullptr || !device->IsValid())
         {
@@ -24,6 +30,8 @@ namespace XEngine
         }
 
         m_Device = device;
+        m_ShadowSampledView = shadowSampledView;
+        m_ShadowSampler = shadowSampler;
         RHIResourceFactory& factory = m_Device->GetResourceFactory();
 
         RHIBindGroupLayoutDesc layoutDesc;
@@ -78,12 +86,11 @@ namespace XEngine
                 m_FrameBuffers[index].get()
             });
             bindGroupDesc.Resources.push_back(RHIBindingResource {
-                1, RHIBindingType::SampledTexture, shadowSampledView, nullptr, nullptr, 0, 0
+                1, RHIBindingType::SampledTexture, m_ShadowSampledView, nullptr, nullptr, 0, 0
             });
             bindGroupDesc.Resources.push_back(RHIBindingResource {
-                2, RHIBindingType::Sampler, nullptr, shadowSampler, nullptr, 0, 0
-            }); // TODO: sure the shadow resource descriptor should be handled here? 
-
+                2, RHIBindingType::Sampler, nullptr, m_ShadowSampler, nullptr, 0, 0
+            });
 
             m_FrameBindGroups[index] = factory.CreateBindGroup(bindGroupDesc);
             if (!m_FrameBindGroups[index])
@@ -113,10 +120,12 @@ namespace XEngine
             buffer.reset();
         }
         m_FrameBindGroupLayout.reset();
+        m_ShadowSampledView = nullptr;
+        m_ShadowSampler = nullptr;
         m_Device = nullptr;
     }
 
-    void RenderFrameResources::Update(const RenderFrameContext& frame, const RenderScene& scene)
+    void RenderFrameResources::Update(const RenderFrameContext& frame, const RenderScene& scene, const RenderShadowManager& shadowManager)
     {
         RHIBuffer* buffer = GetFrameBuffer(frame.FrameIndex);
         if (buffer == nullptr)
@@ -124,7 +133,7 @@ namespace XEngine
             return;
         }
 
-        const GPUFrameData data = BuildGPUFrameData(frame, scene);
+        const GPUFrameData data = BuildGPUFrameData(frame, scene, shadowManager);
         if (!buffer->Update(&data, sizeof(data)))
         {
             XENGINE_LOG_ERROR("Failed to update GPUFrameData buffer");
@@ -148,7 +157,8 @@ namespace XEngine
 
     GPUFrameData RenderFrameResources::BuildGPUFrameData(
         const RenderFrameContext& frame,
-        const RenderScene& scene) const
+        const RenderScene& scene,
+        const RenderShadowManager& shadowManager) const
     {
         GPUFrameData data {};
         data.Camera.View = frame.ViewMatrix;
@@ -156,6 +166,9 @@ namespace XEngine
         data.Camera.ViewProjection = frame.ViewProjectionMatrix;
         data.Camera.CameraPosition = Vec4(frame.CameraWorldPosition, 0.0f);
         data.Lighting = BuildGPULightingData(scene);
+        // Fill per-frame shadow uniforms (cascade matrices, biases, params).
+        // Without this, shader-side Cascades[] is always zero and shadow sampling collapses.
+        shadowManager.FillGPUShadowData(data.Shadows);
         return data;
     }
 

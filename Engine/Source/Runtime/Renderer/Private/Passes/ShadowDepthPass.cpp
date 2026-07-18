@@ -52,7 +52,6 @@ namespace XEngine
                 continue;
             }
 
-            const u32 passIndex = graph.GetNextPassIndex();
             std::string passName = "ShadowDepthPass.C" + std::to_string(cascadeIndex);
             RenderGraphPassDesc desc;
             desc.Name = passName.c_str();

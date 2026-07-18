@@ -13,6 +13,7 @@
 #include "Resources/RenderTextureManager.h"
 #include "Scene/RenderExtraction.h"
 #include "Shadows/RenderShadowManager.h"
+#include "Shadows/RenderShadowType.h"
 
 #include <XEngine/Asset/AssetSystem.h>
 #include <XEngine/Core/Assert.h>
@@ -57,6 +58,8 @@ namespace XEngine
         std::function<void()> OverlayCallback;
         std::function<bool(RenderView&)> ViewProvider;
         std::function<bool(RHIRenderOutputDesc&)> OutputProvider;
+
+        RendererSettings m_RendererSettings;
 
         Mat4 FallbackViewProjection { 1.0f };
         u32 SwapchainWidth = 1280;
@@ -250,8 +253,13 @@ namespace XEngine
             }
 
             // Upload per-frame shader data after extraction so lighting reflects
-            // the current RenderScene.
-            Resources.FrameResources->Update(frame, SceneData);
+            // the current RenderScene. ShadowManager is prepared first so its
+            // Directional.Cascades can be fed through FillGPUShadowData into data.Shadows.
+            Resources.ShadowManager->PrepareFrame(
+                *device, SceneData, frame,
+                m_RendererSettings.Shadows,
+                DebugSettings.Shadows);
+            Resources.FrameResources->Update(frame, SceneData, *Resources.ShadowManager);
 
             ActivePipeline->Render(frame, SceneData, Resources);
             if (!output.RenderToSwapchain && output.ColorTargetView != nullptr)
@@ -321,7 +329,15 @@ namespace XEngine
             return;
         }
         impl.FrameResources = std::make_unique<RenderFrameResources>();
-        if (!impl.FrameResources->Initialize(device))
+        // FrameResources needs the shadow manager's resources ready so it can bind the
+        // shadow sampled view/sampler into Set 0. Initialize ShadowManager first.
+        impl.ShadowManager = std::make_unique<RenderShadowManager>();
+        impl.ShadowManager->Initialize(*device);
+
+        if (!impl.FrameResources->Initialize(
+                device,
+                impl.ShadowManager->GetFrameData().Directional.SampledView,
+                impl.ShadowManager->GetFrameData().Directional.Sampler))
         {
             impl.Shutdown();
             return;
@@ -336,9 +352,6 @@ namespace XEngine
             impl.Shutdown();
             return;
         }
-
-        impl.ShadowManager = std::make_unique<RenderShadowManager>();
-        impl.ShadowManager->Initialize(*device);
 
         impl.Resources.Textures = impl.Textures.get();
         impl.Resources.Meshes = impl.Meshes.get();
@@ -424,5 +437,17 @@ namespace XEngine
     const RendererDebugSettings& RenderSystem::GetDebugSettings() const
     {
         return m_Impl->DebugSettings;
+    }
+
+    RendererSettings& RenderSystem::GetSettings()
+    {
+        static RendererSettings s_Default;
+        return m_Impl ? m_Impl->m_RendererSettings : s_Default;
+    }
+
+    const RendererSettings& RenderSystem::GetSettings() const
+    {
+        static RendererSettings s_Default;
+        return m_Impl ? m_Impl->m_RendererSettings : s_Default;
     }
 }

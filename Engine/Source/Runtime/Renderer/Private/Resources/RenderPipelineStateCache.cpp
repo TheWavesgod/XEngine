@@ -73,27 +73,71 @@ namespace XEngine
         const GraphicsPipelineStateKey& key)
     {
         if (m_Device == nullptr || m_ShaderLibrary == nullptr || m_MaterialSystem == nullptr ||
-            m_FrameResources == nullptr ||
-            key.PassKind != RenderPassKind::ForwardOpaque)
+            m_FrameResources == nullptr)
         {
             return {};
         }
 
-        RenderShaderKey vertexKey;
-        vertexKey.Path = "shader://Passes/ForwardPBR.slang";
-        vertexKey.EntryPoint = "vertexMain";
-        vertexKey.Stage = ShaderStage::Vertex;
-        vertexKey.Target = ShaderTarget::VulkanSPIRV;
-
-        RenderShaderKey fragmentKey = vertexKey;
-        fragmentKey.EntryPoint = "fragmentMain";
-        fragmentKey.Stage = ShaderStage::Fragment;
-
-        RHIShader* vertexShader = m_ShaderLibrary->GetOrCreateShader(vertexKey);
-        RHIShader* fragmentShader = m_ShaderLibrary->GetOrCreateShader(fragmentKey);
-        if (vertexShader == nullptr || fragmentShader == nullptr)
+        if (key.PassKind != RenderPassKind::ForwardOpaque &&
+            key.PassKind != RenderPassKind::ShadowDepth)
         {
             return {};
+        }
+
+        RHIShader* vertexShader = nullptr;
+        RHIShader* fragmentShader = nullptr;
+        const char* debugName = nullptr;
+        std::vector<RHIBindGroupLayout*> bindGroupLayouts;
+        u32 pushConstantSize = 0;
+
+        if (key.PassKind == RenderPassKind::ShadowDepth)
+        {
+            // Depth-only cascade shadow pass.
+            // Uses DepthOnly.slang (vertex + ForceInline fragment that emits SV_Depth).
+            RenderShaderKey vertexKey;
+            vertexKey.Path = "shader://Passes/DepthOnly.slang";
+            vertexKey.EntryPoint = "vertexMain";
+            vertexKey.Stage = ShaderStage::Vertex;
+            vertexKey.Target = ShaderTarget::VulkanSPIRV;
+
+            RenderShaderKey fragmentKey = vertexKey;
+            fragmentKey.EntryPoint = "fragmentMain";
+            fragmentKey.Stage = ShaderStage::Fragment;
+
+            vertexShader = m_ShaderLibrary->GetOrCreateShader(vertexKey);
+            fragmentShader = m_ShaderLibrary->GetOrCreateShader(fragmentKey);
+            if (vertexShader == nullptr || fragmentShader == nullptr)
+            {
+                return {};
+            }
+
+            bindGroupLayouts = {}; // ShadowDepth owns no Set 0 binding; cascade LVP arrives via push constants.
+            pushConstantSize = sizeof(ShadowDepthPushConstants);
+            debugName = "ShadowDepth graphics pipeline";
+        }
+        else // RenderPassKind::ForwardOpaque
+        {
+            RenderShaderKey vertexKey;
+            vertexKey.Path = "shader://Passes/ForwardPBR.slang";
+            vertexKey.EntryPoint = "vertexMain";
+            vertexKey.Stage = ShaderStage::Vertex;
+            vertexKey.Target = ShaderTarget::VulkanSPIRV;
+
+            RenderShaderKey fragmentKey = vertexKey;
+            fragmentKey.EntryPoint = "fragmentMain";
+            fragmentKey.Stage = ShaderStage::Fragment;
+
+            vertexShader = m_ShaderLibrary->GetOrCreateShader(vertexKey);
+            fragmentShader = m_ShaderLibrary->GetOrCreateShader(fragmentKey);
+            if (vertexShader == nullptr || fragmentShader == nullptr)
+            {
+                return {};
+            }
+
+            bindGroupLayouts.push_back(m_FrameResources->GetFrameBindGroupLayout());
+            bindGroupLayouts.push_back(m_MaterialSystem->GetPBRMaterialBindGroupLayout());
+            pushConstantSize = sizeof(PBRPushConstants);
+            debugName = "Forward opaque graphics pipeline";
         }
 
         RHIGraphicsPipelineDesc desc;
@@ -114,25 +158,20 @@ namespace XEngine
             RHIVertexAttributeDesc { 1, RHIFormat::R32G32B32Float, static_cast<u32>(offsetof(MeshVertex, Normal)) },
             RHIVertexAttributeDesc { 2, RHIFormat::R32G32Float, static_cast<u32>(offsetof(MeshVertex, TexCoord0)) }
         };
-        // Forward pipeline layout convention:
-        // Set 0 = per-frame data.
-        // Set 1 = material data.
-        // Set 2 = object data or push constants.
-        desc.BindGroupLayouts.push_back(m_FrameResources->GetFrameBindGroupLayout());
-        desc.BindGroupLayouts.push_back(m_MaterialSystem->GetPBRMaterialBindGroupLayout());
-        desc.PushConstantSize = sizeof(PBRPushConstants);
+        desc.BindGroupLayouts = bindGroupLayouts;
+        desc.PushConstantSize = pushConstantSize;
         desc.PushConstantStages = RHIShaderStageFlags::AllGraphics;
-        desc.DebugName = "Forward opaque graphics pipeline";
+        desc.DebugName = debugName;
 
         std::shared_ptr<RHIPipeline> pipeline =
             m_Device->GetResourceFactory().CreateGraphicsPipeline(desc);
         if (pipeline)
         {
-            XENGINE_LOG_INFO("RenderPipelineStateCache cached ForwardOpaque pipeline");
+            XENGINE_LOG_INFO("RenderPipelineStateCache cached pipeline");
         }
         else
         {
-            XENGINE_LOG_ERROR("Failed to create ForwardOpaque graphics pipeline");
+            XENGINE_LOG_ERROR("Failed to create graphics pipeline");
         }
         return pipeline;
     }
