@@ -41,6 +41,11 @@ namespace XEngine
                     return;
                 }
 
+                // ShadowDepthPass sets a depth-only render output. Restore the full
+                // color+depth binding so the ForwardOpaque pipeline (colorAttachmentCount=1)
+                // sees a matching VkRenderingInfo.
+                commandList->SetRenderOutput(frameContext.Output);
+
                 RHIBindGroup* frameBindGroup =
                     resources.FrameResources->GetFrameBindGroup(frameContext.FrameIndex);
                 if (frameBindGroup == nullptr)

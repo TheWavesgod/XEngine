@@ -122,6 +122,12 @@ namespace XEngine
                                 0);
                         }
                     }
+
+                    // Transition this cascade layer from DEPTH_ATTACHMENT_OPTIMAL
+                    // to SHADER_READ_ONLY_OPTIMAL so the next pass can sample it.
+                    // Without this barrier, dynamic-rendering validation complains
+                    // about image layout mismatch in vkCmdDrawIndexed.
+                    commandList->TransitionTextureToShaderRead(depthView);
                 }
             );
         }

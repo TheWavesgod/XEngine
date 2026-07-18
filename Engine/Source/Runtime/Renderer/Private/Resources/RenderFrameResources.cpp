@@ -32,6 +32,14 @@ namespace XEngine
         m_Device = device;
         m_ShadowSampledView = shadowSampledView;
         m_ShadowSampler = shadowSampler;
+        m_HasRealShadow = (shadowSampledView != nullptr && shadowSampler != nullptr);
+        if (!m_HasRealShadow)
+        {
+            CreatePlaceholderShadow(*device);
+            m_ShadowSampledView = m_PlaceholderShadowView.get();
+            m_ShadowSampler = m_PlaceholderShadowSampler.get();
+            XENGINE_LOG_WARN("FrameResources: shadow bind group using placeholder; will rebind when ShadowManager acquires real resources.");
+        }
         RHIResourceFactory& factory = m_Device->GetResourceFactory();
 
         RHIBindGroupLayoutDesc layoutDesc;
@@ -53,27 +61,151 @@ namespace XEngine
             return false;
         }
 
+        RebuildBindGroups();
+
+        XENGINE_LOG_INFO("RenderFrameResources initialized");
+        return true;
+    }
+
+    void RenderFrameResources::Shutdown()
+    {
+        if (m_Device != nullptr)
+        {
+            XENGINE_LOG_INFO("RenderFrameResources shutdown");
+        }
+
+        for (auto& bindGroup : m_FrameBindGroups)
+        {
+            bindGroup.reset();
+        }
+        for (auto& buffer : m_FrameBuffers)
+        {
+            buffer.reset();
+        }
+        m_FrameBindGroupLayout.reset();
+        DestroyPlaceholderShadow();
+        m_ShadowSampledView = nullptr;
+        m_ShadowSampler = nullptr;
+        m_HasRealShadow = false;
+        m_Device = nullptr;
+    }
+
+    void RenderFrameResources::SetShadowBindings(RHITextureView* shadowSampledView, RHISampler* shadowSampler)
+    {
+        if (shadowSampledView == nullptr || shadowSampler == nullptr)
+        {
+            // Keep current bindings if either side is missing.
+            return;
+        }
+        if (shadowSampledView == m_ShadowSampledView && shadowSampler == m_ShadowSampler)
+        {
+            return;
+        }
+        m_ShadowSampledView = shadowSampledView;
+        m_ShadowSampler = shadowSampler;
+        m_HasRealShadow = true;
+        if (m_FrameBindGroupLayout == nullptr || m_Device == nullptr)
+        {
+            return;
+        }
+        RebuildBindGroups();
+    }
+
+    void RenderFrameResources::CreatePlaceholderShadow(RHIDevice& device)
+    {
+        RHIResourceFactory& factory = device.GetResourceFactory();
+
+        // 1x1 D32 texture; depth = 0 so reverse-Z compare (`>= 0`) returns 1.0 (lit everywhere).
+        RHITextureDesc texDesc {};
+        texDesc.Width = 1;
+        texDesc.Height = 1;
+        texDesc.MipLevels = 1;
+        texDesc.ArrayLayers = 1;
+        texDesc.Format = RHIFormat::D32Float;
+        texDesc.Dimension = RHITextureDimension::Texture2D;
+        texDesc.Usage = RHITextureUsageFlags::DepthStencilAttachment
+                      | RHITextureUsageFlags::Sampled;
+        texDesc.DebugName = "PlaceholderShadowTexture";
+        m_PlaceholderShadowTexture = factory.CreateTexture(texDesc);
+        if (!m_PlaceholderShadowTexture)
+        {
+            XENGINE_LOG_ERROR("Failed to create placeholder shadow texture");
+            return;
+        }
+
+        RHITextureViewDesc sampledDesc {};
+        sampledDesc.Texture = m_PlaceholderShadowTexture.get();
+        sampledDesc.Usage = RHITextureViewUsageFlags::Sampled;
+        sampledDesc.ViewDimension = RHITextureViewDimension::Texture2D;
+        sampledDesc.Aspect = RHITextureAspectFlags::Depth;
+        sampledDesc.Format = RHIFormat::D32Float;
+        sampledDesc.BaseMipLevel = 0;
+        sampledDesc.MipCount = 1;
+        sampledDesc.BaseArrayLayer = 0;
+        sampledDesc.ArrayLayerCount = 1;
+        sampledDesc.DebugName = "PlaceholderShadowSampledView";
+        m_PlaceholderShadowView = factory.CreateTextureView(sampledDesc);
+        if (!m_PlaceholderShadowView)
+        {
+            XENGINE_LOG_ERROR("Failed to create placeholder shadow view");
+            m_PlaceholderShadowTexture.reset();
+            return;
+        }
+
+        RHISamplerDesc samplerDesc {};
+        samplerDesc.MinFilter = RHIFilter::Nearest;
+        samplerDesc.MagFilter = RHIFilter::Nearest;
+        samplerDesc.AddressU = RHIAddressMode::ClampToEdge;
+        samplerDesc.AddressV = RHIAddressMode::ClampToEdge;
+        samplerDesc.AddressW = RHIAddressMode::ClampToEdge;
+        samplerDesc.MaxAnisotropy = 1.0f;
+        samplerDesc.DebugName = "PlaceholderShadowSampler";
+        m_PlaceholderShadowSampler = factory.CreateSampler(samplerDesc);
+        if (!m_PlaceholderShadowSampler)
+        {
+            XENGINE_LOG_ERROR("Failed to create placeholder shadow sampler");
+            m_PlaceholderShadowView.reset();
+            m_PlaceholderShadowTexture.reset();
+            return;
+        }
+    }
+
+    void RenderFrameResources::DestroyPlaceholderShadow()
+    {
+        m_PlaceholderShadowSampler.reset();
+        m_PlaceholderShadowView.reset();
+        m_PlaceholderShadowTexture.reset();
+    }
+
+    void RenderFrameResources::RebuildBindGroups()
+    {
+        if (m_Device == nullptr || m_FrameBindGroupLayout == nullptr)
+        {
+            return;
+        }
+        RHIResourceFactory& factory = m_Device->GetResourceFactory();
+
         const GPUFrameData initialData {};
         for (u32 index = 0; index < RendererMaxFramesInFlight; ++index)
         {
-            RHIBufferDesc bufferDesc;
-            bufferDesc.Size = sizeof(GPUFrameData);
-            bufferDesc.Usage = RHIBufferUsage::Uniform;
-            bufferDesc.MemoryUsage = RHIMemoryUsage::CPUToGPU;
-            bufferDesc.DebugName = "GPUFrameData buffer";
-
-            // One GPUFrameData buffer per frame-in-flight to avoid overwriting data
-            // that may still be used by the GPU.
-            m_FrameBuffers[index] = factory.CreateBuffer(bufferDesc);
             if (!m_FrameBuffers[index])
             {
-                XENGINE_LOG_ERROR("Failed to create GPUFrameData buffer");
-                return false;
+                RHIBufferDesc bufferDesc;
+                bufferDesc.Size = sizeof(GPUFrameData);
+                bufferDesc.Usage = RHIBufferUsage::Uniform;
+                bufferDesc.MemoryUsage = RHIMemoryUsage::CPUToGPU;
+                bufferDesc.DebugName = "GPUFrameData buffer";
+                m_FrameBuffers[index] = factory.CreateBuffer(bufferDesc);
+                if (!m_FrameBuffers[index])
+                {
+                    XENGINE_LOG_ERROR("Failed to create GPUFrameData buffer");
+                    continue;
+                }
+                m_Device->GetUploadManager().UploadBuffer(
+                    *m_FrameBuffers[index],
+                    &initialData,
+                    sizeof(initialData));
             }
-            m_Device->GetUploadManager().UploadBuffer(
-                *m_FrameBuffers[index],
-                &initialData,
-                sizeof(initialData));
 
             RHIBindGroupDesc bindGroupDesc;
             bindGroupDesc.Layout = m_FrameBindGroupLayout.get();
@@ -96,33 +228,8 @@ namespace XEngine
             if (!m_FrameBindGroups[index])
             {
                 XENGINE_LOG_ERROR("Failed to create GPUFrameData bind group");
-                return false;
             }
         }
-
-        XENGINE_LOG_INFO("RenderFrameResources initialized");
-        return true;
-    }
-
-    void RenderFrameResources::Shutdown()
-    {
-        if (m_Device != nullptr)
-        {
-            XENGINE_LOG_INFO("RenderFrameResources shutdown");
-        }
-
-        for (auto& bindGroup : m_FrameBindGroups)
-        {
-            bindGroup.reset();
-        }
-        for (auto& buffer : m_FrameBuffers)
-        {
-            buffer.reset();
-        }
-        m_FrameBindGroupLayout.reset();
-        m_ShadowSampledView = nullptr;
-        m_ShadowSampler = nullptr;
-        m_Device = nullptr;
     }
 
     void RenderFrameResources::Update(const RenderFrameContext& frame, const RenderScene& scene, const RenderShadowManager& shadowManager)

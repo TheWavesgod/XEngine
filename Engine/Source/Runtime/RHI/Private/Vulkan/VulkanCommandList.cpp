@@ -104,10 +104,11 @@ namespace XEngine
 
     void VulkanCommandList::SetRenderOutput(const RHIRenderOutputDesc& output)
     {
+        // Calling SetRenderOutput mid-pass is a normal V0 transition: end the prior
+        // rendering scope first, then adopt the new attachments.
         if (m_RenderingActive)
         {
-            XENGINE_LOG_WARN("Render output must be set before the first graphics pipeline is bound");
-            return;
+            EndRenderingIfActive();
         }
 
         m_RenderOutput = output;

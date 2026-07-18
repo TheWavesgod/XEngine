@@ -259,6 +259,14 @@ namespace XEngine
                 *device, SceneData, frame,
                 m_RendererSettings.Shadows,
                 DebugSettings.Shadows);
+            // Rebind Set 0 binding 1/2 if the shadow cache produced real resources
+            // this frame (first frame, or cache was recreated by settings change).
+            const RenderDirectionalShadowFrameData& dirData =
+                Resources.ShadowManager->GetFrameData().Directional;
+            if (dirData.SampledView != nullptr && dirData.Sampler != nullptr)
+            {
+                Resources.FrameResources->SetShadowBindings(dirData.SampledView, dirData.Sampler);
+            }
             Resources.FrameResources->Update(frame, SceneData, *Resources.ShadowManager);
 
             ActivePipeline->Render(frame, SceneData, Resources);

@@ -731,6 +731,8 @@ namespace XEngine
         // TODO Stage 11: replace per-material descriptors with BindlessResourceManager.
         VkDescriptorPoolSize poolSizes[] = {
             VkDescriptorPoolSize { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
+            VkDescriptorPoolSize { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 256 },
+            VkDescriptorPoolSize { VK_DESCRIPTOR_TYPE_SAMPLER, 256 },
             VkDescriptorPoolSize { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 128 },
             VkDescriptorPoolSize { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 64 }
         };
