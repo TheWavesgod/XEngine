@@ -129,8 +129,6 @@ namespace XEngine
         {
             XENGINE_LOG_ERROR("Failed to update GPUFrameData buffer");
         }
-
-        
     }
 
     RHIBuffer* RenderFrameResources::GetFrameBuffer(u32 frameIndex) const
