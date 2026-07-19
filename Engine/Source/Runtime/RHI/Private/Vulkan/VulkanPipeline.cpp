@@ -26,6 +26,23 @@ namespace XEngine
             return;
         }
 
+        // Guard against oversized push-constant blocks. Vulkan guarantees only
+        // 128 bytes for maxPushConstantsSize; some drivers (Intel Iris Xe Gen
+        // 11/12 included) crash inside vkCreatePipelineLayout instead of
+        // returning an error when a range exceeds the device's limit, which
+        // made the ShadowDepth pass take down the engine on those devices.
+        // We surface the failure as a clear log line so the caller can react.
+        const u32 deviceMaxPushConstantSize = device.GetCapabilities().MaxPushConstantSize;
+        if (desc.PushConstantSize > deviceMaxPushConstantSize)
+        {
+            XENGINE_LOG_ERROR(
+                "Vulkan pipeline push constant size " +
+                std::to_string(desc.PushConstantSize) +
+                " exceeds device maxPushConstantsSize " +
+                std::to_string(deviceMaxPushConstantSize));
+            return;
+        }
+
         XENGINE_ASSERT(desc.VertexShader != nullptr, "Vulkan graphics pipeline requires a vertex shader");
         XENGINE_ASSERT(&desc.VertexShader->GetOwnerDevice() == &device, "Vulkan graphics pipeline shaders must belong to the owning device");
         auto* vertexShader = CheckedVulkanCast<VulkanShader>(desc.VertexShader, device);
@@ -135,6 +152,10 @@ namespace XEngine
         inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
         inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
+        // Vulkan requires that viewportCount and scissorCount be non-zero when
+        // VK_DYNAMIC_STATE_VIEWPORT / VK_DYNAMIC_STATE_SCISSOR are set (the
+        // _WITH_COUNT variants are what allow count=0). Both forward and
+        // shadow-pipeline callers use non-zero counts here.
         VkPipelineViewportStateCreateInfo viewportState {};
         viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
         viewportState.viewportCount = 1;

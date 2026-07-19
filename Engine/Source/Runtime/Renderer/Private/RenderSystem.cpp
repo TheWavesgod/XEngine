@@ -160,6 +160,7 @@ namespace XEngine
             RenderFrameContext frame;
             frame.Device = device;
             frame.CommandList = commandList;
+
             RHIRenderOutputDesc output;
             output.Viewport = RHIRect2D { 0, 0, SwapchainWidth, SwapchainHeight };
             output.ColorFormat = device->GetSwapchainFormat();
@@ -270,6 +271,7 @@ namespace XEngine
             Resources.FrameResources->Update(frame, SceneData, *Resources.ShadowManager);
 
             ActivePipeline->Render(frame, SceneData, Resources);
+            
             if (!output.RenderToSwapchain && output.ColorTargetView != nullptr)
             {
                 commandList->TransitionTextureToShaderRead(output.ColorTargetView);
@@ -350,6 +352,7 @@ namespace XEngine
             impl.Shutdown();
             return;
         }
+        
         impl.PipelineStates = std::make_unique<RenderPipelineStateCache>();
         if (!impl.PipelineStates->Initialize(
             device,
