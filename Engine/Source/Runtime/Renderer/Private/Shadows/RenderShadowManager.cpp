@@ -8,6 +8,11 @@
 #include "../Pipeline/RenderFrameContext.h"
 #include "../ShaderInterop/GPUShadowTypes.h"
 
+#include <cstdint>
+#include <locale>
+#include <sstream>
+#include <string>
+
 namespace XEngine
 {
     void RenderShadowManager::Initialize(RHIDevice& device)
@@ -182,6 +187,21 @@ namespace XEngine
         for (u32 i = 0; i < settings.CascadeCount; ++i)
         {
             m_FrameData.Directional.CascadeDepthViews[i] = res.LayerDepthViews[i].get();
+        }
+        // Debug instrumentation (Stage 9 V0 only; will be removed after shadow debug).
+        {
+            const auto view = reinterpret_cast<std::uintptr_t>(m_FrameData.Directional.SampledView);
+            std::string info1 = std::string("PrepareDirectionalShadow: Enabled=")
+                + (m_FrameData.Directional.Enabled ? "1 " : "0 ")
+                + "CascadeCount=" + std::to_string(m_FrameData.Directional.CascadeCount)
+                + " SampledView=0x" + std::to_string(view);
+            XENGINE_LOG_INFO(info1);
+            const Mat4& m = m_FrameData.Directional.Cascades[0].LightViewProjection;
+            std::ostringstream s;
+            s.imbue(std::locale::classic());
+            s << "  Cascade[0].LVP col0=(" << m[0][0] << "," << m[1][0] << "," << m[2][0] << "," << m[3][0] << ")";
+            s << " col3=(" << m[0][3] << "," << m[1][3] << "," << m[2][3] << "," << m[3][3] << ")";
+            XENGINE_LOG_INFO(s.str());
         }
     }
 

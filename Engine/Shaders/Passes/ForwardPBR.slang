@@ -116,6 +116,14 @@ float4 fragmentMain(VSOutput input) : SV_Target0
     // Move HDR output and tonemapping into a dedicated post-process path.
     color = pow(Saturate3(color), float3(1.0 / 2.2));
 
+    // DEBUG (remove before commit): visualize shadow factor for light 0 as a
+    // gray scale so we can see if shadow sampling reaches the shader at all.
+    if (g_FrameData.Shadow.ShadowParams.x > 0.5)
+    {
+        float sf = shadowFactors[0];
+        return float4(sf, sf, sf, baseColor.a);
+    }
+
     // This is a debug overlay. It is applied after the main lighting evaluation and overrides the final color.
     if (g_FrameData.Shadow.ShadowParams.w > 0.5)
     {

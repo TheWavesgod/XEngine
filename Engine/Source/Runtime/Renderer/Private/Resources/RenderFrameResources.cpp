@@ -15,6 +15,8 @@
 #include <XEngine/RHI/Resources/RHITextureView.h>
 
 #include <algorithm>
+#include <cstdint>
+#include <string>
 
 namespace XEngine
 {
@@ -104,6 +106,10 @@ namespace XEngine
         m_ShadowSampledView = shadowSampledView;
         m_ShadowSampler = shadowSampler;
         m_HasRealShadow = true;
+        const auto viewPtr = reinterpret_cast<std::uintptr_t>(shadowSampledView);
+        const auto samplerPtr = reinterpret_cast<std::uintptr_t>(shadowSampler);
+        XENGINE_LOG_INFO("SetShadowBindings: switching to real shadow view=0x" + std::to_string(viewPtr)
+            + " sampler=0x" + std::to_string(samplerPtr));
         if (m_FrameBindGroupLayout == nullptr || m_Device == nullptr)
         {
             return;

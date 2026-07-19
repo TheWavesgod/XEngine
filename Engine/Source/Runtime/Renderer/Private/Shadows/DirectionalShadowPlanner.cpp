@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>      // std::fabs, std::round
 #include <limits>     // std::numeric_limits
+#include <string>
 
 namespace XEngine
 {
@@ -321,6 +322,21 @@ namespace XEngine
             lightView[3]  = Vec4(lightPosition,      1.0f);
             lightView     = Math::Inverse(lightView);
 
+            // DEBUG: dump direction-to-light, computed light position, and the
+            // post-Inverse view matrix column 3 (translation).
+            XENGINE_LOG_INFO(
+                std::string("DBG cascade=0 directionToLight=(")
+                + std::to_string(desc.Light->DirectionToLight.x) + ","
+                + std::to_string(desc.Light->DirectionToLight.y) + ","
+                + std::to_string(desc.Light->DirectionToLight.z) + ") "
+                + "lightPos=(" + std::to_string(lightPosition.x) + ","
+                + std::to_string(lightPosition.y) + ","
+                + std::to_string(lightPosition.z) + ") "
+                + "viewCol3=(" + std::to_string(lightView[3][0]) + ","
+                + std::to_string(lightView[3][1]) + ","
+                + std::to_string(lightView[3][2]) + ","
+                + std::to_string(lightView[3][3]) + ")");
+
             // Apply texel snap to keep cascades from swimming (Step 1's StabilizeCascades).
             // The snap projection must match the final cascade projection exactly,
             // so we delegate to the same MakeCascadeProjection helper used below.
@@ -329,7 +345,13 @@ namespace XEngine
                 const Mat4 tmpProj = MakeCascadeProjection(radius, desc.DepthBias, desc.ReverseZ);
 
                 const Vec3 snap = ComputeTexelSnapOffset(center, lightView, tmpProj, texelSize);
+                XENGINE_LOG_INFO("DBG snap=(" + std::to_string(snap.x) + ","
+                    + std::to_string(snap.y) + "," + std::to_string(snap.z) + ")");
                 lightView[3] -= Vec4(snap, 0.0f);
+                XENGINE_LOG_INFO("DBG viewCol3-after-snap=(" + std::to_string(lightView[3][0]) + ","
+                    + std::to_string(lightView[3][1]) + ","
+                    + std::to_string(lightView[3][2]) + ","
+                    + std::to_string(lightView[3][3]) + ")");
             }
 
             // Final light projection (orthographic).
