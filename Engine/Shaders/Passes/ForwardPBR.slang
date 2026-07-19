@@ -116,12 +116,25 @@ float4 fragmentMain(VSOutput input) : SV_Target0
     // Move HDR output and tonemapping into a dedicated post-process path.
     color = pow(Saturate3(color), float3(1.0 / 2.2));
 
-    // DEBUG (remove before commit): visualize shadow factor for light 0 as a
-    // gray scale so we can see if shadow sampling reaches the shader at all.
+    // DEBUG multi-channel viz. Channels mean:
+    //   R = shadowFactors[0]      (1 = lit, 0 = in shadow)
+    //   G = ShadowParams.x        (1 = shadow enabled, 0 = disabled)
+    //   B = refDepth for cascade 0 (mapped to [0,1] for visibility)
+    //   A = ShadowParams.y        (cascade count, encoded)
     if (g_FrameData.Shadow.ShadowParams.x > 0.5)
     {
-        float sf = shadowFactors[0];
-        return float4(sf, sf, sf, baseColor.a);
+        int cascadeIdx = SelectCascadeIndex(viewDepth, g_FrameData.Shadow);
+        float refDepth = 0.0;
+        {
+            float4 clip = ProjectToCascadeClip(input.worldPosition, g_FrameData.Shadow.Cascades[cascadeIdx].LightViewProjection);
+            refDepth = ClipToShadowDepth(clip);
+        }
+        return float4(
+            shadowFactors[0],
+            g_FrameData.Shadow.ShadowParams.x,
+            saturate(refDepth),
+            g_FrameData.Shadow.ShadowParams.y / 4.0
+        );
     }
 
     // This is a debug overlay. It is applied after the main lighting evaluation and overrides the final color.
