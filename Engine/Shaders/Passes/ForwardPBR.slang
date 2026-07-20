@@ -120,23 +120,24 @@ float4 fragmentMain(VSOutput input) : SV_Target0
     //   R = shadowFactors[0]      (1 = lit, 0 = in shadow)
     //   G = ShadowParams.x        (1 = shadow enabled, 0 = disabled)
     //   B = refDepth for cascade 0 (mapped to [0,1] for visibility)
-    //   A = sample of shadow texture cascade 0 at fixed UV (probe of texture contents)
+    //   A = (shadowMapDepth - refDepth) for cascade 0; positive = in-shadow
     if (g_FrameData.Shadow.ShadowParams.x > 0.5)
     {
         int cascadeIdx = SelectCascadeIndex(viewDepth, g_FrameData.Shadow);
         float refDepth = 0.0;
+        float shadowMapDepth = 0.0;
         {
             float4 clip = ProjectToCascadeClip(input.worldPosition, g_FrameData.Shadow.Cascades[cascadeIdx].LightViewProjection);
             refDepth = ClipToShadowDepth(clip);
+            float2 uv = saturate(ClipToShadowUV(clip));
+            shadowMapDepth = g_ShadowMap.Sample(g_ShadowSampler, float3(uv, (float)cascadeIdx)).r;
         }
-        // Probe shadow texture at 4 fixed points to confirm depth data exists.
-        float probeCenter = g_ShadowMap.Sample(g_ShadowSampler, float3(0.5, 0.5, 0)).r;
-        float probeCorner = g_ShadowMap.Sample(g_ShadowSampler, float3(0.25, 0.25, 0)).r;
+        float delta = saturate((shadowMapDepth - refDepth) * 4.0 + 0.5);
         return float4(
             shadowFactors[0],
             g_FrameData.Shadow.ShadowParams.x,
             saturate(refDepth),
-            probeCenter + 0.5 * probeCorner
+            delta
         );
     }
 

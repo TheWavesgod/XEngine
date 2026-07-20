@@ -28,8 +28,8 @@ namespace XEngine
     {
         bool Enabled = true;
 
-        DirectionalShadowTechnique Technique = DirectionalShadowTechnique::CascadedShadowMaps; 
-        ShadowMapStorageMode StorageMode = ShadowMapStorageMode::Texture2DArray; 
+        DirectionalShadowTechnique Technique = DirectionalShadowTechnique::CascadedShadowMaps;
+        ShadowMapStorageMode StorageMode = ShadowMapStorageMode::Texture2DArray;
         ShadowFilterMode FilterMode = ShadowFilterMode::PCF3x3;
 
         u32 CascadeCount = 4;
@@ -37,7 +37,10 @@ namespace XEngine
 
         float SplitLambda = 0.5f;
 
-        float DepthBias = 0.003f;
+        // TODO Stage 9 V0: tune depth bias. 0.003 was overlapping with self-shadow
+        // under the reverse-Z `clip.z * 0.5 + 0.5` mapping we ended up with, so
+        // default is now 0 to avoid masking shadow acne that needs separate handling.
+        float DepthBias = 0.0f;
         float NormalBias = 0.0f;
 
         bool StabilizeCascades = true;
