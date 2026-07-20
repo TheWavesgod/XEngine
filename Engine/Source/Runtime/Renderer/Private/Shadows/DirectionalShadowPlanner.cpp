@@ -23,16 +23,19 @@ namespace XEngine
     // every projection and texel-snap site.
     static constexpr float CascadeDepthBiasSlackMultiplier = 4.0f;
 
-    // Build the cascade's orthographic projection. Reverse-Z is the Vulkan default:
-    // we swap near/far so depth comparison `>=` keeps the standard reverse-Z contract.
-    // When reverseZ is false, near < far and the projection matches classic forward depth.
-    static Mat4 MakeCascadeProjection(float radius, float depthBias, bool reverseZ)
+    // Build the cascade's orthographic projection.
+    // Uses Vulkan forward-Z default (LESS depth-compare, depth buffer in [0, 1]
+    // with 0 = near, 1 = far). The projection passes `near = -half, far = +half`
+    // so light's near plane sits at NDC.z = -1 and far at NDC.z = +1.
+    // The reverseZ parameter is preserved as a hook for future explicit
+    // reverse-Z hardware or shader path but currently ignored so the GPU hardware
+    // convention matches the shader's `<=`-lit test.
+    static Mat4 MakeCascadeProjection(float radius, float depthBias, bool /*reverseZ*/)
     {
         const float half = radius + depthBias * CascadeDepthBiasSlackMultiplier;
-        if (reverseZ)
-        {
-            return Math::OrthographicLH_ZO(-half, half, -half, half, half, -half);
-        }
+        // Vulkan default: light POV has near = -half (closest to light) at NDC.z = -1
+        // and far = +half (farthest from light) at NDC.z = +1. GPU maps NDC.z=[-1,1]
+        // linearly to depth buffer [0, 1] with 0=near (close to light) and 1=far.
         return Math::OrthographicLH_ZO(-half, half, -half, half, -half, half);
     }
 

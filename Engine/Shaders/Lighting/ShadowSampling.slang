@@ -45,13 +45,12 @@ float2 ClipToShadowUV(float4 clip)
     return clip.xy / clip.w * float2(0.5, -0.5) + float2(0.5, 0.5); // Y-flip for Vulkan
 }
 
-// Converts our orthographic projection's clip.z (which is in [1, 0] because
-// we swapped near/far of `Math::OrthographicLH_ZO` for CSM reverse-Z) into the
-// depth-buffer convention that Vulkan writes to the depth attachment when
-// we run ShadowDepthPass. The actual storage is `clip.z * 0.5 + 0.5`, mapping
-// the ortho [1, 0] -> [1.0, 0.5] depth range. To match this, the fragment
-// shader must compare in the SAME range, so it too calls `clip.z * 0.5 + 0.5`.
-// Closer-to-light fragments get larger depth; farther-from-light get smaller.
+// Maps orthographic clip.z (NDC z in [-1, 1]) to Vulkan depth buffer [0, 1].
+// Vulkan's hardware default: depth = (NDC.z + 1) / 2. With forward-Z near = -1 (close
+// to light) and far = +1 (far from light), stored depth 0 = close to light
+// and 1 = far from light. The shader's `<=` lit test reads naturally:
+// shadowMapDepth <= refDepth means caster depth <= fragment depth -> caster is
+// at or behind the fragment -> nothing blocks -> LIT.
 float ClipToShadowDepth(float4 clip)
 {
     return clip.z / clip.w * 0.5 + 0.5;
