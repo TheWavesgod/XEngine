@@ -45,26 +45,26 @@ float2 ClipToShadowUV(float4 clip)
     return clip.xy / clip.w * float2(0.5, -0.5) + float2(0.5, 0.5); // Y-flip for Vulkan
 }
 
-// Converts Vulkan clip-space z (in [-1, 1] NDC) to the depth-buffer convention
-// stored by Vulkan's depth-test. For Vulkan forward-Z default, depth-buffer
-// value is (NDC.z + 1) / 2 in [0, 1] with 0 = near (close to light) and 1 = far
-// (far from light). Our cascade projection swaps near/far so that the light
-// "near plane" sits at NDC.z = 1 and "far plane" at NDC.z = 0.
-// After this conversion, BOTH refDepth and shadowMapDepth live in [0, 1] and
-// the larger value corresponds to further-from-light, so the lit test is
-// shadowMapDepth >= refDepth (caster closer to light in the shadow map means
-// depth record larger than the fragment's own depth, which returns 0 in shadow).
+// Converts our orthographic projection's clip.z (which is in [1, 0] because
+// we swapped near/far of `Math::OrthographicLH_ZO` for CSM reverse-Z) into the
+// depth-buffer convention that Vulkan writes to the depth attachment when
+// we run ShadowDepthPass. The actual storage is `clip.z * 0.5 + 0.5`, mapping
+// the ortho [1, 0] -> [1.0, 0.5] depth range. To match this, the fragment
+// shader must compare in the SAME range, so it too calls `clip.z * 0.5 + 0.5`.
+// Closer-to-light fragments get larger depth; farther-from-light get smaller.
 float ClipToShadowDepth(float4 clip)
 {
     return clip.z / clip.w * 0.5 + 0.5;
 }
 
 // Single-tap shadow test. Returns 1.0 if lit, 0.0 if in shadow.
-// refDepth and shadowMapDepth are both in Vulkan depth-buffer convention [0, 1]
-// with 0 = near (close to light) and 1 = far. A fragment is lit when the depth
-// recorded at its shadow-map UV is at-or-beyond the fragment's own depth.
-// We subtract `bias` from refDepth so a surface that recorded its own depth
-// satisfies this threshold instead of self-shadowing from float rounding.
+// Our cascade projection swaps near/far so that:
+//   - Larger depth value (closer to 1) = fragment is closer to the light.
+//   - Smaller depth value (closer to 0.5) = fragment is farther from the light.
+// For LIT: the surface that the light ray hits at this fragment's UV must be at
+// or beyond the fragment's own depth from the light, i.e. shadowMapDepth <= refDepth.
+// We add `bias` (and slope term) to refDepth so surface self-shadowing (float
+// rounding around zero) tolerates the comparison.
 float SampleShadow1Tap(
     GPUShadowData shadow, int cascadeIndex,
     float3 worldPos, float refDepth, float NdotL)
@@ -74,9 +74,9 @@ float SampleShadow1Tap(
     float layer = (float)cascadeIndex;
     float shadowMapDepth = g_ShadowMap.Sample(g_ShadowSampler, float3(uv, layer)).r;
     float biasedRef = refDepth
-                    - shadow.Cascades[cascadeIndex].Params.y
-                    - max(0.0, 1.0 - NdotL) * shadow.Cascades[cascadeIndex].Params.z;
-    return (shadowMapDepth >= biasedRef) ? 1.0 : 0.0;
+                    + shadow.Cascades[cascadeIndex].Params.y
+                    + max(0.0, 1.0 - NdotL) * shadow.Cascades[cascadeIndex].Params.z;
+    return (shadowMapDepth <= biasedRef) ? 1.0 : 0.0;
 }
 
 // 3x3 PCF. Average 9 taps for a soft shadow.
@@ -94,8 +94,8 @@ float SampleShadowPCF3x3(
     float texelSize = shadow.Cascades[cascadeIndex].Params.w;
     float layer = (float)cascadeIndex;
     float biasedRef = refDepth
-                    - shadow.Cascades[cascadeIndex].Params.y
-                    - max(0.0, 1.0 - NdotL) * shadow.Cascades[cascadeIndex].Params.z;
+                    + shadow.Cascades[cascadeIndex].Params.y
+                    + max(0.0, 1.0 - NdotL) * shadow.Cascades[cascadeIndex].Params.z;
 
     float sum = 0.0;
     [unroll]
@@ -107,7 +107,7 @@ float SampleShadowPCF3x3(
             float2 offset = float2(dx, dy) * texelSize;
             float2 sampleUV = saturate(uv + offset);
             float sampleDepth = g_ShadowMap.Sample(g_ShadowSampler, float3(sampleUV, layer)).r;
-            sum += (sampleDepth >= biasedRef) ? 1.0 : 0.0;
+            sum += (sampleDepth <= biasedRef) ? 1.0 : 0.0;
         }
     }
     return sum / 9.0;

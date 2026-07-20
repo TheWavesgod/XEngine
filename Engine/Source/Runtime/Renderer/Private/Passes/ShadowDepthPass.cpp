@@ -9,9 +9,12 @@
 #include "../RenderGraph/RenderGraph.h"
 #include "../RenderGraph/RenderGraphContext.h"
 
+#include <XEngine/Logging/Log.h>
 #include <XEngine/Renderer/RenderScene.h>
 #include <XEngine/RHI/RHICommandList.h>
 #include <XEngine/RHI/RHIDevice.h>
+
+#include <string>
 
 namespace XEngine
 {
@@ -87,6 +90,7 @@ namespace XEngine
                     commandList->SetGraphicsPipeline(depthPipeline);
 
                     // Iterate shadow-casting objects.
+                    u32 dbgDrawn = 0;
                     for (const RenderObject& object : scene.OpaqueObjects)
                     {
                         if (!object.Visible) continue;
@@ -98,6 +102,7 @@ namespace XEngine
                         {
                             continue;
                         }
+                        ++dbgDrawn;
 
                         // Per-object shader constants.
                         ShadowDepthPushConstants constants;
@@ -121,6 +126,12 @@ namespace XEngine
                                 submesh.VertexOffset,
                                 0);
                         }
+                    }
+
+                    // DEBUG Stage 9 V0: log how many objects were actually drawn.
+                    if (dbgDrawn > 0 && cascadeIndex == 0)
+                    {
+                        XENGINE_LOG_INFO("ShadowDepthPass cascade=0 drew " + std::to_string(dbgDrawn) + " objects");
                     }
 
                     // Transition this cascade layer from DEPTH_ATTACHMENT_OPTIMAL
