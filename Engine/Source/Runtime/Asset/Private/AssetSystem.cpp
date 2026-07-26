@@ -24,9 +24,11 @@ namespace XEngine
     {
         std::unique_ptr<AssetRegistry> Registry;
         std::unique_ptr<ImporterRegistry> ImporterRegistry;
+
         std::unordered_map<u32, MaterialAsset> MaterialAssets;
         std::unordered_map<u32, MeshAsset> MeshAssets;
         std::unordered_map<u32, TextureAsset> TextureAssets;
+        
         bool Initialized = false;
     };
 

@@ -30,7 +30,6 @@ namespace XEngine
         }
     };
 
-    // Stage 7B placeholder for future CPU-side load APIs.
     struct AssetLoadResult
     {
         AssetImportResultCode Code = AssetImportResultCode::Failed;

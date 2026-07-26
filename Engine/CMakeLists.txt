@@ -47,3 +47,10 @@ if(XENGINE_ENABLE_EDITOR)
         target_compile_features(XEngineEditor PUBLIC cxx_std_20)
     endif()
 endif()
+
+# Tests module. See Engine/Tests/CMakeLists.txt for the layer structure
+# (Unit / Integration / Smoke / TestSupport) and gating options. Runtime
+# modules above never depend on Tests / TestSupport.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Tests/CMakeLists.txt")
+    add_subdirectory(Tests)
+endif()
