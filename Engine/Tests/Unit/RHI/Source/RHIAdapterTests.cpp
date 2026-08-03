@@ -1,0 +1,139 @@
+// Unit tests for RHIAdapter abstract interface.
+//
+// M2 adapter tests work on a stub implementation — the real backend
+// adapters (Vulkan / D3D12 / Metal) land in M3 and replace this stub.
+
+#include <gtest/gtest.h>
+
+#include <XEngine/Core/Types.h>
+#include <XEngine/RHI/Base.h>
+#include <XEngine/RHI/RHIObject.h>
+#include <XEngine/RHI/RHIInstance.h>  // brings RHIInstance, RHIInstanceDesc
+#include <XEngine/RHI/RHIAdapter.h>   // brings RHIAdapter, RHIAdapterInfo
+#include <XEngine/RHI/RHIDevice.h>    // brings RHIDevice, RHICapabilities
+
+#include <string_view>
+
+namespace XEngine
+{
+    // Minimal RHIInstance stub for RHIAdapter tests. Provides the bare
+    // minimum to instantiate an RHIAdapter (just the constructor works).
+    // The real RHIInstance surface (EnumerateAdapters, CreateDevice, ...)
+    // is exercised in RHIInstanceTests.cpp.
+    class RHIInstanceStub : public RHIInstance
+    {
+    public:
+        RHIInstanceStub()
+            : RHIInstance(RHIInstanceDesc{}, RHIBackend::Vulkan)
+        {
+        }
+
+        std::vector<std::unique_ptr<RHIAdapter>> EnumerateAdapters() override
+        {
+            return {};
+        }
+
+        RHIDevice* CreateDevice(RHIAdapter& adapter, const RHIDeviceDesc& desc) override
+        {
+            (void)adapter;
+            (void)desc;
+            return nullptr;
+        }
+    };
+}
+
+namespace
+{
+    using namespace XEngine;
+
+    // Concrete adapter stub that records the info it was constructed with
+    // and lets tests toggle the capability filter.
+    class StubAdapter : public RHIAdapter
+    {
+    public:
+        StubAdapter(RHIInstance& owner, RHIAdapterInfo info)
+            : RHIAdapter(owner, RHIBackend::Vulkan)
+            , m_Info(info)
+        {
+        }
+
+        RHIAdapterInfo GetInfo() const override { return m_Info; }
+
+        bool SupportsRequiredCapabilities(const RHICapabilities&) const override
+        {
+            return m_CapsSupported;
+        }
+
+        // Test harness: switch the caps filter on / off.
+        void SetCapabilitiesSupported(bool supported) noexcept
+        {
+            m_CapsSupported = supported;
+        }
+
+    private:
+        RHIAdapterInfo m_Info;
+        bool m_CapsSupported = true;
+    };
+
+    // ---------------------------------------------------------------------
+    TEST(RHIAdapter, OwnerDeviceIsNull)
+    {
+        // RHIAdapter has no device owner — its owner is the instance.
+        RHIInstanceStub instance;
+        RHIAdapterInfo info{ .Type = RHIAdapterType::Discrete };
+        StubAdapter adapter(instance, info);
+
+        EXPECT_EQ(adapter.GetOwnerDevice(), nullptr);
+        EXPECT_EQ(adapter.GetBackend(), RHIBackend::Vulkan);
+    }
+
+    TEST(RHIAdapter, GetInfoReturnsConstructedValues)
+    {
+        RHIInstanceStub instance;
+        RHIAdapterInfo info{
+            .VendorName   = "NVIDIA",
+            .AdapterName  = "RTX 4090",
+            .Type         = RHIAdapterType::Discrete,
+            .DedicatedMemoryBytes = 8ull * 1024 * 1024 * 1024,
+        };
+
+        StubAdapter adapter(instance, info);
+        const RHIAdapterInfo got = adapter.GetInfo();
+
+        EXPECT_EQ(got.VendorName, "NVIDIA");
+        EXPECT_EQ(got.AdapterName, "RTX 4090");
+        EXPECT_EQ(got.Type, RHIAdapterType::Discrete);
+        EXPECT_EQ(got.DedicatedMemoryBytes, 8ull * 1024 * 1024 * 1024);
+    }
+
+    TEST(RHIAdapter, SupportsRequiredCapabilitiesControlledByStub)
+    {
+        RHIInstanceStub instance;
+        RHIAdapterInfo info;
+        StubAdapter adapter(instance, info);
+
+        RHICapabilities caps;
+        EXPECT_TRUE(adapter.SupportsRequiredCapabilities(caps));
+
+        adapter.SetCapabilitiesSupported(false);
+        EXPECT_FALSE(adapter.SupportsRequiredCapabilities(caps));
+
+        adapter.SetCapabilitiesSupported(true);
+        EXPECT_TRUE(adapter.SupportsRequiredCapabilities(caps));
+    }
+
+    TEST(RHIAdapter, IsPolymorphic)
+    {
+        // RHIAdapter must be polymorphic (virtual dtor) so RHIInstance can
+        // delete adapters through the base pointer.
+        static_assert(std::is_polymorphic_v<RHIAdapter>,
+                      "RHIAdapter must be polymorphic");
+
+        RHIInstanceStub instance;
+        RHIAdapterInfo info;
+        StubAdapter adapter(instance, info);
+
+        RHIAdapter* base = &adapter;
+        EXPECT_EQ(base->GetInfo().Type, RHIAdapterType::Unknown);
+    }
+}

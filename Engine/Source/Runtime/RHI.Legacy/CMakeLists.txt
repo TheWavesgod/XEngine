@@ -1,0 +1,60 @@
+file(GLOB_RECURSE XENGINE_RHI_SOURCES CONFIGURE_DEPENDS
+    Public/*.h
+    Private/*.h
+    Private/*.cpp
+)
+
+if(NOT XENGINE_ENABLE_VULKAN)
+    list(FILTER XENGINE_RHI_SOURCES EXCLUDE REGEX "/Vulkan/")
+endif()
+
+add_library(XEngineRHI ${XENGINE_RHI_SOURCES})
+
+target_include_directories(XEngineRHI
+    PUBLIC
+        Public
+    PRIVATE
+        Private
+)
+
+target_compile_features(XEngineRHI PUBLIC cxx_std_20)
+target_link_libraries(XEngineRHI
+    PUBLIC
+        XEngineFoundation
+        XEngineCoreRuntime
+        XEnginePlatform
+        XEngineShader
+)
+
+if(XENGINE_ENABLE_VULKAN)
+    find_package(Vulkan REQUIRED)
+
+    target_compile_definitions(XEngineRHI
+        PUBLIC
+            XENGINE_ENABLE_VULKAN
+            VK_NO_PROTOTYPES
+    )
+
+    target_include_directories(XEngineRHI
+        PUBLIC
+            ${Vulkan_INCLUDE_DIRS}
+        PRIVATE
+            ${CMAKE_SOURCE_DIR}/ThirdParty/VulkanMemoryAllocator/include
+    )
+
+    if(TARGET volk::volk)
+        target_link_libraries(XEngineRHI PUBLIC volk::volk)
+    elseif(TARGET volk)
+        target_link_libraries(XEngineRHI PUBLIC volk)
+    else()
+        message(FATAL_ERROR "volk target not found.")
+    endif()
+
+    if(XENGINE_ENABLE_SDL)
+        if(XENGINE_SDL_LINK_SHARED)
+            target_link_libraries(XEngineRHI PRIVATE SDL3::SDL3-shared)
+        else()
+            target_link_libraries(XEngineRHI PRIVATE SDL3::SDL3-static)
+        endif()
+    endif()
+endif()

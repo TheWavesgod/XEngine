@@ -1,22 +1,25 @@
 # Integration tests layer
 #
-# Integration tests combine multiple real components. They may link against
-# the Vulkan SDK and (in the future) XEngineVulkanRHI once that target exists.
-# Currently, backend-specific Vulkan code still lives inside XEngineRHI itself,
-# so the Vulkan integration tests link against XEngineRHI + Vulkan SDK.
+# Post-RHI-rebuild layout. Per Docs/AI helper/prompts.md:
+#
+#   RHI        -> backend-agnostic contract tests, links XEngineRHI only.
+#   VulkanRHI  -> Vulkan-specific integration tests, links XEngineRHI +
+#                 XEngineVulkanRHI. Only available when both RHI and
+#                 VulkanRHI are enabled.
 #
 # Allowed dependencies:
-#   XEngineCore (Foundation / CoreRuntime)
-#   XEngineRHI
+#   XEngineFoundation
+#   XEngineRHI / XEngineVulkanRHI
 #   XEngineTestSupport
-#   Vulkan SDK
+#   Vulkan SDK (via XEngineVulkanRHI PRIVATE link, only when the Vulkan
+#              test wants to talk to a real VkInstance)
 #   GoogleTest
-#   (XEngineVulkanRHI -- added when that target exists)
 #
-# Disallowed dependencies: Renderer, Editor, Sandbox, Asset.
+# Disallowed dependencies: Renderer, Editor, Sandbox, Asset, XEngineCoreRuntime,
+# XEngineShader, XEnginePlatform, XEngineEngine.
 
 add_subdirectory(RHI)
 
-if(XENGINE_ENABLE_VULKAN)
+if(TARGET XEngineVulkanRHI)
     add_subdirectory(VulkanRHI)
 endif()

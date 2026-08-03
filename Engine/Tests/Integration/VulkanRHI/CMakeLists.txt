@@ -1,17 +1,26 @@
 # Integration/VulkanRHI tests
 #
-# Per-backend integration tests for the Vulkan RHI. These tests will exercise
-# a real VkInstance / VkPhysicalDevice / VkDevice / VkQueue / VkCommandBuffer
-# path, when the XEngineVulkanRHI separation lands.
+# Per-backend integration tests for the Vulkan RHI. After the rebuild these
+# tests prove that XEngineVulkanRHI compiles, links, and exposes its public
+# surface to a consumer. The Vulkan SDK and volk are reached only through
+# XEngineVulkanRHI's PRIVATE link surface, so this test target does NOT
+# need to call find_package(Vulkan) itself.
 #
-# CURRENT STATE (RHI refactor in progress):
-#   XEngineVulkanRHI is not yet a separate target. The Vulkan backend still
-#   lives inside XEngineRHI. As a result, this target currently links only
-#   against XEngineRHI + Vulkan SDK + TestSupport + GoogleTest, and the
-#   source file only contains a skeleton test.
+# Once XEngineVulkanRHI exposes a stable Vulkan initialization entry point,
+# this file is the right place to add:
+#   * VkInstance creation through the RHI loader
+#   * Physical device selection
+#   * Logical device creation
+#   * Command pool / command buffer / queue-family contract checks
+#   * Resource creation (buffer, texture, sampler)
+#   * GPU memory readback helpers
 #
-# Once XEngineVulkanRHI is extracted, replace XEngineRHI with XEngineVulkanRHI
-# in target_link_libraries and use the XEngineVulkanRHI public surface here.
+# Allowed dependencies:
+#   XEngineFoundation, XEngineRHI, XEngineVulkanRHI, XEngineTestSupport,
+#   GoogleTest.
+#
+# Disallowed: XEngineCoreRuntime, Renderer, Editor, Sandbox, Asset,
+# direct Vulkan SDK headers / volk / VMA in this CMake file.
 
 file(GLOB_RECURSE XENGINE_VULKAN_RHI_INTEGRATION_SOURCES CONFIGURE_DEPENDS
     Source/*.cpp
@@ -27,30 +36,14 @@ target_include_directories(XEngineVulkanRHIIntegrationTests
 
 target_compile_features(XEngineVulkanRHIIntegrationTests PRIVATE cxx_std_20)
 
-# Vulkan SDK is brought in by the top-level find_package(Vulkan REQUIRED) in
-# Engine/CMakeLists.txt, so we can reuse Vulkan_INCLUDE_DIRS / Vulkan_LIBRARIES
-# here.
-find_package(Vulkan REQUIRED)
-
-target_compile_definitions(XEngineVulkanRHIIntegrationTests
-    PRIVATE
-        VK_NO_PROTOTYPES
-)
-
-target_include_directories(XEngineVulkanRHIIntegrationTests
-    PRIVATE
-        ${Vulkan_INCLUDE_DIRS}
-)
-
 target_link_libraries(XEngineVulkanRHIIntegrationTests
     PRIVATE
         XEngineFoundation
-        XEngineCoreRuntime
         XEngineRHI
+        XEngineVulkanRHI
         XEngineTestSupport
         GTest::gtest
         GTest::gtest_main
-        ${Vulkan_LIBRARIES}
 )
 
 gtest_discover_tests(XEngineVulkanRHIIntegrationTests

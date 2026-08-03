@@ -1,16 +1,20 @@
 # Tests module
 #
-# Top-level entry point for XEngine test targets.
-# Each test target lives under Engine/Tests/<Layer>/<Area>.
+# Top-level entry point for XEngine test targets. Each test target lives under
+# Engine/Tests/<Layer>/<Area>.
 #
-# Layer rules (enforced by CMake dependency graph, not source-level checks):
-#   Unit        -> XEngineCore / XEngineRHI / TestSupport / GoogleTest
-#   Integration -> XEngineCore / XEngineRHI / Vulkan SDK / TestSupport / GoogleTest
-#                   (XEngineVulkanRHI will be added here when that target exists)
-#   Smoke       -> XEngineCore / XEnginePlatform / XEngineRHI / Vulkan SDK / SDL3
-#                   (XEngineVulkanRHI will be added here when that target exists)
+# Post-RHI-rebuild layer rules (enforced by CMake dependency graph, not
+# source-level checks):
 #
-# Runtime modules must never depend on Tests / TestSupport.
+#   Unit        -> XEngineFoundation / XEngineRHI / XEngineTestSupport / GTest
+#   Integration -> XEngineFoundation / XEngineRHI / XEngineVulkanRHI / Vulkan SDK / TestSupport / GTest
+#   Smoke       -> XEngineFoundation / XEngineVulkanRHI / Vulkan SDK / SDL3 (window only) / TestSupport
+#
+# Runtime modules (Renderer, Editor, Asset, Scene, Engine runtime,
+# Shader compiler, ...) must never depend on Tests / TestSupport.
+#
+# A test is allowed to link XEngineVulkanRHI only when XEngineVulkanRHI is
+# actually being built via XENGINE_BUILD_VULKAN_RHI=ON.
 
 option(XENGINE_BUILD_TESTS          "Build XEngine tests"                ON)
 option(XENGINE_BUILD_UNIT_TESTS     "Build XEngine unit tests"           ON)
@@ -68,14 +72,31 @@ endif()
 # ----------------------------------------------------------------------------
 add_subdirectory(TestSupport)
 
-if(XENGINE_BUILD_UNIT_TESTS AND XENGINE_BUILD_VULKAN_TESTS)
+# Unit layer is backend-agnostic and must NOT depend on Vulkan SDK or
+# XEngineVulkanRHI. The XENGINE_BUILD_VULKAN_TESTS gate is kept for backwards
+# compatibility with the previous tree; it does not currently gate anything in
+# Unit/ after the rebuild.
+if(XENGINE_BUILD_UNIT_TESTS AND TARGET XEngineRHI)
     add_subdirectory(Unit)
 endif()
 
+# Integration layer is split into:
+#   RHI        -> backend-agnostic contract tests, links XEngineRHI only.
+#   VulkanRHI  -> Vulkan-specific integration tests, links XEngineRHI +
+#                 XEngineVulkanRHI. Only available when both RHI and VulkanRHI
+#                 are enabled.
 if(XENGINE_BUILD_INTEGRATION_TESTS)
-    add_subdirectory(Integration)
+    if(TARGET XEngineRHI)
+        add_subdirectory(Integration/RHI)
+    endif()
+    if(TARGET XEngineRHI AND TARGET XEngineVulkanRHI AND XENGINE_BUILD_VULKAN_TESTS)
+        add_subdirectory(Integration/VulkanRHI)
+    endif()
 endif()
 
-if(XENGINE_BUILD_SMOKE_TESTS AND XENGINE_BUILD_VULKAN_TESTS)
+# Smoke layer is Vulkan-only at this stage. Per prompts.md the smoke test must
+# be able to construct a minimal Platform/Window dependency, but it does not
+# need to do so today.
+if(XENGINE_BUILD_SMOKE_TESTS AND XENGINE_BUILD_VULKAN_TESTS AND TARGET XEngineVulkanRHI)
     add_subdirectory(Smoke)
 endif()

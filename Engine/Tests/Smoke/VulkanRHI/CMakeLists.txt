@@ -1,23 +1,24 @@
 # Smoke/VulkanRHI executable skeleton.
 #
-# This is the place where the future "open a window, init Vulkan, clear, swap,
-# exit" smoke test will live. It does NOT use GoogleTest -- it is a standalone
-# executable registered with CTest.
+# Per Docs/AI helper/prompts.md the smoke test's required dependency list is:
 #
-# CURRENT STATE (RHI refactor in progress):
-#   * XEngineVulkanRHI does not exist as a separate target yet.
-#   * XEnginePlatform currently links Vulkan + SDL3 as a side effect of
-#     XEngineRHI's CMake, which means linking XEnginePlatform here can drag
-#     in Vulkan types not yet isolated to a VulkanRHI target.
+#   XEngineVulkanRHI  (PUBLIC)
+#   minimal Platform/Window dependency (NOT YET LINKED — see below)
 #
-# To keep this commit minimal and not "fix" link issues by hacking
-# XEnginePlatform / XEngineRHI, this skeleton target currently only links
-# against XEngineFoundation / XEngineCoreRuntime and the Vulkan SDK headers
-# -- no XEnginePlatform, no SDL3, no XEngineRHI -- and its source only
-# verifies that the executable itself links. Real smoke logic will be added
-# when XEngineVulkanRHI and a stable platform initialization entry exist.
-
-find_package(Vulkan REQUIRED)
+# SDL3 is permitted here only in the future window-creation path; today no
+# window is created and no SDL3 link is performed. Vulkan SDK / volk / VMA
+# are reached ONLY through XEngineVulkanRHI's PRIVATE link surface, so this
+# CMake file does not call find_package(Vulkan).
+#
+# This is the place where the future "open a window, init Vulkan, clear,
+# swap, exit" smoke test will live. Until XEngineVulkanRHI exposes a
+# stable initialization entry point the executable only verifies that:
+#
+#   * XEngineVulkanRHI links correctly.
+#   * XEngineVulkanRHI's public header (XEngine/VulkanRHI/Base.h) is
+#     visible.
+#   * The version probe defined in XEngineVulkanRHI/Private/VulkanRHI.cpp
+#     resolves at link time.
 
 add_executable(XEngineVulkanRHISmokeTest
     Source/main.cpp
@@ -26,20 +27,16 @@ add_executable(XEngineVulkanRHISmokeTest
 target_include_directories(XEngineVulkanRHISmokeTest
     PRIVATE
         Source
-        ${Vulkan_INCLUDE_DIRS}
+        ../../TestSupport/Public
 )
 
 target_compile_features(XEngineVulkanRHISmokeTest PRIVATE cxx_std_20)
-target_compile_definitions(XEngineVulkanRHISmokeTest
-    PRIVATE
-        VK_NO_PROTOTYPES
-)
-
 target_link_libraries(XEngineVulkanRHISmokeTest
     PRIVATE
         XEngineFoundation
-        XEngineCoreRuntime
-        ${Vulkan_LIBRARIES}
+        XEngineRHI
+        XEngineVulkanRHI
+        XEngineTestSupport
 )
 
 add_test(

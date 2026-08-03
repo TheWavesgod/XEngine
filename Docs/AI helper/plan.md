@@ -1,1904 +1,729 @@
-# XEngine Development Plan
+# XEngine RHI 重构背景提要
 
-## Project Positioning
+## 1. 项目背景
 
-**XEngine** is a renderer-first learning engine.
+XEngine 使用 C++20，目前主要图形后端是 Vulkan，未来计划支持：
 
-The goal is not to clone Unreal Engine or Unity.
-The goal is to build a clean, modular, modern rendering engine architecture step by step.
+* Vulkan
+* Direct3D 12
+* Metal
 
-Core direction:
+现有 RHI 是一个已经实现并投入使用过的版本，但经过进一步开发后，当前设计被认为存在较明显的架构问题。
 
-```text
-C++20
-SDL3 platform layer
-Vulkan-first RHI
-Future D3D12 / Metal backend
-Slang-first shader system
-RenderGraph-managed frame
-Bindless-ready material system
-GPU-driven-ready renderer
-Editor-ready runtime structure
-```
+本次工作不是对旧 RHI 做小范围修补，也不是要求保持旧接口兼容，而是一次从底层开始的重新设计。
+
+旧 RHI 代码可以作为 Vulkan 实现细节和已有功能的参考，但不再被视为必须兼容的协议。
 
 ---
 
-# Current Status
+## 2. 本次重构的核心原则
 
-```text
-Stage 0  - Foundation + Engine Loop                     DONE
-Stage 1  - SDL Platform Layer                            DONE
-Stage 2A - Vulkan Dependencies + RHI Skeleton            DONE
-Stage 2B-1 - Vulkan Instance / Surface / Device          DONE
-Stage 2B-2 - Vulkan Swapchain / Clear / Present          DONE
-Stage 3  - RenderSystem + Linear RenderGraph V0          DONE
+本次采用推倒式、由下至上的重构方式。
 
-Next:
-Stage 4A - ShaderSystem + Slang Integration
-Stage 4B - RHIShader / Pipeline / TrianglePass
-```
+当前只考虑：
 
----
+* XEngine 的必要基础模块
+* 新的 RHI Core
+* VulkanRHI 后端
+* RHI 单元测试
+* VulkanRHI 集成测试
+* VulkanRHI Smoke Test
 
-# Major Architecture Principles
+当前不考虑：
 
-## Subsystem Ownership
+* Renderer
+* Editor
+* Scene
+* Asset
+* Engine runtime
+* Sandbox
+* EditorApp
+* ImGui Vulkan 集成
+* 其他依赖旧 RHI 的模块
 
-```text
-Engine owns SubsystemManager.
-Subsystem creation order is registration order.
-Subsystem destruction order is reverse registration order.
-Logging is a static service, not a subsystem.
-Time is an internal Engine service.
-```
+这些上层模块在新 RHI 完成并稳定之后，再根据最终协议重新设计和迁移。
 
-Current subsystem order:
+因此，在 RHI 重构期间：
 
-```text
-PlatformSystem
-RHISystem
-RenderSystem
-```
-
-Future subsystem order:
-
-```text
-FileSystem
-PlatformSystem
-InputSystem
-JobSystem
-AssetSystem
-ShaderSystem
-RHISystem
-RenderSystem
-SceneSystem
-UISystem
-EditorSystem
-```
+* 整个引擎可以无法编译；
+* Renderer、Editor、Sandbox 等可以处于不可构建状态；
+* 不需要为旧上层代码保留 compatibility wrapper；
+* 不需要提供 forwarding header；
+* 不需要维持旧 RHI public API；
+* 不应该为了旧调用方而扭曲新设计。
 
 ---
 
-## Rendering Architecture Direction
+## 3. 当前已确认的旧架构问题
 
-Long-term renderer layering:
+现有工程中，通用 RHI 接口与 Vulkan 后端实现被编译进同一个 `XEngineRHI` target。
 
-```text
-RenderSystem
-  -> RenderPipeline
-      -> RenderFeature
-          -> RenderPass
-              -> RenderGraph
-                  -> RHI
-```
+当前审计发现的问题包括：
 
-Meaning:
+* `XEngineRHI` 同时编译通用 RHI 与 `Private/Vulkan` 下的实现；
+* Vulkan include directories 通过 `PUBLIC` 传播；
+* `volk::volk` 通过 `PUBLIC` 链接传播；
+* Vulkan 相关编译定义通过 `PUBLIC` 传播；
+* VMA、SDL3 和 Vulkan SDK 依赖混入 RHI Core；
+* RHI public API 中存在 Vulkan 专属接口；
+* `RHIDevice` 暴露 Vulkan native context 和 native binding；
+* `RHISystem` 直接包含并创建 VulkanDevice；
+* RHI unit tests 因链接 `XEngineRHI` 而被动依赖 Vulkan；
+* Core RHI 无法在不安装 Vulkan SDK 的环境中独立构建。
 
-```text
-RenderSystem:
-  Owns high-level renderer lifecycle.
+完整审计还确认，当前 Renderer、Asset、Scene 等模块没有大量直接包含 Vulkan 类型；主要 Vulkan 泄漏点集中在 RHI 本身和 Editor 的 ImGui Vulkan 集成。
 
-RenderPipeline:
-  Assembles a full frame, such as ForwardPipeline, DeferredPipeline, EditorPipeline.
-
-RenderFeature:
-  Represents configurable renderer features, such as Bloom, FXAA, TAA, SSAO, Shadows.
-
-RenderPass:
-  Represents concrete GPU work, such as ClearPass, ForwardPass, TonemapPass.
-
-RenderGraph:
-  Records, compiles, and executes passes.
-
-RHI:
-  Executes backend-specific graphics commands.
-```
-
-Important distinction:
-
-```text
-RenderPass is the execution unit.
-RenderFeature is the configurable feature module.
-RenderPipeline is the frame assembly strategy.
-RenderGraph is the execution and dependency system.
-RenderSettings stores user/project/camera configuration.
-```
+由于本次不考虑旧上层模块兼容，Editor 和旧调用方的 Vulkan bridge 暂时不属于当前范围。
 
 ---
 
-# Stage 0 - Foundation + Engine Loop
+## 4. 新项目边界
 
-## Status
-
-```text
-DONE
-```
-
-## Goal
-
-Create a stable engine runtime skeleton before integrating rendering dependencies.
-
-## Systems
+目标至少拆分为两个独立模块：
 
 ```text
-Core
-Logging
-Assert
-Time
-Subsystem
-SubsystemManager
-Engine
-EngineConfig
-Diagnostics placeholder
+XEngineRHI
+XEngineVulkanRHI
 ```
 
-## Features
+强制依赖方向：
 
 ```text
-Basic type aliases
-Assertion macros
-spdlog-based logging
-Engine initialization
-Engine shutdown
-Main loop
-Subsystem lifecycle management
-Delta time calculation
+Foundation / 必要基础 Core
+                ↓
+           XEngineRHI
+                ↓
+       XEngineVulkanRHI
 ```
 
-## Completion Criteria
+禁止出现：
 
 ```text
-SandboxApp starts.
-Engine.Initialize() works.
-Engine.Run() works.
-Engine.Shutdown() works.
-SubsystemManager creates subsystems in registration order.
-SubsystemManager destroys subsystems in reverse registration order.
-Logs show lifecycle events.
+XEngineRHI → XEngineVulkanRHI
+XEngineRHI → Vulkan SDK
+XEngineRHI → volk
+XEngineRHI → VMA
+XEngineRHI → SDL3
+XEngineRHI → Renderer
+XEngineRHI → Editor
+XEngineRHI → Asset
+XEngineRHI → Scene
+XEngineRHI → Shader compiler
 ```
+
+`XEngineRHI` 应当能够在没有 Vulkan SDK 的环境中独立编译。
 
 ---
 
-# Stage 1 - SDL Platform Layer
+## 5. 建议项目结构
 
-## Status
-
-```text
-DONE
-```
-
-## Goal
-
-Add SDL3 as the platform backend while keeping SDL hidden inside private Platform implementation.
-
-## Systems
+当前先保持简单，不提前建立大量尚无实际职责的子目录：
 
 ```text
-PlatformSystem
-Window
-SDLWindow
-NativeWindowHandle
-PlatformEvent queue
+Engine/
+├── Source/
+│   └── Runtime/
+│       ├── RHI/
+│       │   ├── Public/
+│       │   │   └── XEngine/RHI/
+│       │   ├── Private/
+│       │   └── CMakeLists.txt
+│       │
+│       └── VulkanRHI/
+│           ├── Public/
+│           │   └── XEngine/VulkanRHI/
+│           ├── Private/
+│           └── CMakeLists.txt
+│
+└── Tests/
+    ├── Unit/
+    │   └── RHI/
+    ├── Integration/
+    │   └── VulkanRHI/
+    ├── Smoke/
+    │   └── VulkanRHI/
+    └── TestSupport/
 ```
 
-## Third-party Libraries
+不要仅为了目录整齐而提前创建：
 
-```text
-SDL3
-```
+* Common
+* Services
+* Instance
+* Adapter
+* Device
+* Resources
+* Pipeline
+* Synchronization
 
-## Features
-
-```text
-Create native SDL window
-Poll events
-Handle close event
-Track window size
-Expose NativeWindowHandle without leaking SDL_Window
-SDL3 built from ThirdParty/SDL
-SDL3 dynamically linked by default
-```
-
-## Completion Criteria
-
-```text
-Sandbox opens a window.
-Closing the window exits the engine loop.
-SDL headers only appear in Platform/Private/SDL.
-Public Platform headers do not expose SDL types.
-```
+这些目录应当在相关职责真正确定后再创建。
 
 ---
 
-# Stage 2A - Vulkan Dependencies + RHI Skeleton
+## 6. 测试结构
 
-## Status
+测试按层级组织，而不是全部堆在一个 RHI 测试目录中。
 
-```text
-DONE
-```
+### 6.1 Unit Tests
 
-## Goal
-
-Prepare Vulkan dependencies and create the first RHI skeleton.
-
-## Dependency Policy
+目标：
 
 ```text
-Vulkan SDK:
-  System SDK, detected by find_package(Vulkan REQUIRED) inside Engine/CMakeLists.txt.
-
-volk:
-  ThirdParty/volk, built with add_subdirectory.
-
-VMA:
-  ThirdParty/VulkanMemoryAllocator, privately included by XEngineRuntime.
+XEngineRHIUnitTests
 ```
 
-## Systems
+依赖：
 
 ```text
-RHI public API skeleton
-RHISystem skeleton
-Vulkan backend private skeleton
+XEngineRHI
+GoogleTest
+CTest
 ```
 
-## Completion Criteria
+不得依赖：
+
+* Vulkan SDK
+* XEngineVulkanRHI
+* volk
+* VMA
+* SDL3
+* Renderer
+* Editor
+* Asset
+* Scene
+
+Unit tests 用于验证纯协议和纯 CPU 逻辑，例如：
+
+* enum flags
+* Result/Error 语义
+* descriptor validation
+* format classification
+* subresource range
+* adapter scoring
+* capability matching
+* command state machine
+* binding compatibility
+
+### 6.2 Integration Tests
+
+目标：
 
 ```text
-XENGINE_ENABLE_VULKAN=ON configures successfully.
-Vulkan SDK is detected inside Engine/CMakeLists.txt.
-volk is privately linked.
-VMA is privately included.
-No Vulkan / volk / VMA types appear in public headers.
+XEngineVulkanRHIIntegrationTests
 ```
 
----
-
-# Stage 2B-1 - Vulkan Instance / Surface / Device / Allocator
-
-## Status
+依赖：
 
 ```text
-DONE
+XEngineRHI
+XEngineVulkanRHI
+GoogleTest
+Vulkan backend private dependencies
 ```
 
-## Goal
+用于验证真实 GPU 行为，但尽量不依赖窗口：
 
-Create the Vulkan backend up to logical device and allocator creation.
+* Vulkan instance 创建
+* adapter 枚举
+* device 创建
+* buffer 创建
+* upload/copy/readback
+* texture 创建
+* command submission
+* synchronization
+* compute dispatch
+* offscreen rendering
+* Vulkan validation layer 错误
 
-## Features
+### 6.3 Smoke Test
+
+目标：
 
 ```text
-volkInitialize()
-VkInstance
-VkDebugUtilsMessengerEXT
-VkSurfaceKHR from SDL window
-VkPhysicalDevice selection
-VkDevice
-Graphics queue
-Present queue
-VmaAllocator
+XEngineVulkanRHISmokeTest
 ```
 
-## Completion Criteria
+这是独立 executable，用于验证完整最小运行链：
 
-```text
-SDL window opens.
-Vulkan instance is created.
-SDL Vulkan surface is created.
-Physical device is selected.
-Logical device is created.
-VMA allocator is created.
-Shutdown destroys Vulkan resources in correct order.
-```
+* window
+* surface
+* swapchain
+* clear
+* draw
+* present
+* resize
+* frames in flight
+* shutdown
 
----
-
-# Stage 2B-2 - Vulkan Swapchain / Command / Clear / Present
-
-## Status
-
-```text
-DONE
-```
-
-## Goal
-
-Create a Vulkan swapchain and clear it every frame.
-
-## Features
-
-```text
-VulkanSwapchain
-Swapchain image views
-Command pool
-Primary command buffer
-ImageAvailable semaphore
-RenderFinished semaphore
-InFlight fence
-vkAcquireNextImageKHR
-vkCmdClearColorImage
-vkQueueSubmit
-vkQueuePresentKHR
-Basic resize / out-of-date handling
-```
-
-## Important Choice
-
-Stage 2B-2 uses:
-
-```text
-vkCmdClearColorImage
-```
-
-It does not use:
-
-```text
-Render pass
-Framebuffer
-Graphics pipeline
-Shader
-Triangle
-```
-
-## Completion Criteria
-
-```text
-Window clears to fixed color.
-Window close exits cleanly.
-Resize does not crash.
-RenderDoc can capture the clear frame.
-```
+Smoke Test 不依赖正式 Renderer。
 
 ---
 
-# Stage 3 - RenderSystem + Linear RenderGraph V0
+## 7. 测试工具
 
-## Status
-
-```text
-DONE
-```
-
-## Goal
-
-Move frame rendering ownership from RHISystem into RenderSystem + RenderGraph.
-
-## Systems
+使用：
 
 ```text
-RenderSystem
-RenderGraph V0
-RenderGraphBuilder placeholder
-RenderGraphContext
-ClearPass
-PresentPass placeholder
-RenderSettings initial version
+GoogleTest
+CTest
 ```
 
-## Current RenderGraph Scope
+GoogleTest 用于：
+
+* 编写测试；
+* fixture；
+* parameterized test；
+* assertions；
+* 失败定位。
+
+CTest 用于：
+
+* 从 CMake 中注册测试；
+* 统一运行所有测试程序；
+* 汇总结果；
+* 接入 CI。
+
+GoogleMock 可以随 GoogleTest 提供，但当前不计划大量使用。
+
+优先级：
 
 ```text
-Linear pass list
-Insertion-order execution
-Single-threaded execution
-No resource dependency analysis
-No automatic barriers
-No resource aliasing
-No async compute
+真实纯逻辑测试
+> 简单手写 fake
+> 少量 gmock
+> 不 mock Vulkan API
 ```
 
-## RenderGraph Pass Types
-
-```cpp
-enum class RenderGraphPassType
-{
-    Graphics,
-    Compute,
-    Transfer,
-    Present,
-    External
-};
-```
-
-## Important Design Decision
-
-Do not create a `NeuralPass` class.
-
-Future neural rendering features should be represented as:
-
-```text
-Compute pass
-External pass
-```
-
-Examples:
-
-```text
-NeuralDenoisePass       -> Compute / External
-NeuralTextureDecodePass -> Compute
-DLSS / FSR / XeSS       -> External
-```
-
-## Completion Criteria
-
-```text
-Engine registers PlatformSystem -> RHISystem -> RenderSystem.
-RHISystem no longer directly clears every frame.
-RenderSystem builds RenderGraph every frame.
-ClearPass calls RHIDevice::ClearSwapchain.
-PresentPass exists as placeholder.
-Window still clears to fixed color.
-No shaders, triangle, pipeline, or RenderFeature system yet.
-```
+不应逐函数 mock `vkCreateImage`、`vkAllocateMemory` 等 Vulkan 调用。Vulkan 后端应通过真实 integration test 和 validation layer 验证。
 
 ---
 
-# Stage 4A - ShaderSystem + Slang Integration
+## 8. RHI 的设计定位
 
-## Status
+新 RHI 应当是现代显式图形 API 的共同抽象，而不是 Vulkan API 的重命名。
 
-```text
-NEXT
-```
+它应表达 Vulkan、D3D12 和 Metal 可以合理共享的 GPU 概念，例如：
 
-## Goal
+* Instance
+* Adapter
+* Device
+* Queue
+* CommandList
+* Buffer
+* Texture
+* TextureView
+* Sampler
+* Shader
+* BindGroupLayout
+* BindGroup
+* PipelineLayout
+* ComputePipeline
+* GraphicsPipeline
+* Fence
+* Semaphore
+* Resource state
+* Barrier
+* Surface
+* Swapchain
 
-Introduce Slang as the primary shader language and compile `.slang` files to SPIR-V.
+但不应表达：
 
-## Systems
-
-```text
-ShaderSystem
-ShaderCompiler
-ShaderTypes
-ShaderReflection
-ShaderModule
-SlangCompiler
-```
-
-## Third-party Libraries
-
-```text
-Slang
-```
-
-## Features
-
-```text
-Read .slang files
-Compile vertex / fragment / compute entry points
-Output SPIR-V bytecode
-Create CompiledShader objects
-Keep Slang types private
-```
-
-## Public API Direction
-
-```cpp
-enum class ShaderStage
-{
-    Vertex,
-    Fragment,
-    Compute
-};
-
-enum class ShaderTarget
-{
-    VulkanSPIRV,
-    D3D12DXIL,
-    MetalMSL
-};
-```
-
-## Completion Criteria
-
-```text
-ShaderSystem can compile Triangle.slang to SPIR-V.
-ShaderSystem public headers do not expose Slang.
-No Vulkan pipeline creation yet.
-No triangle draw yet.
-```
+* VkRenderPass
+* VkFramebuffer
+* VkDescriptorSet
+* VkImageLayout
+* VkQueueFamilyIndex
+* D3D12 descriptor heap
+* Metal argument buffer 细节
+* Renderer pass
+* Material
+* Shadow
+* CSM
+* RenderGraph
+* Scene
+* Asset import
 
 ---
 
-# Stage 4B - RHIShader / Pipeline / TrianglePass
+## 9. 后端选择与设备约束
 
-## Status
+已经确认以下产品约束：
 
-```text
-PLANNED
-```
+* 用户可以选择图形后端；
+* 用户可以选择 Adapter；
+* 默认选择性能最强且满足要求的 Adapter；
+* 可以枚举多个 Adapter；
+* 整个运行时只允许创建并使用一个 RHIDevice；
+* 不支持多 Device；
+* 不支持 multi-GPU；
+* 不支持跨 Device 资源共享；
+* 运行期间不支持切换 Device；
+* 切换 backend 或 GPU 需要重新初始化应用。
 
-## Goal
+默认 Adapter 选择不是简单选择显存最大的设备，而应首先满足 required capabilities，再根据策略评分。
 
-Draw the first triangle using Slang-compiled shaders.
-
-## Systems
-
-```text
-RHIShader
-RHIPipeline
-RHICommandList minimal draw API
-VulkanShader
-VulkanPipeline
-VulkanCommandList
-TrianglePass
-```
-
-## Features
+未来可支持：
 
 ```text
-Create VkShaderModule
-Create minimal graphics pipeline
-Use dynamic rendering if available
-Use vertex ID triangle
-No vertex buffer
-No descriptor set
-No material
-No texture
+Automatic
+HighPerformance
+LowPower
+Explicit
 ```
 
-## RenderGraph Flow
-
-```text
-ClearPass
-TrianglePass
-PresentPass
-```
-
-## Completion Criteria
-
-```text
-Triangle.slang compiles.
-Vulkan shader modules are created.
-Graphics pipeline is created.
-TrianglePass draws a triangle.
-No mesh, material, texture, scene, or asset system yet.
-```
+但当前只需围绕单 Device 模型设计协议。
 
 ---
 
-# Stage 5 - Basic Mesh Forward Renderer
+## 10. 后端实现模式
 
-## Status
+推荐采用：
 
-```text
-PLANNED
-```
+* C++ abstract interface；
+* backend `final` derived classes；
+* RAII；
+* 启动阶段使用 factory 选择后端；
+* 运行阶段通过虚接口调用；
+* 不在每个渲染调用中判断 backend。
 
-## Goal
-
-Move from hardcoded triangle rendering to basic mesh rendering.
-
-## Systems
-
-```text
-RHI buffer abstraction
-Basic mesh representation
-Camera data
-RenderView
-RenderScene initial version
-ForwardOpaquePass
-```
-
-## Features
+例如：
 
 ```text
-Vertex buffer
-Index buffer
-Depth buffer
-Depth test
-Camera uniform data
-Draw cube or hardcoded mesh
+RHI abstract interface
+        ↑
+Vulkan implementation
+D3D12 implementation
+Metal implementation
 ```
 
-## GPU-driven Preparation
+不计划在当前阶段采用完整 handle-based RHI。
 
-Start designing render data as IDs and indices:
+原因是 handle-based 模型会立即要求：
 
-```cpp
-struct RenderObject
-{
-    u32 ObjectId = 0;
-    u32 MeshId = 0;
-    u32 MaterialId = 0;
+* generation handle
+* resource registry
+* handle pool
+* centralized destruction
+* backend lookup
+* lifetime validation
 
-    Mat4 World;
-    Mat4 PreviousWorld;
+当前更适合 typed C++ object interface。
 
-    AABB Bounds;
-};
-```
-
-## Completion Criteria
+创建接口可以使用 NVI：
 
 ```text
-A basic 3D mesh renders.
-Depth testing works.
-Renderer uses RenderScene / RenderObject direction, not direct immediate hardcoding only.
+public non-virtual validation
+        ↓
+protected virtual backend implementation
 ```
+
+高频 CommandList API 是否使用完整 NVI，需要后续按性能和验证需求决定。
+
+后端内部不应到处使用 `dynamic_cast`。可以使用集中式、带 owner-device 检查的 `static_cast` helper。
 
 ---
 
-# Stage 6 - Material + Texture + Basic PBR
+## 11. 资源所有权原则
 
-## Status
+已经确认：
 
-```text
-PLANNED
-```
+* RHI 管理底层 GPU/native object；
+* RHI 管理 device ownership；
+* RHI 管理 GPU-safe destruction；
+* Renderer 以后负责语义层资源所有权、缓存和复用；
+* 资源属于创建它的 Device；
+* 不允许跨 Device 使用资源；
+* 当前为单 Device 模型。
 
-## Goal
-
-Introduce material data, texture sampling, and basic physically based shading.
-
-## Systems
-
-```text
-TextureManager
-MaterialSystem
-Sampler
-MaterialAsset initial version
-GPU material data placeholder
-```
-
-## Third-party Libraries
+Texture 与 TextureView 必须是独立对象：
 
 ```text
-stb_image
-nlohmann/json optional
+RHITexture
+RHITextureView
 ```
 
-## Features
+不采用：
+
+* Texture 内置默认 view；
+* Texture 自己缓存所有 view；
+* Renderer 通过 Vulkan native view 操作资源。
+
+Buffer 当前不设计通用 `RHIBufferView`，优先使用：
 
 ```text
-Texture loading
-Sampler creation
-Unlit textured shader
-Basic PBR shader
-BaseColor texture
-Normal texture
-Metallic/Roughness texture
-AO texture optional
-Directional light
+Buffer + offset + size
 ```
 
-## Bindless Preparation
-
-Material data should be index-based where possible:
-
-```cpp
-struct GPUMaterialData
-{
-    u32 BaseColorTextureIndex;
-    u32 NormalTextureIndex;
-    u32 MetallicRoughnessTextureIndex;
-    u32 AOTextureIndex;
-
-    Vec4 BaseColorFactor;
-    f32 MetallicFactor;
-    f32 RoughnessFactor;
-};
-```
-
-## Completion Criteria
-
-```text
-A mesh can render with texture.
-A mesh can render with basic PBR material.
-MaterialAsset does not hold Vulkan handles.
-```
+只有未来出现明确跨后端语义时，再评估 BufferView。
 
 ---
 
-# Stage 6 Split
+## 12. 服务层边界
 
-Stage 6 is split into:
+下列功能应当建立在 RHI Core 之上，而不属于最小 GPU 协议本身：
 
-```text
-Stage 6A - Math V0 + RHI Texture / Sampler / Image Upload Foundation
-Stage 6B - TextureManager + stb_image File Loading
-Stage 6C - MaterialSystem + Material Data
-Stage 6D - BindGroup V0 + Unlit Textured Mesh
-Stage 6E - Basic PBR Material
-```
+* UploadManager
+* DeferredDeletion
+* StagingBufferAllocator
+* DescriptorAllocator
+* PipelineCache
 
-## Stage 6A Decisions
+例如 UploadManager 应使用：
 
-```text
-Stage 6A introduces Math V0.
-Math V0 uses glm as the backend.
-XEngine code should use XEngine Math types such as Vec2 / Vec3 / Vec4 / Mat4 / Quat.
-Direct glm usage should be avoided outside the Math module where practical.
-Future stages may replace aliases with fully owned XEngine math structs if needed.
-```
+* Buffer
+* CommandList
+* Queue
+* Fence
 
-```text
-stb_image is used as the Stage 6 simple development image loader.
-It is lightweight and easy to integrate.
-It is not the final production texture pipeline.
-Future production texture support should include KTX2 / Basis Universal / DDS / GPU compressed formats.
-```
+来实现 CPU 到 GPU 上传，而不是成为 Device 基础协议的一部分。
 
-```text
-RHIDevice currently acts as a resource creation facade.
-This is acceptable in early stages.
-Renderer controls what resources are created.
-RHI backend controls how native GPU resources are created.
-Resource usage should happen through RHICommandList.
-Future stages should split RHIDevice into ResourceFactory / UploadManager / Swapchain / Queue responsibilities.
-```
-
-Do not introduce RenderFeature system in Stage 6.
-RenderFeature V0 is planned for Stage 9 when HDR / Tonemap / Bloom / FXAA become configurable.
+这些服务等核心资源、命令和同步协议稳定后再实现。
 
 ---
 
-## Stage 6B - TextureManager + stb_image File Loading
+## 13. 推荐实现顺序
+
+不要一次性设计完整 RHI。
+
+每一个阶段都遵循：
 
 ```text
-TextureManager is a lightweight renderer-side manager, not the full AssetSystem.
-stb_image is used for simple development-time loading of PNG/JPG/TGA/HDR-style files where supported.
-TextureManager loads RGBA8 CPU pixels and creates RHITexture through RHIDevice.
-TextureManager owns default fallback textures.
-Missing files return a missing texture fallback.
-No MaterialSystem yet.
-No texture sampling shader yet.
-No BindGroup / descriptor V0 yet.
-Future production texture pipeline should support KTX2 / Basis Universal / DDS / GPU compressed formats.
+讨论协议
+→ 写 Unit Tests
+→ 实现 RHI Core
+→ 实现 VulkanRHI
+→ 写 Integration Tests
+→ 验证
+→ 再进入下一阶段
 ```
 
-## Stage 6C - MaterialSystem + Material Data
+推荐里程碑：
+
+### M0：工程与测试骨架
+
+* 独立 `XEngineRHI`
+* 独立 `XEngineVulkanRHI`
+* Unit / Integration / Smoke targets
+* RHI 不依赖 Vulkan
+
+### M1：基础类型
+
+* namespace
+* export macro
+* backend enum
+* Result/Error
+* flags
+* debug naming
+* 基础 object/lifetime 规则
+
+### M2：Instance 与 Adapter
+
+* RHIInstance
+* RHIInstanceDesc
+* RHIAdapter
+* RHIAdapterInfo
+* RHIAdapterPreference
+* adapter selection
+* 单 Device 创建约束
+
+### M3：Device、Queue 与 Capabilities
+
+* RHIDevice
+* RHIDeviceDesc
+* RHIQueue
+* required/optional features
+* supported capabilities 与 enabled capabilities 分离
+
+### M4：Buffer、Copy 与 Readback
+
+* RHIBuffer
+* RHIBufferDesc
+* memory usage
+* command recording
+* queue submit
+* fence
+* buffer upload/copy/readback
+
+这是第一个真实 GPU 数据闭环。
+
+### M5：Texture、TextureView 与 Sampler
+
+* RHITexture
+* RHITextureView
+* RHISampler
+* formats
+* usage
+* mip/layer/subresource
+* upload/readback
+
+### M6：Barrier 与同步
+
+* resource state
+* barriers
+* fence
+* semaphore
+* command state machine
+
+RHI 保持显式同步，不自动猜测 Renderer 的所有资源状态。
+
+### M7：Shader 与 Binding
+
+* shader bytecode
+* entry point
+* shader stage
+* BindGroupLayout
+* BindGroup
+* PipelineLayout
+
+RHI 不依赖 Slang。Shader 模块以后向 RHI 提供已编译 bytecode。
+
+### M8：Compute Pipeline
+
+先做 Compute Pipeline，再做 Graphics Pipeline。
+
+建立：
 
 ```text
-MaterialSystem is a lightweight renderer-side manager, not AssetSystem.
-MaterialHandle is introduced.
-MaterialDesc stores base color, metallic, roughness, alpha mode, and texture handles.
-GPUMaterialData is introduced as a GPU-friendly / bindless-ready data structure.
-MaterialSystem owns default lit, default unlit, and missing materials.
-MaterialSystem resolves invalid texture handles to TextureManager fallback textures.
-No BindGroup / descriptor set yet.
-No texture sampling shader yet.
-No PBR shader yet.
-RenderFeature system remains planned for Stage 9.
+Buffer
+→ Upload
+→ Bind
+→ Dispatch
+→ Readback
 ```
 
-## Stage 6D - BindGroup V0 + Unlit Textured Mesh
+这是验证资源、命令、同步、Shader、Binding 和 Pipeline 的最佳早期闭环。
 
-```text
-Introduces RHIBindGroupLayout and RHIBindGroup.
-Introduces Vulkan descriptor set layout / descriptor pool / descriptor set update.
-Stage 6D only supports combined image sampler for base color texture.
-MaterialSystem creates per-material base color bind groups.
-UnlitTextured.slang samples base color texture.
-ForwardOpaquePass / ForwardMeshPass binds pipeline and material bind group.
-No PBR yet.
-No bindless descriptors yet.
-No RenderFeature system yet.
-```
+### M9：Graphics Pipeline 与离屏渲染
 
-## Stage 6E - Basic PBR Material
+* graphics pipeline state
+* dynamic rendering 风格 attachment model
+* offscreen clear
+* triangle draw
+* texture readback
+* pixel validation
 
-```text
-Adds ForwardPBR.slang.
-Extends MaterialSystem with PBR material bind groups.
-Supports base color / normal / metallic-roughness / AO texture slots.
-Supports base color factor, metallic factor, and roughness factor.
-Implements a basic direct-lighting metallic-roughness BRDF.
-Uses a simple hardcoded directional light.
-Uses push constants for Stage 6E material scalar factors.
-Uses safe fallback textures for missing material slots.
-Does not implement IBL.
-Does not implement shadows.
-Does not implement glTF import.
-Does not implement RenderFeature system.
-Does not implement bindless descriptors.
-```
+不要先引入 swapchain。
 
----
+### M10：Surface、Swapchain 与 Present
 
-# Stage 7 - Asset System Foundation
+* window integration
+* surface
+* swapchain
+* acquire
+* present
+* resize
+* frames in flight
 
-## Status
+### M11：Services
 
-```text
-PLANNED
-```
+* UploadManager
+* DeferredDeletion
+* staging allocation
+* descriptor allocation
+* pipeline cache
 
-## Goal
+### M12：迁移上层模块
 
-Build the asset metadata/import pipeline in small steps, then connect real assets to renderer and scene systems.
+新 RHI 稳定之后，再依次迁移：
 
-## Stage 7 Split
+* Renderer
+* Shader integration
+* Editor
+* ImGui backend
+* Asset
+* Engine
+* Apps
 
-```text
-Stage 7A - Asset Core
-Stage 7B - TextureAsset + Private ImageImporter
-Stage 7C - MeshAsset + RenderMeshManager Bridge
-Stage 7D - MaterialAsset + RenderMaterial Bridge
-Stage 7E - glTF Importer V0
-Stage 7F - Scene System V0 + RenderExtraction
-Stage 7G - InputSystem V0 + Debug Camera
-```
-
-## Stage 7A - Asset Core
-
-```text
-AssetHandle
-AssetType
-AssetMetadata
-AssetRegistry
-AssetSystem subsystem
-Public AssetImportTypes
-Path-based metadata registration
-Basic type guessing from source extensions
-No real importers yet
-No GPU resources
-```
-
-## Stage 7B - TextureAsset + Private ImageImporter
-
-```text
-TextureAsset CPU-side RGBA8 data
-IAssetImporter private to Runtime/Asset
-Public AssetSystem exposes ImportAsset(), not importer registration
-Private ImporterRegistry
-Extension-based importer dispatch
-Private ImageImporter backed by stb_image
-AssetSystem image import into TextureAsset
-AssetSystem TextureAsset lookup by AssetHandle
-Renderer TextureManager bridge from TextureAsset to RHITexture
-Renderer image decoding deprecated
-No glTF parsing yet
-No MeshAsset import yet
-No MaterialAsset import yet
-No GPU resources inside AssetSystem
-```
-
-## Stage 7C - MeshAsset + RenderMeshManager Bridge
-
-```text
-MeshAsset CPU-side mesh data
-MeshVertex
-MeshSubmesh
-Vertices, indices, submeshes, and bounds
-AssetSystem CPU-side MeshAsset storage
-Procedural cube MeshAsset validation
-Renderer MeshHandle
-Renderer-private RenderMeshManager
-MeshAsset -> vertex/index RHIBuffer bridge
-ForwardOpaquePass draws RenderMesh through RenderMeshManager
-No glTF parsing yet
-No MaterialAsset yet
-No SceneAsset yet
-No GPU resources inside AssetSystem
-```
-
-## Stage 7D - MaterialAsset + RenderMaterial Bridge
-
-```text
-MaterialAsset CPU-side material data
-MaterialAsset stores base color, metallic, roughness, alpha mode, and TextureAsset references
-MaterialAsset contains no RHI or Vulkan resources
-AssetSystem CPU-side MaterialAsset storage
-AssetSystem test MaterialAsset validation helper
-Renderer MaterialSystem creates MaterialHandle from MaterialAsset
-Renderer MaterialSystem resolves TextureAsset handles through AssetSystem / TextureManager
-TextureManager caches textures created from AssetHandle references
-ForwardOpaquePass draws RenderMesh with MaterialHandle
-No glTF parsing yet
-No SceneAsset yet
-No GPU resources inside AssetSystem
-```
-
-## Stage 7E - glTF Importer V0
-
-```text
-Uses fastgltf 0.9
-GltfImporter is private to Asset module
-Public headers do not expose fastgltf
-Imports .gltf and .glb files through AssetSystem::ImportAsset
-Converts glTF meshes into MeshAsset
-Converts glTF materials into MaterialAsset
-Converts glTF images into TextureAsset where supported
-Supports static meshes and basic metallic-roughness material data
-Supports external images and GLB bufferView image data where decodable by stb_image
-Does not implement SceneAsset yet
-Does not implement animation, skinning, morph targets, or glTF extensions
-Does not create GPU resources inside AssetSystem
-Stage 7E is the final pure Asset import stage
-Stage 7F will connect imported assets to Scene / RenderObject
-```
-
-## Stage 7F - Scene System V0 + RenderExtraction
-
-```text
-Introduces Scene module
-Adds Entity handle
-Adds TransformComponent
-Adds MeshRendererComponent
-Adds CameraComponent data only
-Adds SceneSystem subsystem
-Scene stores AssetHandle references, not renderer handles
-Adds RenderScene and RenderObject in Renderer
-Adds RenderExtraction boundary
-RenderExtraction resolves MeshAsset into MeshHandle through RenderMeshManager
-RenderExtraction resolves MaterialAsset into MaterialHandle through MaterialSystem
-RenderMeshManager caches AssetHandle to MeshHandle mappings
-MaterialSystem caches AssetHandle to MaterialHandle mappings
-TextureManager keeps AssetHandle to TextureHandle caching
-ForwardOpaquePass draws RenderScene.OpaqueObjects
-RenderSystem creates a validation Scene entity from Cube or DamagedHelmet glTF assets
-RenderSystem falls back to a procedural cube entity if glTF validation import is unavailable
-Does not implement InputSystem
-Does not implement DebugCamera control yet
-Does not implement full ECS, scene serialization, animation, or skinning
-Stage 7G will implement InputSystem V0 + DebugCamera in Scene
-```
-
-## Stage 7G - InputSystem V0 + Debug Camera
-
-```text
-Introduces Input module
-Adds InputSystem subsystem
-Adds engine-level KeyCode / MouseButton types
-Platform events are translated into engine input events
-InputSystem tracks current/previous key and mouse state
-InputSystem tracks mouse position, mouse delta, and mouse wheel delta
-Adds UE-style Scene DebugCameraController
-RMB + mouse controls camera yaw/pitch
-RMB + WASD/QE controls camera movement
-Shift accelerates movement
-Mouse wheel adjusts movement speed
-SceneSystem owns a primary debug camera entity
-RenderSystem uses the primary Scene camera
-Debug camera can frame imported model bounds
-Validation prefers DamagedHelmet, then Cube with texture, then procedural cube
-DamagedHelmet should be viewable through auto-framing and interactive navigation
-Does not implement full editor viewport focus, input rebinding, gamepad input, picking, or gizmos
-```
-
-## Asset / Renderer / RHI Boundary
-
-```text
-AssetSystem:
-  Owns source paths, asset handles, metadata, private importer registry, and CPU-side asset data.
-
-Renderer:
-  Owns render resource managers, material systems, and GPU-facing render representations.
-  Converts TextureAsset data into RHITexture objects.
-  Converts MeshAsset data into vertex/index RHIBuffer objects.
-  Converts MaterialAsset data into MaterialHandle / bind group backed renderer materials.
-
-RHI:
-  Owns backend GPU objects such as buffers, images, samplers, descriptor sets, and pipelines.
-```
-
-Correct future data flow:
-
-```text
-.gltf / .glb / .png / .jpg
-  -> AssetSystem
-  -> private importer
-  -> TextureAsset / MeshAsset / MaterialAsset
-  -> Renderer managers
-  -> RHI resources
-```
-
-## fastgltf Decision
-
-```text
-fastgltf 0.9 is the selected glTF importer library.
-It is placed under ThirdParty/fastgltf.
-It should be used only inside Asset/Private/Importers/GltfImporter in Stage 7E.
-Public Asset headers must not expose fastgltf types.
-Renderer and RHI must not include fastgltf.
-```
-
-## Validation Assets
-
-```text
-Validation assets are placed under Assets/models/gltf:
-- Cube with texture
-- DamagedHelmet
-```
-
-## Completion Criteria
-
-```text
-Stage 7A creates AssetSystem and metadata registration without parsing glTF or creating GPU resources.
-Later Stage 7 sub-stages add texture, mesh, material, glTF, and scene integration.
-```
+迁移时以上层需求验证协议，但不重新把 Vulkan 类型泄漏进通用模块。
 
 ---
 
-# Stage 8 - Lighting + Shadow
+## 14. 当前非目标
 
-## Stage 8A - Renderer Architecture Stabilization
+目前明确不做：
 
-```text
-COMPLETE
-```
+* RHILoader 独立模块；
+* BackendRegistry；
+* 动态后端插件；
+* stable C ABI；
+* DLL ABI 设计；
+* D3D12RHI 空壳；
+* MetalRHI 空壳；
+* 多 GPU；
+* 多 Device；
+* bindless 完整系统；
+* RenderGraph；
+* Renderer resource manager；
+* Material；
+* Shadow/CSM；
+* 完整 performance framework；
+* Vulkan 函数级 mock；
+* 为旧 Renderer 保留兼容接口。
 
-- Clarifies Renderer naming and distinguishes RenderPipeline from the RHI graphics pipeline.
-- Adds RenderFrameContext and RenderResourceContext.
-- Adds the RenderPipeline base class and ForwardRenderPipeline.
-- Moves per-frame pass composition out of RenderSystem.
-- Keeps one unified linear RenderGraph per frame.
-- Adds RenderShaderLibrary for persistent RHIShader reuse.
-- Adds RenderPipelineStateCache for persistent graphics pipeline reuse.
-- Keeps RenderTextureManager, RenderMeshManager, and RenderMaterialSystem as Asset-to-GPU bridges.
-- Keeps the existing RHIPipeline name to avoid a broad Vulkan/backend rename.
-- Does not implement lights, shadows, RenderFeature, HDR, post-processing, or RHIPipelineCache.
+后端当前可以作为独立静态 target。
 
-Current frame flow:
-
-```text
-SceneSystem
-  -> RenderExtraction
-  -> RenderScene
-  -> ForwardRenderPipeline
-  -> RenderGraph
-  -> ClearPass / ForwardOpaquePass / PresentPass
-  -> RHI
-```
-
-Future stages:
-
-```text
-Stage 8B - LightComponent + RenderLight Extraction
-Stage 8C - GPU Light Data + PBR Shader Integration
-Stage 8D - Runtime Serialization + SceneSerializer V0 + Validation Scene Migration
-```
-
-## Stage 8C - Per-frame GPU Data + Shader Lighting Integration
-
-- Adds `GPUFrameData`.
-- Adds `GPULightingData`.
-- Adds `RenderFrameResources`.
-- Uses one per-frame buffer per renderer frame slot.
-- Binds Set 0 per-frame data in `ForwardOpaquePass`.
-- Keeps material textures in Set 1.
-- Splits shader common code into Common / Lighting / BRDF / Material files.
-- Makes Directional Light affect the PBR shader through extracted scene lighting.
-- Does not implement shadows or IBL.
-
-## Stage 8B-pre - Coordinate Convention Cleanup
-
-Mid-term cleanup:
-- Keeps GLM as the Math backend through XEngine aliases.
-- Consolidates common operations behind XEngine Math helpers.
-- Removes redundant GPU matrix/vector wrapper types and pure-copy packing.
-- Allows shader-visible structs to use Mat4 and Vec4 with layout checks.
-- Removes legacy image loading from Renderer; decoding stays in Asset private importers.
-- Keeps CMake source discovery aligned with the current Renderer and Math files.
-
-```text
-COMPLETE
-```
-
-- Defines XEngine world coordinates as +X forward, +Y right, +Z up, left-handed.
-- Centralizes coordinate axes and transform direction helpers in Math.
-- Converts glTF position, normal, tangent, and triangle winding during import.
-- Centralizes left-handed camera/view/projection matrix construction.
-- Adds an RHI clip-space convention and a single Renderer projection adaptation point.
-- Moves AABB transformation and combination into Math.
-- Moves GPU matrix packing out of renderer passes.
-- Updates DebugCamera to the XEngine world convention.
-- Does not implement lights, shadows, GPU light buffers, or RenderFeature.
-
-## Pre-Stage 8C - Transform Hierarchy + Rotator Cleanup
-
-- Adds local/world transform separation.
-- Adds degree-based Rotator.
-- Defines Roll/Pitch/Yaw around +X/+Y/+Z.
-- Adds Scene-managed parent-child hierarchy.
-- Adds the Scene-private TransformSystem.
-- Updates camera, light, and mesh extraction to read world transforms.
-- Adds engine color presets.
-- Moves common helper calls under XEngine::Math.
-
-## Stage 8D - Runtime Serialization + SceneSerializer V0 + Validation Scene Migration
-
-```text
-COMPLETE
-```
-
-- Cleans `ThirdParty/json` down to the header-only include tree plus license files.
-- Adds `ThirdParty_json` and the `XEngineSerialization` runtime module.
-- Adds JSON load/save helpers, serialization context, and `.xscene` version metadata.
-- Adds `SceneSerializer` in the Scene module for entities, transforms, cameras, lights,
-  mesh renderers, and hierarchy.
-- Moves validation scene content into `Assets/Scenes/*.xscene`.
-- Updates Sandbox to load `Assets/Scenes/Default.xscene` at startup.
-- Keeps RenderSystem focused on renderer resources, scene extraction, and frame rendering only.
-- Does not implement ImGui, editor panels, shadows, CSM, or scene save UI.
-
-## Stage 8E-1 - ThirdParty ImGui Cleanup + Editor ImGui Foundation
-
-```text
-COMPLETE
-```
-
-- Cleans `ThirdParty/imgui` to core files, SDL3 backend, Vulkan backend, stdlib helper, and license.
-- Adds `ThirdParty_imgui` as an editor-only static library target.
-- Adds `EditorApplication`, `EditorContext`, and a real `EditorSystem` skeleton.
-- Adds editor-private `ImGuiLayer` and `ImGuiVulkanBackend`.
-- Enables docking without multi-viewport.
-- Adds a temporary `XEngine Editor Debug` validation window.
-- Adds a generic renderer overlay callback and a Vulkan-native RHI bridge for editor overlay rendering.
-- Keeps ImGui out of Runtime public headers, Sandbox, Scene, Asset, Serialization, Renderer implementation, RHI implementation, and Shader modules.
-- Does not implement SceneHierarchyPanel, InspectorPanel, RendererDebugPanel, ViewportPanel, editor camera movement, gizmos, DebugDraw, shadows, CSM, asset browser, undo/redo, prefab, project system, or native file dialogs.
-
-## Stage 8E-2 - EditorCamera, ViewportPanel, Mouse Capture, and Axis Gizmo
-
-```text
-COMPLETE
-```
-
-- Adds editor-only `EditorCamera`.
-- Adds renderer-neutral `RenderView` and `RenderSystem::SetViewProvider`.
-- Editor chooses between EditorCamera and active Scene primary CameraComponent through `UseEditorCamera`.
-- Adds viewport input state to `EditorContext`.
-- Adds reusable editor free camera control for mouse look, WASD, Q/E, and Shift speed.
-- Adds Platform window APIs for cursor visibility, relative mouse mode, and focus state.
-- Adds `ViewportPanel` with hover/focus tracking, capture hints, and camera capture entry.
-- Releases camera capture on Esc, focus loss, or disabling Editor Camera.
-- Adds a screen-space viewport axis gizmo for +X Forward, +Y Right, +Z Up.
-- Keeps Sandbox on Scene primary CameraComponent and out of Editor/ImGui.
-- Does not implement SceneHierarchyPanel, InspectorPanel, RendererDebugPanel, Viewport render target, DebugDraw, shadows, CSM, picking, manipulation gizmos, asset browser, undo/redo, prefab, project system, or native file dialogs.
-
-## Stage 8E-3 - Editor Panels, Scene Load/Save UI, and Renderer Debug Settings
-
-```text
-COMPLETE
-```
-
-- Adds editor-private `MainMenuBar`, `SceneHierarchyPanel`, `InspectorPanel`, and `RendererDebugPanel`.
-- Adds fixed-path New/Open/Save/Save As scene workflows through Runtime `SceneSerializer`.
-- Tracks selection, panel visibility, and scene dirty state in `EditorContext`.
-- Adds `Scene::Clear()` and keeps hierarchy traversal behind Scene query APIs.
-- Inspector edits local transform, light, camera, and mesh renderer state without touching editor camera data.
-- Adds runtime `RendererDebugSettings` and exposes it through `RenderSystem`.
-- Adds a main editor dockspace without layout persistence or multi-viewport platform windows.
-- Keeps Sandbox runtime-only: load `.xscene`, use Scene primary camera, no Editor/ImGui link, no save path.
-- Does not implement CSM, shadow maps, DebugDraw, picking, manipulation gizmos, asset browser, material editor, undo/redo, prefab, project system, or native file dialogs.
-
-## Status
-
-```text
-PLANNED
-```
-
-## Goal
-
-Add basic real-time lighting and shadows.
-
-## Systems
-
-```text
-Light system
-Shadow pass
-Shadow map resources
-RenderGraph texture read/write
-```
-
-## Features
-
-```text
-Directional light
-Point light optional
-ShadowMapPass
-Directional shadow map
-PCF filtering
-Cascaded shadow maps later
-```
-
-## RenderPipeline Preparation
-
-At this stage, start preparing the idea of:
-
-```text
-ForwardPipeline
-```
-
-But do not introduce a full RenderFeature system yet unless necessary.
-
-## Completion Criteria
-
-```text
-Directional light affects PBR shading.
-A shadow map is rendered.
-ForwardPBRPass reads shadow map.
-RenderGraph tracks shadow pass dependency.
-```
+未来若确有动态链接需求，再在已稳定的模块边界上增加 loader 和 ABI 层。
 
 ---
 
-# Stage 9 - HDR + Post-processing + RenderFeature V0
+## 15. 与 Claude Code 协作要求
 
-## Status
+Claude Code 在每个阶段开始前应：
 
-```text
-PLANNED
-```
+1. 阅读本文件；
+2. 检查仓库实际代码和 CMake；
+3. 对比当前实现与本阶段目标；
+4. 给出小范围设计方案；
+5. 列出预计修改文件；
+6. 等设计确认后再实施，除非任务明确要求直接执行。
 
-## Goal
+实施时应：
 
-Introduce HDR rendering, post-processing, and the first real RenderFeature system.
+* 每次只处理一个里程碑；
+* 不自动补全后续全部 RHI；
+* 不因旧代码存在而保留错误协议；
+* 不修改无关模块；
+* 不进行无关格式化；
+* 不自行引入 loader、registry 或插件系统；
+* 不为了“全引擎编译成功”修改上层；
+* 每个阶段增加对应测试；
+* 每个阶段输出构建和测试结果；
+* 遇到设计分歧时明确列出选择和影响，不自行做重大架构决定。
 
-This is the recommended stage to formally introduce:
+每个任务结束时应输出：
 
-```text
-RenderPipeline
-RenderFeature
-RenderSettings expansion
-```
-
-because this is the first stage where multiple configurable rendering features become meaningful.
-
-## Systems
-
-```text
-ForwardPipeline
-RenderFeature base concept
-RenderSettings expanded
-PostProcess system
-TonemapPass
-Bloom passes
-FXAAPass optional
-```
-
-## Why RenderFeature Starts Here
-
-Stage 9 introduces several configurable features:
-
-```text
-Bloom on/off
-Tone mapping mode
-FXAA on/off
-Exposure settings
-Color grading optional
-```
-
-This is the right time to move away from hardcoding pass order directly in RenderSystem.
-
-## Recommended Layering
-
-```text
-RenderSystem
-  -> ForwardPipeline
-      -> RenderFeature
-          -> RenderPass
-              -> RenderGraph
-```
-
-## Initial RenderFeature Candidates
-
-```text
-BloomFeature
-TonemapFeature
-AntiAliasingFeature V0
-```
-
-## AntiAliasing V0
-
-Start small:
-
-```cpp
-enum class AntiAliasingMode
-{
-    None,
-    FXAA
-};
-```
-
-Do not implement TAA yet.
-
-## Features
-
-```text
-HDR color target
-Tonemapping
-Gamma correction
-Bloom downsample
-Bloom upsample
-FXAA optional
-Color grading optional
-```
-
-## Completion Criteria
-
-```text
-Scene renders into HDRColor.
-TonemapPass writes LDR output.
-Bloom can be toggled.
-FXAA can be toggled if implemented.
-RenderFeature V0 can add one or more passes to RenderGraph.
-RenderSystem delegates frame assembly to ForwardPipeline.
-```
+* 修改文件列表；
+* 当前接口摘要；
+* target 依赖；
+* 测试覆盖；
+* 构建结果；
+* 已知限制；
+* 下一阶段建议；
+* 然后停止，不继续实现下一阶段。
 
 ---
 
-# Stage 10 - GPUScene + RenderQueue
+## 16. 当前下一步
 
-## Status
-
-```text
-PLANNED
-```
-
-## Goal
-
-Refactor renderer data into GPU-friendly buffers and prepare for GPU-driven rendering.
-
-## Systems
+当前建议从 M0 开始：
 
 ```text
-GPUScene
-RenderQueue
-DrawList
-ObjectBuffer
-MaterialBuffer
-MeshBuffer
-LightBuffer
+建立新的 XEngineRHI 与 XEngineVulkanRHI 边界
+建立独立测试闭环
+排除旧 RHI 实现和旧上层模块
+验证 RHI Core 不依赖 Vulkan
 ```
 
-## Features
+M0 完成后，正式讨论 M1：
 
 ```text
-GPUObjectData
-GPUMaterialData
-GPUMeshData
-Opaque render queue
-Transparent render queue placeholder
-CPU frustum culling
-Draw sorting
+RHI 基础类型
+Result/Error
+RHIObject 是否需要
+对象生命周期
+debug naming
+flags
+public header 规则
 ```
 
-## GPU-driven Preparation
-
-This is the real foundation for GPU-driven rendering.
-
-The renderer should move toward:
-
-```text
-ObjectBuffer
-MaterialBuffer
-MeshBuffer
-DrawList
-```
-
-instead of immediate per-object CPU binding.
-
-## Completion Criteria
-
-```text
-Objects are uploaded into structured GPU buffers.
-Render queue controls draw order.
-Foundation for indirect drawing exists.
-```
-
----
-
-# Stage 11 - Bindless Resource Model
-
-## Status
-
-```text
-PLANNED
-```
-
-## Goal
-
-Introduce a modern resource binding model.
-
-## Systems
-
-```text
-BindlessResourceManager
-Texture heap
-Sampler heap
-Material texture indices
-```
-
-## Features
-
-```text
-Global texture array
-Global sampler table
-Material stores texture indices
-Descriptor indexing
-Non-uniform indexing
-```
-
-## Why This Matters
-
-Bindless is a major prerequisite for scalable GPU-driven rendering.
-
-GPU-driven draw should be able to resolve:
-
-```text
-object id -> material id -> texture indices
-```
-
-without CPU-side per-material descriptor rebinding.
-
-## Completion Criteria
-
-```text
-Material no longer requires per-material descriptor set binding.
-Textures are accessed by index.
-Bindless manager owns descriptor allocation/update.
-```
-
----
-
-# Stage 12 - Forward+ / Clustered Lighting
-
-## Status
-
-```text
-PLANNED
-```
-
-## Goal
-
-Support many dynamic lights efficiently and mature compute-pass infrastructure.
-
-## Systems
-
-```text
-LightCullingPass
-Cluster data
-Tile light list
-Compute pipeline
-```
-
-## Features
-
-```text
-Depth prepass
-Light culling compute shader
-Forward+ tile lighting
-Clustered lighting optional
-Many point lights
-```
-
-## GPU-driven Preparation
-
-This stage trains the renderer for:
-
-```text
-Compute pass
-Storage buffers
-Compute-to-graphics dependency
-GPU-generated lists
-```
-
-These are also required by later GPU-driven culling.
-
-## Completion Criteria
-
-```text
-Many lights render with reasonable performance.
-Light culling runs as a compute pass.
-ForwardPBRPass reads light lists.
-RenderGraph handles compute-to-graphics dependency.
-```
-
----
-
-# Stage 13 - Editor Base
-
-## Status
-
-```text
-PLANNED
-```
-
-## Goal
-
-Build the first editor interface.
-
-## Systems
-
-```text
-UISystem
-ImGuiRenderer
-EditorSystem
-ViewportPanel
-SceneHierarchyPanel
-InspectorPanel
-AssetBrowserPanel
-ProfilerPanel
-RenderGraphPanel
-```
-
-## Third-party Libraries
-
-```text
-Dear ImGui docking branch
-```
-
-## Features
-
-```text
-DockSpace
-Viewport panel
-Scene hierarchy placeholder
-Inspector placeholder
-Asset browser placeholder
-Profiler panel placeholder
-RenderGraph panel placeholder
-```
-
-## Completion Criteria
-
-```text
-EditorApp launches with dockable UI.
-SandboxApp does not depend on Editor.
-ImGui does not appear in public runtime headers.
-Viewport can display renderer output.
-```
-
----
-
-# Stage 14 - Temporal Renderer
-
-## Status
-
-```text
-PLANNED
-```
-
-## Goal
-
-Introduce temporal rendering infrastructure.
-
-## Systems
-
-```text
-Frame history
-Motion vector pass
-History resource manager
-Temporal resolve pass
-TAAFeature
-```
-
-## Features
-
-```text
-Previous view-projection matrix
-Previous object transform
-Jittered projection
-Motion vector buffer
-TAA
-History color
-History depth
-Temporal accumulation
-```
-
-## AntiAliasing Expansion
-
-Expand:
-
-```cpp
-enum class AntiAliasingMode
-{
-    None,
-    FXAA,
-    TAA
-};
-```
-
-## Completion Criteria
-
-```text
-Renderer stores current and previous frame data.
-Motion vectors render correctly.
-TAA improves image stability.
-History resources are managed safely.
-TAA is implemented as a RenderFeature.
-```
-
----
-
-# Stage 15 - Advanced Renderer Experiments
-
-## Status
-
-```text
-PLANNED
-```
-
-## Goal
-
-Explore modern and experimental rendering techniques after the renderer architecture is stable.
-
-## Candidate Features
-
-```text
-SSAO / GTAO
-SSR
-Deferred rendering
-Visibility buffer
-GPU-driven rendering
-GPU frustum culling
-GPU occlusion culling
-Indirect draw
-Meshlet rendering
-Mesh shader path
-Ray traced shadows
-Ray traced reflections
-Simple path tracing mode
-Virtual shadow maps
-Virtual texturing
-External upscalers
-Neural rendering experiments
-```
-
----
-
-## Stage 15A - GPU-driven V0: CPU-generated Indirect Draw
-
-```text
-CPU builds VkDrawIndexedIndirectCommand buffer.
-GPU executes indirect draw.
-No GPU culling yet.
-```
-
-## Stage 15B - GPU-driven V1: GPU Frustum Culling
-
-```text
-Compute shader tests object bounds.
-Visible objects write indirect draw commands.
-Graphics pass executes indirect draw.
-```
-
-## Stage 15C - GPU-driven V2: GPU Draw Count
-
-```text
-Atomic counter / count buffer.
-vkCmdDrawIndexedIndirectCount.
-```
-
-## Stage 15D - GPU-driven V3: Hi-Z Occlusion Culling
-
-```text
-Build depth pyramid.
-Compute shader tests object bounds against Hi-Z.
-Cull hidden objects.
-```
-
-## Stage 15E - Meshlet / Cluster Culling
-
-```text
-meshoptimizer meshlets.
-Cluster bounds.
-Cluster cone culling.
-Compute fallback first.
-Mesh shader path later.
-```
-
-## Stage 15F - External / Neural Features
-
-Use `RenderGraphPassType::External` or `RenderGraphPassType::Compute`.
-
-Candidate features:
-
-```text
-DLSS
-FSR
-XeSS
-Neural denoising
-Neural texture decoding
-Neural material approximation
-Neural radiance cache experiments
-```
-
-Do not introduce these before the renderer has:
-
-```text
-Motion vectors
-Depth
-History resources
-RenderFeature system
-External pass support
-Stable RenderGraph resources
-```
-
----
-
-# Multithreading Plan
-
-## Stage 0-3
-
-```text
-No real multithreading.
-RenderGraph execution is single-threaded.
-```
-
-## Stage 4.5 - JobSystem V0
-
-Introduce after ShaderSystem is working.
-
-```text
-Worker thread pool
-Submit()
-Wait()
-ParallelFor()
-Used by shader compilation later
-```
-
-Do not implement work stealing or complex task graphs yet.
-
-## Stage 7.5 - Async Asset Loading V0
-
-```text
-Texture decoding
-glTF parsing
-Mesh optimization
-CPU-side asset import on workers
-GPU resource creation stays on render/RHI thread
-```
-
-## Stage 10.5 - Parallel Render Preparation
-
-```text
-Parallel scene extraction
-Parallel CPU frustum culling
-Parallel draw list building
-```
-
-## Stage 12.5+ - RenderGraph Task Scheduling
-
-```text
-Pass preparation tasks
-Parallel command recording
-Async compute groundwork
-```
-
----
-
-# RenderFeature System Plan
-
-The RenderFeature system should **not** be implemented too early.
-
-## Not in Stage 3
-
-Stage 3 only contains:
-
-```text
-RenderSystem
-RenderGraph V0
-ClearPass
-PresentPass
-RenderSettings initial clear color
-```
-
-Do not implement:
-
-```text
-BloomFeature
-AntiAliasingFeature
-ShadowFeature
-SSAOFeature
-```
-
-## Formal Introduction
-
-RenderFeature should be formally introduced in:
-
-```text
-Stage 9 - HDR + Post-processing + RenderFeature V0
-```
-
-Reason:
-
-```text
-Stage 9 is the first time XEngine has multiple configurable rendering features:
-- Bloom
-- Tonemap
-- FXAA
-- Exposure
-- Color grading
-```
-
-## Future Expansion
-
-```text
-Stage 14:
-  TAAFeature
-
-Stage 15:
-  External upscalers
-  Neural rendering experiments
-  GPU-driven features
-```
-
----
-
-# Recommended Development Sequence From Now
-
-```text
-1. Stage 4A - ShaderSystem + Slang Integration
-2. Stage 4B - RHIShader / Pipeline / TrianglePass
-3. Stage 4.5 - JobSystem V0
-4. Stage 5 - Basic Mesh Forward Renderer
-5. Stage 6 - Material + Texture + Basic PBR
-6. Stage 7 - Asset System Foundation
-7. Stage 7.5 - Async Asset Loading V0
-8. Stage 8 - Lighting + Shadow
-9. Stage 9 - HDR + Post-processing + RenderFeature V0
-10. Stage 10 - GPUScene + RenderQueue
-11. Stage 11 - Bindless Resource Model
-12. Stage 12 - Forward+ / Clustered Lighting
-13. Stage 13 - Editor Base
-14. Stage 14 - Temporal Renderer
-15. Stage 15 - Advanced Renderer Experiments
-```
-
----
-
-# Immediate Next Step
-
-The next practical stage is:
-
-```text
-Stage 4A - ShaderSystem + Slang Integration
-```
-
-Primary goal:
-
-```text
-Compile Triangle.slang to SPIR-V through XEngine ShaderSystem.
-```
-
-Do not create Vulkan pipeline yet in Stage 4A.
-
-Stage 4B will handle:
-
-```text
-VkShaderModule
-Graphics pipeline
-TrianglePass
-Draw triangle
-```
-
----
-
-## Stage 8F Complete
-
-Implemented:
-
-- CMake-generated development path fallback header.
-- `ProjectPaths` runtime path resolution and root logging.
-- Config/Saved folder convention with editor/renderer default config files.
-- ImGui docking default/user layout loading and Saved layout persistence.
-- Scene explicit root entity list for the implicit SceneRoot.
-- Parent/clear-parent cycle-safe hierarchy operations with keep-world conversion.
-- TransformSystem traversal from root entities.
-- Inspector World/Local transform editing behavior.
-- Scene serialization using virtual asset paths and parent ids.
+未经讨论，不应直接开始实现 Instance、Adapter 或 Device。
