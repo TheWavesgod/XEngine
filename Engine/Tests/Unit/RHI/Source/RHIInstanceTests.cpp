@@ -159,8 +159,7 @@ namespace
         // unique_ptr<RHIDevice> can hold it. Constructed via the protected
         // Local device stub — derives from RHIDevice so the base-class
         // unique_ptr<RHIDevice> can hold it. M3 expanded RHIDevice with
-        // 5 pure virtuals; this stub implements the minimum needed for
-        // RHIInstance single-device constraint tests.
+        // 5 pure virtuals; M4 added CreateBufferImpl.
         class StubDevice : public RHIDevice
         {
         public:
@@ -171,6 +170,13 @@ namespace
             const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
             u32 GetMaxFramesInFlight() const noexcept override { return 2; }
             RHIQueue* GetQueue(RHIQueueType) const override { return nullptr; }
+            RHIBuffer* CreateBufferImpl(const RHIBufferDesc&) override { return nullptr; }
+            RHITexture* CreateTextureImpl(const RHITextureDesc&) override { return nullptr; }
+            RHITextureView* CreateTextureViewImpl(const RHITextureViewDesc&) override { return nullptr; }
+            RHISampler* CreateSamplerImpl(const RHISamplerDesc&) override { return nullptr; }
+            RHIFence* CreateFenceImpl(const RHIFenceDesc&) override { return nullptr; }
+            RHISemaphore* CreateSemaphoreImpl(const RHISemaphoreDesc&) override { return nullptr; }
+            RHICommandList* CreateCommandListImpl(const RHICommandListDesc&) override { return nullptr; }
 
         private:
             RHICapabilities m_Caps;

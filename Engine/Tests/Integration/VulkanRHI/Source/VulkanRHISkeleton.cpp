@@ -1,33 +1,28 @@
-// Skeleton Vulkan RHI integration test for the new XEngineVulkanRHI target.
+// Phase 1 (M0-M3 backend) Vulkan RHI integration test.
 //
-// This file exists to prove the integration test target compiles and links
-// against the new XEngineVulkanRHI target (which is now a separate, minimal
-// skeleton). It intentionally does NOT create a VkInstance, VkPhysicalDevice,
-// VkDevice, or VkCommandBuffer yet, because per Docs/AI helper/prompts.md:
+// Verifies the new XEngineVulkanRHI against a real GPU / loader:
+//   * VkInstance creation through VulkanInstance::CreateInstance
+//   * Physical device enumeration
+//   * Logical device creation
+//   * Per-family queue retrieval
+//   * Capabilities population (M3 audit)
 //
-//   1. The new XEngineVulkanRHI public surface is currently empty (only a
-//      version probe) — the RHIInstance / RHIAdapter / RHIDevice API
-//      design has deliberately not started yet.
-//   2. Designing or implementing any of those protocols is out of scope
-//      for this task. Once they land, this file is where the new
-//      contract checks will live.
-//
-// What this file DOES verify today:
-//   * XEngineVulkanRHI's public header (XEngine/VulkanRHI/Base.h) is
-//     visible from the test executable.
-//   * XEngineRHI's public header (XEngine/RHI/Base.h) is still visible
-//     (it is a PUBLIC dep of XEngineVulkanRHI).
-//   * The version probe defined in XEngineVulkanRHI/Private/VulkanRHI.cpp
-//     resolves at link time.
+// Phase 2+ will add buffer roundtrip and fence/semaphore tests.
 
 #include <gtest/gtest.h>
 
 #include <XEngine/Core/Types.h>
 #include <XEngine/RHI/Base.h>
+#include <XEngine/RHI/RHIInstance.h>
+#include <XEngine/RHI/RHIAdapter.h>
+#include <XEngine/RHI/RHIDevice.h>
+#include <XEngine/RHI/RHIQueue.h>
 #include <XEngine/Test/TestSupport.h>
 #include <XEngine/VulkanRHI/Base.h>
+#include <XEngine/VulkanRHI/Backend.h>
 
 #include <cstdint>
+#include <memory>
 
 namespace XEngine
 {
@@ -38,21 +33,72 @@ namespace XEngine
     } // namespace
 } // namespace XEngine
 
-TEST(VulkanRHIIntegration, SkeletonBuildsAndLinks)
+TEST(VulkanRHIIntegration, LinkTimeProbeResolves)
 {
+    // If XEngineVulkanRHI is not actually linked, the linker would fail.
     EXPECT_EQ(XEngine::Test::TestSupportAbiVersion, 0);
+    EXPECT_EQ(XEngineVulkanRHI_GetVersionMajor(), XEngine::VulkanRHIVersionMajor);
+    EXPECT_EQ(XEngineVulkanRHI_GetVersionMinor(), XEngine::VulkanRHIVersionMinor);
+    EXPECT_EQ(XEngineVulkanRHI_GetVersionPatch(), XEngine::VulkanRHIVersionPatch);
 }
 
-TEST(VulkanRHIIntegration, NewVulkanRHIVersionTriplesExposed)
+TEST(VulkanRHIIntegration, CreateInstanceSucceeds)
 {
-    // Link-time resolution test: if XEngineVulkanRHI is not actually
-    // linked, the linker will fail. The runtime checks below produce a
-    // useful CTest output entry in case the linkers succeed but values
-    // ever drift.
-    EXPECT_EQ(XEngineVulkanRHI_GetVersionMajor(),
-              XEngine::VulkanRHIVersionMajor);
-    EXPECT_EQ(XEngineVulkanRHI_GetVersionMinor(),
-              XEngine::VulkanRHIVersionMinor);
-    EXPECT_EQ(XEngineVulkanRHI_GetVersionPatch(),
-              XEngine::VulkanRHIVersionPatch);
+    XEngine::RHIInstanceDesc desc;
+    desc.ApplicationName = "VulkanRHIIntegrationTest";
+    desc.ApplicationVersion = 0;
+    desc.EnableValidation = false;
+    desc.EnableDebugMarkers = true;
+
+    auto instance = XEngine::VulkanRHI::CreateInstance(desc);
+    ASSERT_NE(instance, nullptr);
+    EXPECT_EQ(instance->GetBackend(), XEngine::RHIBackend::Vulkan);
+}
+
+TEST(VulkanRHIIntegration, EnumerateAdaptersReturnsAtLeastOne)
+{
+    auto instance = XEngine::VulkanRHI::CreateInstance({});
+    ASSERT_NE(instance, nullptr);
+
+    auto adapters = instance->EnumerateAdapters();
+    EXPECT_GE(adapters.size(), 1u);
+    for (auto& a : adapters)
+    {
+        const auto info = a->GetInfo();
+        EXPECT_FALSE(info.VendorName.empty());
+        EXPECT_FALSE(info.AdapterName.empty());
+        EXPECT_NE(info.Type, XEngine::RHIAdapterType::Unknown);
+    }
+}
+
+TEST(VulkanRHIIntegration, CreateDeviceAndGetQueues)
+{
+    auto instance = XEngine::VulkanRHI::CreateInstance({});
+    ASSERT_NE(instance, nullptr);
+
+    auto adapters = instance->EnumerateAdapters();
+    ASSERT_FALSE(adapters.empty());
+
+    auto& adapter = *adapters.front();
+    auto* device = instance->CreateDevice(adapter, {});
+    ASSERT_NE(device, nullptr);
+
+    EXPECT_EQ(device->GetBackend(), XEngine::RHIBackend::Vulkan);
+    EXPECT_EQ(device->GetMaxFramesInFlight(), 2u);
+
+    const auto& caps = device->GetCapabilities();
+    EXPECT_GT(caps.MaxTextureSize2D, 0u);
+    EXPECT_GT(caps.MaxSamplerAnisotropy, 0u);
+
+    auto* gfx = device->GetQueue(XEngine::RHIQueueType::Graphics);
+    auto* cmp = device->GetQueue(XEngine::RHIQueueType::Compute);
+    auto* xfr = device->GetQueue(XEngine::RHIQueueType::Transfer);
+    EXPECT_NE(gfx, nullptr);
+    EXPECT_EQ(gfx->GetType(), XEngine::RHIQueueType::Graphics);
+    EXPECT_NE(cmp, nullptr);
+    EXPECT_EQ(cmp->GetType(), XEngine::RHIQueueType::Compute);
+    EXPECT_NE(xfr, nullptr);
+    EXPECT_EQ(xfr->GetType(), XEngine::RHIQueueType::Transfer);
+
+    device->WaitIdle();
 }

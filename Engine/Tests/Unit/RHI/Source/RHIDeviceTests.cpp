@@ -12,9 +12,13 @@
 #include <XEngine/RHI/Base.h>
 #include <XEngine/RHI/RHIObject.h>
 #include <XEngine/RHI/RHIDevice.h>
+#include <XEngine/RHI/RHIBuffer.h>
+#include <XEngine/RHI/RHITexture.h>
 #include <XEngine/RHI/RHIQueue.h>
 #include <XEngine/RHI/RHIInstance.h>
+#include <XEngine/RHI/RHIDescriptors.h>
 #include <XEngine/RHI/RHIEnums.h>
+#include <XEngine/RHI/RHIFlags.h>
 
 #include <memory>
 #include <vector>
@@ -53,8 +57,102 @@ namespace XEngine
 
         RHIQueueType GetType() const noexcept override { return m_Type; }
 
+        void Submit(
+            RHICommandList*,
+            RHIFence* = nullptr,
+            std::span<RHISemaphore*> = {},
+            std::span<RHISemaphore*> = {}) override
+        {
+        }
+
     private:
         RHIQueueType m_Type;
+    };
+
+    // Local buffer stub — verifies M4 surface on a stub.
+    class StubBuffer : public RHIBuffer
+    {
+    public:
+        StubBuffer(RHIDevice& owner, RHIBufferDesc desc)
+            : RHIBuffer(owner, owner.GetBackend())
+            , m_Desc(desc)
+        {
+        }
+
+        u64 GetSize() const noexcept override { return m_Desc.Size; }
+        RHIBufferUsage GetUsage() const noexcept override { return m_Desc.Usage; }
+        void Update(u64, const void*, u64) override { m_UpdateCount++; }
+        void* Map() override { m_MapCount++; return nullptr; }
+        void Unmap() override { m_UnmapCount++; }
+
+        u32 GetUpdateCount() const noexcept { return m_UpdateCount; }
+
+    private:
+        RHIBufferDesc m_Desc;
+        u32 m_UpdateCount = 0;
+        u32 m_MapCount = 0;
+        u32 m_UnmapCount = 0;
+    };
+
+    // M5: local texture stub. Mirrors StubBuffer's pattern.
+    class StubTexture : public RHITexture
+    {
+    public:
+        StubTexture(RHIDevice& owner, RHITextureDesc desc)
+            : RHITexture(owner, owner.GetBackend())
+            , m_Desc(desc)
+        {
+        }
+
+        RHIFormat          GetFormat()      const noexcept override { return m_Desc.Format; }
+        RHITextureDimension GetDimension() const noexcept override { return m_Desc.Dimension; }
+        u32                GetWidth()      const noexcept override { return m_Desc.Width; }
+        u32                GetHeight()     const noexcept override { return m_Desc.Height; }
+        u32                GetDepth()      const noexcept override { return m_Desc.Depth; }
+        u32                GetMipLevels()  const noexcept override { return m_Desc.MipLevels; }
+        u32                GetArrayLayers() const noexcept override { return m_Desc.ArrayLayers; }
+        RHITextureUsage    GetUsage()      const noexcept override { return m_Desc.Usage; }
+
+    private:
+        RHITextureDesc m_Desc;
+    };
+
+    // M5: local texture view stub.
+    class StubTextureView : public RHITextureView
+    {
+    public:
+        StubTextureView(RHIDevice& owner, RHITextureViewDesc desc)
+            : RHITextureView(owner, owner.GetBackend())
+            , m_Desc(desc)
+        {
+        }
+
+        RHIFormat          GetFormat()          const noexcept override { return m_Desc.Format; }
+        const RHITexture*  GetSource()          const noexcept override { return m_Desc.Source; }
+        RHITextureDimension GetDimension()     const noexcept override { return m_Desc.Dimension; }
+        u32                GetBaseMipLevel()    const noexcept override { return m_Desc.BaseMipLevel; }
+        u32                GetMipLevelCount()   const noexcept override { return m_Desc.MipLevelCount; }
+        u32                GetBaseArrayLayer()  const noexcept override { return m_Desc.BaseArrayLayer; }
+        u32                GetArrayLayerCount() const noexcept override { return m_Desc.ArrayLayerCount; }
+
+    private:
+        RHITextureViewDesc m_Desc;
+    };
+
+    // M5: local sampler stub. Captures desc at creation.
+    class StubSampler : public RHISampler
+    {
+    public:
+        StubSampler(RHIDevice& owner, RHISamplerDesc desc)
+            : RHISampler(owner, owner.GetBackend())
+            , m_Desc(desc)
+        {
+        }
+
+        RHISamplerDesc GetDesc() const noexcept override { return m_Desc; }
+
+    private:
+        RHISamplerDesc m_Desc;
     };
 
     // Stub RHIDevice — exposes settable caps / max frames / queue type.
@@ -77,11 +175,43 @@ namespace XEngine
             return (type == m_QueueType) ? m_Queue.get() : nullptr;
         }
 
+        RHIBuffer* CreateBufferImpl(const RHIBufferDesc& desc) override
+        {
+            m_LastBuffer = std::make_unique<StubBuffer>(*this, desc);
+            return m_LastBuffer.get();
+        }
+
+        RHITexture* CreateTextureImpl(const RHITextureDesc& desc) override
+        {
+            m_LastTexture = std::make_unique<StubTexture>(*this, desc);
+            return m_LastTexture.get();
+        }
+
+        RHITextureView* CreateTextureViewImpl(const RHITextureViewDesc& desc) override
+        {
+            m_LastTextureView = std::make_unique<StubTextureView>(*this, desc);
+            return m_LastTextureView.get();
+        }
+
+        RHISampler* CreateSamplerImpl(const RHISamplerDesc& desc) override
+        {
+            m_LastSampler = std::make_unique<StubSampler>(*this, desc);
+            return m_LastSampler.get();
+        }
+
+        RHIFence* CreateFenceImpl(const RHIFenceDesc&) override { return nullptr; }
+        RHISemaphore* CreateSemaphoreImpl(const RHISemaphoreDesc&) override { return nullptr; }
+        RHICommandList* CreateCommandListImpl(const RHICommandListDesc&) override { return nullptr; }
+
         // Test harness
         void SetMaxFramesInFlight(u32 v) noexcept { m_MaxFramesInFlight = v; }
         void SetCapabilities(RHICapabilities caps) noexcept { m_Caps = caps; }
         u32 GetWaitIdleCount() const noexcept { return m_WaitIdleCount; }
         RHIQueueType GetQueuedType() const noexcept { return m_QueueType; }
+        StubBuffer* GetLastBuffer() noexcept { return m_LastBuffer.get(); }
+        StubTexture* GetLastTexture() noexcept { return m_LastTexture.get(); }
+        StubTextureView* GetLastTextureView() noexcept { return m_LastTextureView.get(); }
+        StubSampler* GetLastSampler() noexcept { return m_LastSampler.get(); }
 
     private:
         RHIQueueType m_QueueType;
@@ -89,6 +219,10 @@ namespace XEngine
         u32 m_WaitIdleCount = 0;
         RHICapabilities m_Caps;
         std::unique_ptr<StubQueue> m_Queue;
+        std::unique_ptr<StubBuffer> m_LastBuffer;
+        std::unique_ptr<StubTexture> m_LastTexture;
+        std::unique_ptr<StubTextureView> m_LastTextureView;
+        std::unique_ptr<StubSampler> m_LastSampler;
     };
 }
 
@@ -199,5 +333,59 @@ namespace
         RHIQueue* q = device.GetQueue(RHIQueueType::Graphics);
         ASSERT_NE(q, nullptr);
         EXPECT_EQ(q->GetType(), RHIQueueType::Graphics);
+    }
+
+    // ---------------------------------------------------------------------
+    // Resource creation (M4)
+    // ---------------------------------------------------------------------
+
+    TEST(RHIDevice, CreateBufferReturnsStubBuffer)
+    {
+        DeviceTestInstance instance;
+        StubDevice device(instance);
+
+        RHIBufferDesc desc{
+            .Size = 1024,
+            .Usage = RHIBufferUsage::Vertex | RHIBufferUsage::TransferDst,
+        };
+        RHIBuffer* buffer = device.CreateBuffer(desc);
+        ASSERT_NE(buffer, nullptr);
+
+        EXPECT_EQ(buffer->GetSize(), 1024u);
+        EXPECT_EQ(buffer->GetUsage(), RHIBufferUsage::Vertex | RHIBufferUsage::TransferDst);
+        EXPECT_EQ(buffer->GetOwnerDevice(), &device);
+
+        StubBuffer* stub = device.GetLastBuffer();
+        ASSERT_NE(stub, nullptr);
+        EXPECT_EQ(stub->GetSize(), 1024u);
+        EXPECT_EQ(stub->GetUsage(), RHIBufferUsage::Vertex | RHIBufferUsage::TransferDst);
+    }
+
+    TEST(RHIDevice, CreateBufferSizeZeroIsNull)
+    {
+        DeviceTestInstance instance;
+        StubDevice device(instance);
+
+        RHIBufferDesc desc{
+            .Size = 0,
+            .Usage = RHIBufferUsage::Vertex,
+        };
+        RHIBuffer* buffer = device.CreateBuffer(desc);
+        EXPECT_EQ(buffer, nullptr);
+        EXPECT_EQ(device.GetLastBuffer(), nullptr);
+    }
+
+    TEST(RHIDevice, CreateBufferUsageNoneIsNull)
+    {
+        DeviceTestInstance instance;
+        StubDevice device(instance);
+
+        RHIBufferDesc desc{
+            .Size = 1024,
+            .Usage = RHIBufferUsage::None,
+        };
+        RHIBuffer* buffer = device.CreateBuffer(desc);
+        EXPECT_EQ(buffer, nullptr);
+        EXPECT_EQ(device.GetLastBuffer(), nullptr);
     }
 }

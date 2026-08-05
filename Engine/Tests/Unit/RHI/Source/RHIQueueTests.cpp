@@ -1,7 +1,6 @@
 // Unit tests for RHIQueue.
 //
-// M3 surface is minimal: GetType() only. Tests verify identifier,
-// polymorphism, and enum value stability.
+// M3: GetType() only. M6: + Submit.
 
 #include <gtest/gtest.h>
 
@@ -11,14 +10,21 @@
 #include <XEngine/RHI/RHIQueue.h>
 #include <XEngine/RHI/RHIDevice.h>
 #include <XEngine/RHI/RHIInstance.h>
+#include <XEngine/RHI/RHIDescriptors.h>
+#include <XEngine/RHI/RHIBuffer.h>
+#include <XEngine/RHI/RHITexture.h>
+#include <XEngine/RHI/RHISampler.h>
+#include <XEngine/RHI/RHIFence.h>
+#include <XEngine/RHI/RHISemaphore.h>
+#include <XEngine/RHI/RHICommandList.h>
 #include <XEngine/RHI/RHIEnums.h>
 
 #include <memory>
+#include <span>
 #include <vector>
 
 namespace XEngine
 {
-    // Minimal RHIInstance stub — implements pure virtuals with no-op returns.
     class QueueTestInstance : public RHIInstance
     {
     public:
@@ -38,12 +44,11 @@ namespace XEngine
         }
     };
 
-    // Minimal RHIDevice stub — required to construct RHIQueue.
     class QueueTestDevice : public RHIDevice
     {
     public:
         explicit QueueTestDevice(RHIInstance& owner)
-            : RHIDevice(owner)
+            : RHIDevice(owner, RHIBackend::Vulkan)
         {
         }
 
@@ -52,16 +57,23 @@ namespace XEngine
         const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
         u32 GetMaxFramesInFlight() const noexcept override { return 2; }
         RHIQueue* GetQueue(RHIQueueType) const override { return nullptr; }
-
+        RHIBuffer* CreateBufferImpl(const RHIBufferDesc&) override { return nullptr; }
+        RHITexture* CreateTextureImpl(const RHITextureDesc&) override { return nullptr; }
+        RHITextureView* CreateTextureViewImpl(const RHITextureViewDesc&) override { return nullptr; }
+        RHISampler* CreateSamplerImpl(const RHISamplerDesc&) override { return nullptr; }
+        RHIFence* CreateFenceImpl(const RHIFenceDesc&) override { return nullptr; }
+        RHISemaphore* CreateSemaphoreImpl(const RHISemaphoreDesc&) override { return nullptr; }
+        RHICommandList* CreateCommandListImpl(const RHICommandListDesc&) override { return nullptr; }
     private:
         RHICapabilities m_Caps;
     };
 
-    // Stub RHIQueue — returns the type and backend it was constructed with.
-    class StubQueue : public RHIQueue
+    // (No duplicate impls after Cleanup)
+
+    class QueueStub : public RHIQueue
     {
     public:
-        StubQueue(RHIDevice& owner, RHIBackend backend, RHIQueueType type)
+        QueueStub(RHIDevice& owner, RHIBackend backend, RHIQueueType type)
             : RHIQueue(owner, backend)
             , m_Type(type)
         {
@@ -69,8 +81,62 @@ namespace XEngine
 
         RHIQueueType GetType() const noexcept override { return m_Type; }
 
+        void Submit(
+            RHICommandList* commandList,
+            RHIFence* signalFence = nullptr,
+            std::span<RHISemaphore*> waitSemaphores = {},
+            std::span<RHISemaphore*> signalSemaphores = {}) override
+        {
+            m_LastCmdList = commandList;
+            m_LastSignalFence = signalFence;
+            m_LastWaitSemaphores.clear();
+            for (auto* sem : waitSemaphores) 
+            {
+                m_LastWaitSemaphores.push_back(sem);
+            }
+            m_LastSignalSemaphores.clear();
+            for (auto* sem : signalSemaphores) 
+            {
+                m_LastSignalSemaphores.push_back(sem);
+            }
+        }
+
+        RHICommandList* GetLastCmdList() const noexcept { return m_LastCmdList; }
+        RHIFence* GetLastSignalFence() const noexcept { return m_LastSignalFence; }
+        const std::vector<RHISemaphore*>& GetLastWaitSemaphores() const noexcept { return m_LastWaitSemaphores; }
+        const std::vector<RHISemaphore*>& GetLastSignalSemaphores() const noexcept { return m_LastSignalSemaphores; }
+
     private:
         RHIQueueType m_Type;
+        RHICommandList* m_LastCmdList = nullptr;
+        RHIFence* m_LastSignalFence = nullptr;
+        std::vector<RHISemaphore*> m_LastWaitSemaphores;
+        std::vector<RHISemaphore*> m_LastSignalSemaphores;
+    };
+
+    // M6: stubs for fence + semaphore + cmdlist used by Submit tests.
+    class StubFence : public RHIFence
+    {
+    public:
+        StubFence(RHIDevice& owner) : RHIFence(owner, owner.GetBackend()) {}
+        bool IsSignaled() const noexcept override { return false; }
+        bool Wait(u64 = UINT64_MAX) noexcept override { return true; }
+    };
+
+    class StubSemaphore : public RHISemaphore
+    {
+    public:
+        StubSemaphore(RHIDevice& owner) : RHISemaphore(owner, owner.GetBackend()) {}
+    };
+
+    class StubCommandList : public RHICommandList
+    {
+    public:
+        StubCommandList(RHIDevice& owner) : RHICommandList(owner, owner.GetBackend()) {}
+        void Begin() override {}
+        void End() override {}
+        void TransitionTexture(
+            RHITexture*, RHIImageLayout, RHIImageLayout, RHIAccessFlags, RHIAccessFlags) override {}
     };
 }
 
@@ -88,9 +154,9 @@ namespace
         QueueTestInstance instance;
         QueueTestDevice device(instance);
 
-        StubQueue gfx(device, RHIBackend::Vulkan, RHIQueueType::Graphics);
-        StubQueue cmp(device, RHIBackend::Vulkan, RHIQueueType::Compute);
-        StubQueue xfer(device, RHIBackend::Vulkan, RHIQueueType::Transfer);
+        QueueStub gfx(device, RHIBackend::Vulkan, RHIQueueType::Graphics);
+        QueueStub cmp(device, RHIBackend::Vulkan, RHIQueueType::Compute);
+        QueueStub xfer(device, RHIBackend::Vulkan, RHIQueueType::Transfer);
 
         EXPECT_EQ(gfx.GetType(), RHIQueueType::Graphics);
         EXPECT_EQ(cmp.GetType(), RHIQueueType::Compute);
@@ -101,7 +167,7 @@ namespace
     {
         QueueTestInstance instance;
         QueueTestDevice device(instance);
-        StubQueue q(device, RHIBackend::Vulkan, RHIQueueType::Graphics);
+        QueueStub q(device, RHIBackend::Vulkan, RHIQueueType::Graphics);
 
         EXPECT_EQ(q.GetOwnerDevice(), &device);
         EXPECT_EQ(q.GetBackend(), RHIBackend::Vulkan);
@@ -111,22 +177,83 @@ namespace
     {
         QueueTestInstance instance;
         QueueTestDevice device(instance);
-        StubQueue q(device, RHIBackend::Vulkan, RHIQueueType::Compute);
+        QueueStub q(device, RHIBackend::Vulkan, RHIQueueType::Compute);
 
         RHIQueue* base = &q;
         EXPECT_EQ(base->GetType(), RHIQueueType::Compute);
-
-        // Reset to graphics, verify virtual dispatch picks up the change.
-        // (We can't actually reassign the type here since m_Type is const after ctor;
-        //  this just demonstrates that the base pointer works correctly.)
         EXPECT_EQ(base->GetOwnerDevice(), &device);
+    }
+
+    // M6: Submit tests
+    TEST(RHIQueue, SubmitWithAllArgsRecordsThem)
+    {
+        QueueTestInstance instance;
+        QueueTestDevice device(instance);
+        QueueStub queue(device, RHIBackend::Vulkan, RHIQueueType::Graphics);
+
+        StubCommandList cmdList(device);
+        StubFence fence(device);
+        StubSemaphore waitSem1(device);
+        StubSemaphore waitSem2(device);
+        StubSemaphore signalSem(device);
+
+        RHISemaphore* waitSems[] = {&waitSem1, &waitSem2};
+        RHISemaphore* signalSems[] = {&signalSem};
+        queue.Submit(&cmdList, &fence,
+                      std::span<RHISemaphore*>(waitSems, 2),
+                      std::span<RHISemaphore*>(signalSems, 1));
+
+        EXPECT_EQ(queue.GetLastCmdList(), &cmdList);
+        EXPECT_EQ(queue.GetLastSignalFence(), &fence);
+
+        const auto& waits = queue.GetLastWaitSemaphores();
+        EXPECT_EQ(waits.size(), 2u);
+        EXPECT_EQ(waits[0], &waitSem1);
+        EXPECT_EQ(waits[1], &waitSem2);
+
+        const auto& signals = queue.GetLastSignalSemaphores();
+        EXPECT_EQ(signals.size(), 1u);
+        EXPECT_EQ(signals[0], &signalSem);
+    }
+
+    TEST(RHIQueue, SubmitWithOnlyCmdList)
+    {
+        QueueTestInstance instance;
+        QueueTestDevice device(instance);
+        QueueStub queue(device, RHIBackend::Vulkan, RHIQueueType::Graphics);
+
+        StubCommandList cmdList(device);
+
+        queue.Submit(&cmdList);
+
+        EXPECT_EQ(queue.GetLastCmdList(), &cmdList);
+        EXPECT_EQ(queue.GetLastSignalFence(), nullptr);
+        EXPECT_TRUE(queue.GetLastWaitSemaphores().empty());
+        EXPECT_TRUE(queue.GetLastSignalSemaphores().empty());
+    }
+
+    TEST(RHIQueue, SubmitWithFenceOnly)
+    {
+        QueueTestInstance instance;
+        QueueTestDevice device(instance);
+        QueueStub queue(device, RHIBackend::Vulkan, RHIQueueType::Graphics);
+
+        StubCommandList cmdList(device);
+        StubFence fence(device);
+
+        queue.Submit(&cmdList, &fence);
+
+        EXPECT_EQ(queue.GetLastCmdList(), &cmdList);
+        EXPECT_EQ(queue.GetLastSignalFence(), &fence);
+        EXPECT_TRUE(queue.GetLastWaitSemaphores().empty());
+        EXPECT_TRUE(queue.GetLastSignalSemaphores().empty());
     }
 
     TEST(RHIQueueType, ValuesAreContiguous)
     {
-        // Enum values are part of the ABI; document them.
         EXPECT_EQ(static_cast<u8>(RHIQueueType::Graphics), 0);
         EXPECT_EQ(static_cast<u8>(RHIQueueType::Compute), 1);
         EXPECT_EQ(static_cast<u8>(RHIQueueType::Transfer), 2);
     }
 }
+

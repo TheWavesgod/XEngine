@@ -89,4 +89,12 @@ if(XENGINE_BUILD_VULKAN_RHI)
     else()
         target_link_libraries(XEngineVulkanRHI PRIVATE ${Vulkan_LIBRARIES})
     endif()
+
+    # VMA is provided by ThirdParty/CMakeLists.txt as a header-only library.
+    # We must compile its single translation unit into our binary.
+    if(EXISTS "${CMAKE_SOURCE_DIR}/ThirdParty/VulkanMemoryAllocator/src/vma.cpp")
+        target_sources(XEngineVulkanRHI PRIVATE
+            "${CMAKE_SOURCE_DIR}/ThirdParty/VulkanMemoryAllocator/src/vma.cpp"
+        )
+    endif()
 endif()
