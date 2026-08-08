@@ -49,17 +49,23 @@ namespace XEngine
 
         volkLoadInstance(instance);
 
-        return std::make_unique<VulkanInstance>(instance);
+        return std::unique_ptr<VulkanInstance>(new VulkanInstance(instance, desc));
     }
 
-    VulkanInstance::VulkanInstance(VkInstance instance)
-        : RHIInstance(RHIInstanceDesc{}, RHIBackend::Vulkan)
+    VulkanInstance::VulkanInstance(VkInstance instance, const RHIInstanceDesc& desc)
+        : RHIInstance(desc, RHIBackend::Vulkan)
         , m_Instance(instance)
     {
     }
 
     VulkanInstance::~VulkanInstance()
     {
+        // The base class owns m_Device (a unique_ptr<RHIDevice>). We must
+        // reset it before tearing down VkInstance — VkDevice must outlive
+        // VkInstance. Resetting here ensures the destructor order is
+        // correct regardless of where the user obtained the instance.
+        m_Device.reset();
+
         if (m_Instance != VK_NULL_HANDLE)
         {
             vkDestroyInstance(m_Instance, nullptr);
@@ -88,10 +94,11 @@ namespace XEngine
         return adapters;
     }
 
-    RHIDevice* VulkanInstance::CreateDevice(RHIAdapter& adapter, const RHIDeviceDesc& desc)
+    std::unique_ptr<RHIDevice> VulkanInstance::CreateDeviceImpl(
+        RHIAdapter& adapter,
+        const RHIDeviceDesc& desc)
     {
-        (void)desc;
         auto& vAdapter = static_cast<VulkanAdapter&>(adapter);
-        return new VulkanDevice(vAdapter, desc);
+        return VulkanDevice::Create(vAdapter, desc);
     }
 }

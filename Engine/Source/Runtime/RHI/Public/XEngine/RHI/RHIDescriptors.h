@@ -25,16 +25,50 @@ namespace XEngine
 {
     class RHITexture;  // forward — TextureViewDesc references it
 
+    // RHIInstanceDesc — caller-controlled instance-level configuration.
+    //
+    // IMPORTANT: the first four fields are *positionally frozen*. Existing
+    // call sites use C++20 designated initializers (see
+    // Tests/Unit/RHI/Source/RHIInstanceTests.cpp and
+    // Tests/Integration/VulkanRHI/Source/VulkanRHISkeleton.cpp). New fields
+    // must be appended at the end so designated-initializer call sites
+    // continue to compile.
     struct RHIInstanceDesc
     {
-        std::string_view ApplicationName    = "XEngineApp";
-        u32              ApplicationVersion = 1;
-        bool             EnableValidation   = false;
-        bool             EnableDebugMarkers = true;
+        std::string_view        ApplicationName    = "XEngineApp";
+        u32                     ApplicationVersion = 1;
+        bool                    EnableValidation   = false;
+        bool                    EnableDebugMarkers = true;
+
+        // Phase 2: validation-layer fine tuning (only effective when
+        // EnableValidation == true). Backends may ignore fields they have
+        // no equivalent for.
+        RHIValidationSeverity   MinValidationSeverity = RHIValidationSeverity::Warning;
+        bool                    EnableGPUAssistedValidation     = false;
+        bool                    EnableSynchronizationValidation = false;
+
+        // Phase 2: caller-preferred Vulkan instance API version. The backend
+        // clamps this against vkEnumerateInstanceVersion.
+        RHIApiVersion           PreferredApiVersion = RHIApiVersion::Version_1_3;
     };
 
+    // RHIDeviceDesc — caller-controlled device-level configuration.
+    //
+    // Feature negotiation (see Docs/AI helper/plan.md §13 / M3):
+    //   * RequiredFeatures: must be in RHIAdapter::GetSupportedFeatures();
+    //     missing bits cause CreateDevice to return nullptr.
+    //   * OptionalFeatures: requested-but-not-required. Silently downgraded
+    //     if not supported; only enabled bits are reported by
+    //     RHIDevice::GetEnabledFeatures().
+    //
+    // Invariant maintained by RHIInstance::CreateDevice's NVI wrapper:
+    //   Required ⊆ Enabled ⊆ Supported.
     struct RHIDeviceDesc
     {
+        RHIFeature         RequiredFeatures  = RHIFeature::None;
+        RHIFeature         OptionalFeatures  = RHIFeature::None;
+        u32                MaxFramesInFlight = 2;
+        std::string_view   DebugName         = "";
     };
 
     struct RHIBufferDesc

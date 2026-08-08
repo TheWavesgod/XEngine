@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake --build Build/default --target XEngineRHIUnitTests)"
+    ]
+  }
+}

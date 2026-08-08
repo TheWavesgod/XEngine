@@ -112,4 +112,27 @@ namespace XEngine
         (void)desc;
         return Result::Ok();
     }
+
+    // M3 / Phase 2: validates an instance descriptor. Currently all fields
+    // are independent (no cross-field constraints), so we accept any value.
+    inline Result ValidateInstanceDesc(const RHIInstanceDesc& desc)
+    {
+        (void)desc;
+        return Result::Ok();
+    }
+
+    // M3 / Phase 2: validates a device descriptor.
+    //   * MaxFramesInFlight must be >= 1.
+    //   * RequiredFeatures ⊆ OptionalFeatures would be a user bug; we don't
+    //     enforce it but we do reject descriptors whose required bits are
+    //     scattered (left to NVI wrapper for the real check against the
+    //     adapter).
+    inline Result ValidateDeviceDesc(const RHIDeviceDesc& desc)
+    {
+        if (desc.MaxFramesInFlight < 1u)
+        {
+            return Result::Failure("RHIDeviceDesc::MaxFramesInFlight must be >= 1");
+        }
+        return Result::Ok();
+    }
 }

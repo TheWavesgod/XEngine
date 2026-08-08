@@ -39,7 +39,7 @@ namespace XEngine
             return {};
         }
 
-        RHIDevice* CreateDevice(RHIAdapter&, const RHIDeviceDesc&) override
+        std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter&, const RHIDeviceDesc&) override
         {
             return nullptr;
         }
@@ -170,6 +170,7 @@ namespace XEngine
         RHIBackend GetBackend() const noexcept override { return RHIBackend::Vulkan; }
         const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
         u32 GetMaxFramesInFlight() const noexcept override { return m_MaxFramesInFlight; }
+        RHIFeature GetEnabledFeatures() const noexcept override { return m_EnabledFeatures; }
         RHIQueue* GetQueue(RHIQueueType type) const override
         {
             return (type == m_QueueType) ? m_Queue.get() : nullptr;
@@ -218,6 +219,7 @@ namespace XEngine
         u32 m_MaxFramesInFlight = 2;
         u32 m_WaitIdleCount = 0;
         RHICapabilities m_Caps;
+        RHIFeature m_EnabledFeatures = RHIFeature::None;
         std::unique_ptr<StubQueue> m_Queue;
         std::unique_ptr<StubBuffer> m_LastBuffer;
         std::unique_ptr<StubTexture> m_LastTexture;

@@ -46,6 +46,12 @@ namespace XEngine
         // and the string_view fields point into the adapter's owned storage.
         virtual RHIAdapterInfo GetInfo() const = 0;
 
+        // The set of features this physical adapter supports. The set is
+        // static for the lifetime of the adapter (and the underlying
+        // VkPhysicalDevice / IDXGIAdapter). RHIDevice creation must satisfy
+        // RHIDeviceDesc::RequiredFeatures ⊆ GetSupportedFeatures().
+        virtual RHIFeature GetSupportedFeatures() const noexcept = 0;
+
         // Returns true iff every required capability is supported.
         // M2: stub returns true; M3 fills in the real capability comparator.
         virtual bool SupportsRequiredCapabilities(const RHICapabilities& required) const = 0;

@@ -37,7 +37,7 @@ namespace XEngine
             return {};
         }
 
-        RHIDevice* CreateDevice(RHIAdapter&, const RHIDeviceDesc&) override
+        std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter&, const RHIDeviceDesc&) override
         {
             return nullptr;
         }
@@ -71,6 +71,7 @@ namespace XEngine
         RHIBackend GetBackend() const noexcept override { return RHIBackend::Vulkan; }
         const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
         u32 GetMaxFramesInFlight() const noexcept override { return 2; }
+        RHIFeature GetEnabledFeatures() const noexcept override { return RHIFeature::None; }
         RHIQueue* GetQueue(RHIQueueType) const override { return nullptr; }
         RHIBuffer* CreateBufferImpl(const RHIBufferDesc&) override { return nullptr; }
         RHITexture* CreateTextureImpl(const RHITextureDesc&) override { return nullptr; }

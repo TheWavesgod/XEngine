@@ -2,11 +2,12 @@
 //
 // M2 contains only the static factory stub and the adapter scoring
 // algorithm. The base-class virtual services (EnumerateAdapters,
-// CreateDevice) are pure virtual — concrete backends (VulkanRHI / D3D12RHI
-// / MetalRHI) implement them in later milestones.
+// CreateDeviceImpl) are pure virtual — concrete backends (VulkanRHI /
+// D3D12RHI / MetalRHI) implement them in later milestones.
 
 #include <XEngine/RHI/RHIInstance.h>
 #include <XEngine/RHI/RHIAdapter.h>  // RHIAdapterInfo + RHIAdapter needed by ScoreAdapter + RequestAdapter bodies
+#include <XEngine/RHI/RHIValidation.h>
 
 #include <utility>
 
@@ -46,6 +47,46 @@ namespace XEngine
         }
 
         return best;
+    }
+
+    // NVI wrapper enforcing the single-device rule + RequiredFeatures
+    // invariant. Backends never see this method; they override the impl.
+    RHIDevice* RHIInstance::CreateDevice(RHIAdapter& adapter, const RHIDeviceDesc& desc)
+    {
+        // (1) Single-device rule.
+        if (m_Device)
+        {
+            XENGINE_LOG_WARN("RHIInstance::CreateDevice: device already exists; returning nullptr.");
+            return nullptr;
+        }
+
+        // (2) Descriptor validation.
+        if (auto r = ValidateDeviceDesc(desc); !r)
+        {
+            XENGINE_LOG_ERROR(r.Message);
+            return nullptr;
+        }
+
+        // (3) RequiredFeatures ⊆ SupportedFeatures.
+        const RHIFeature supported = adapter.GetSupportedFeatures();
+        using U = std::underlying_type_t<RHIFeature>;
+        const auto missingBits = static_cast<U>(desc.RequiredFeatures) & ~static_cast<U>(supported);
+        if (missingBits != 0u)
+        {
+            XENGINE_LOG_ERROR("RHIInstance::CreateDevice: adapter does not support required features (missing bits).");
+            return nullptr;
+        }
+
+        // (4) Delegate to backend.
+        auto dev = CreateDeviceImpl(adapter, desc);
+        if (!dev)
+        {
+            return nullptr;
+        }
+
+        // (5) Take ownership.
+        m_Device = std::move(dev);
+        return m_Device.get();
     }
 
     // Adapter scoring algorithm. Higher = better. 0 means unsuitable.

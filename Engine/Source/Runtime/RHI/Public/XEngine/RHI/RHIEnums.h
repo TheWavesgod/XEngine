@@ -199,4 +199,70 @@ namespace XEngine
         TransferDstOptimal,
         PresentSrc,
     };
+
+    // M3 / M7+: feature bitmask shared across Vulkan / D3D12 / Metal.
+    //
+    // Three layers (see Docs/AI helper/plan.md §13 / M3):
+    //   * RHIAdapter::GetSupportedFeatures()  — physical GPU "can do".
+    //   * RHIDeviceDesc::RequiredFeatures / OptionalFeatures — user request.
+    //   * RHIDevice::GetEnabledFeatures()      — actually enabled on device.
+    //
+    // Invariant: Required ⊆ Enabled ⊆ Supported. Negotiation happens in
+    // RHIInstance::CreateDevice's NVI wrapper; backends must not redo it.
+    //
+    // Only the bits listed as "Implemented" below are detected/enabled by the
+    // current Vulkan backend (see VulkanAdapter::DetectSupportedFeatures).
+    // Remaining bits are reserved so consumers can spell them today; they
+    // will be detected/enabled in M7+ as the relevant backends land.
+    enum class RHIFeature : u32
+    {
+        None = 0,
+
+        // M6+ (synchronization) — Implemented (Vulkan 1.2 core).
+        TimelineSemaphore    = 1u << 0,
+
+        // M7+ (binding) — Implemented (PushDescriptor via extension,
+        // BindlessDescriptors via Vulkan 1.2 descriptor indexing).
+        PushDescriptor       = 1u << 1,
+        BindlessDescriptors  = 1u << 2,
+
+        // M7+ (pipeline) — Implemented (Vulkan 1.3 core).
+        DynamicRendering     = 1u << 3,
+
+        // M8+ (compute / ray tracing).
+        // ShaderAtomicInt64 / BufferDeviceAddress Implemented (Vulkan 1.2
+        // core). RayTracing reserved — detection/enable deferred to M8.
+        RayTracing           = 1u << 4,
+        BufferDeviceAddress  = 1u << 5,
+        ShaderAtomicInt64    = 1u << 6,
+
+        // M9+ (mesh / fragment) — reserved, deferred to M9.
+        MeshShader           = 1u << 7,
+        ExtendedDynamicState = 1u << 8,
+        FragmentShadingRate  = 1u << 9,
+
+        // M10+ (display) — reserved, deferred to M10.
+        ConservativeRaster   = 1u << 10,
+    };
+    using RHIFeatureFlags = RHIFeature;
+
+    // M3 / Phase 2: how chatty the validation layer should be when enabled.
+    // Backends map this to Vulkan severity flags.
+    enum class RHIValidationSeverity : u8
+    {
+        Verbose = 0,
+        Info,
+        Warning,
+        Error,
+    };
+
+    // M3 / Phase 2: caller-preferred Vulkan instance API version. The backend
+    // clamps this against vkEnumerateInstanceVersion (loader support).
+    enum class RHIApiVersion : u8
+    {
+        Version_1_0 = 0,
+        Version_1_1,
+        Version_1_2,
+        Version_1_3,
+    };
 }

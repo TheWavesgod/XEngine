@@ -33,10 +33,8 @@ namespace XEngine
             return {};
         }
 
-        RHIDevice* CreateDevice(RHIAdapter& adapter, const RHIDeviceDesc& desc) override
+        std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter&, const RHIDeviceDesc&) override
         {
-            (void)adapter;
-            (void)desc;
             return nullptr;
         }
     };
@@ -58,6 +56,7 @@ namespace
         }
 
         RHIAdapterInfo GetInfo() const override { return m_Info; }
+        RHIFeature GetSupportedFeatures() const noexcept override { return m_SupportedFeatures; }
 
         bool SupportsRequiredCapabilities(const RHICapabilities&) const override
         {
@@ -70,9 +69,12 @@ namespace
             m_CapsSupported = supported;
         }
 
+        void SetSupportedFeatures(RHIFeature f) noexcept { m_SupportedFeatures = f; }
+
     private:
         RHIAdapterInfo m_Info;
         bool m_CapsSupported = true;
+        RHIFeature m_SupportedFeatures = RHIFeature::None;
     };
 
     // ---------------------------------------------------------------------

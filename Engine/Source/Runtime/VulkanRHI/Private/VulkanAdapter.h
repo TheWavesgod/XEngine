@@ -11,6 +11,7 @@
 #include <vulkan/vulkan.h>
 
 #include <string>
+#include <vector>
 
 namespace XEngine
 {
@@ -24,13 +25,20 @@ namespace XEngine
 
         // RHIAdapter interface
         RHIAdapterInfo GetInfo() const override;
+        RHIFeature GetSupportedFeatures() const noexcept override { return m_SupportedFeatures; }
         bool SupportsRequiredCapabilities(const RHICapabilities& required) const override;
 
         // Vulkan-specific accessors
         VkPhysicalDevice GetVkPhysicalDevice() const noexcept { return m_PhysicalDevice; }
         VulkanInstance& GetVulkanInstance() const noexcept { return m_Instance; }
 
+        // Lookup of cached device-extension list (Phase 3).
+        bool HasDeviceExtension(const char* name) const noexcept;
+
     private:
+        void DetectSupportedFeatures();
+        void CacheDeviceExtensions();
+
         VulkanInstance& m_Instance;
         VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
 
@@ -40,5 +48,8 @@ namespace XEngine
         std::string m_DriverVersion;
         std::string m_ApiVersion;
         RHIAdapterInfo m_Info;
+
+        RHIFeature m_SupportedFeatures = RHIFeature::None;
+        std::vector<std::string> m_DeviceExtensions;
     };
 }

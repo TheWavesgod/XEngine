@@ -21,7 +21,7 @@
 namespace XEngine
 {
     inline constexpr u32 RHIVersionMajor = 0;
-    inline constexpr u32 RHIVersionMinor = 2;  // M2: RHIInstance + RHIAdapter + scoring.
+    inline constexpr u32 RHIVersionMinor = 3;  // M3: RHIDevice + Queue + Capabilities + feature negotiation.
     inline constexpr u32 RHIVersionPatch = 0;
 
     enum class RHIBackend : std::uint8_t

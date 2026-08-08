@@ -4,8 +4,9 @@
 // instance. Exposes adapter enumeration and device creation.
 //
 // Phase 1 (M0-M3 backend): wraps VkInstance, enumerates VkPhysicalDevices,
-// returns a VulkanAdapter per adapter. CreateDevice delegates to a future
-// XEngineRHI-side factory (M11+), but Phase 1 returns a VulkanDevice directly.
+// returns a VulkanAdapter per adapter. CreateDeviceImpl is the backend hook
+// for the base-class NVI CreateDevice wrapper, which enforces single-device
+// ownership + RequiredFeatures negotiation.
 
 #pragma once
 
@@ -21,18 +22,22 @@ namespace XEngine
     class VulkanAdapter;
     class VulkanDevice;
 
-    class VulkanInstance : public RHIInstance 
+    class VulkanInstance : public RHIInstance
     {
     public:
         // Factory: creates a VkInstance via volkInitialize + vkCreateInstance.
         // Returns nullptr if Vulkan SDK is unavailable or instance creation fails.
         static std::unique_ptr<VulkanInstance> CreateInstance(const RHIInstanceDesc& desc);
 
-        explicit VulkanInstance(VkInstance instance);
+        explicit VulkanInstance(VkInstance instance, const RHIInstanceDesc& desc);
         ~VulkanInstance() override;
 
         std::vector<std::unique_ptr<RHIAdapter>> EnumerateAdapters() override;
-        RHIDevice* CreateDevice(RHIAdapter& adapter, const RHIDeviceDesc& desc) override;
+
+        // Backend hook — see RHIInstance::CreateDevice for the contract.
+        std::unique_ptr<RHIDevice> CreateDeviceImpl(
+            RHIAdapter& adapter,
+            const RHIDeviceDesc& desc) override;
 
         VkInstance GetVkInstance() const noexcept { return m_Instance; }
 

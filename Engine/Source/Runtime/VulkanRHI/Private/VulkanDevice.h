@@ -24,14 +24,21 @@ namespace XEngine
     class VulkanDevice : public RHIDevice
     {
     public:
-        VulkanDevice(VulkanAdapter& adapter, const RHIDeviceDesc& desc);
+        // Backend factory. Returns nullptr when the adapter doesn't expose
+        // any graphics-capable queue family or VkDevice creation fails.
+        // Constructed via private ctor — only this factory may produce one.
+        static std::unique_ptr<VulkanDevice> Create(
+            VulkanAdapter& adapter,
+            const RHIDeviceDesc& desc);
+
         ~VulkanDevice() override;
 
         // RHIDevice interface
         void WaitIdle() override;
         RHIBackend GetBackend() const noexcept override { return RHIBackend::Vulkan; }
         const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
-        u32 GetMaxFramesInFlight() const noexcept override { return 2; }
+        u32 GetMaxFramesInFlight() const noexcept override { return m_MaxFramesInFlight; }
+        RHIFeature GetEnabledFeatures() const noexcept override { return m_EnabledFeatures; }
         RHIQueue* GetQueue(RHIQueueType type) const override;
 
         // M4-M6 hooks (Phase 2+)
@@ -51,13 +58,20 @@ namespace XEngine
         u32 GetTransferFamily() const noexcept { return m_TransferFamily; }
 
     private:
-        void PopulateCapabilities();
-        void FindQueueFamilies();
+        VulkanDevice() = default;
+        void PopulateCapabilities(VkPhysicalDevice physicalDevice);
+        void FindQueueFamilies(VkPhysicalDevice physicalDevice);
 
         VkDevice m_Device = VK_NULL_HANDLE;
         VmaAllocator m_VmaAllocator = VK_NULL_HANDLE;
         RHICapabilities m_Caps;
-        class VulkanAdapter* m_Adapter = nullptr;  // raw pointer (lifetime managed by RHIInstance)
+        u32 m_MaxFramesInFlight = 2;
+
+        // Features actually enabled on this device. Phase 1 has no real
+        // enable chain — populated to None. Phase 3 will populate by
+        // walking the requested bits through VkPhysicalDeviceVulkan12/13
+        // pNext chains. Always a subset of adapter.GetSupportedFeatures().
+        RHIFeature m_EnabledFeatures = RHIFeature::None;
 
         u32 m_GraphicsFamily = ~0u;
         u32 m_ComputeFamily  = ~0u;

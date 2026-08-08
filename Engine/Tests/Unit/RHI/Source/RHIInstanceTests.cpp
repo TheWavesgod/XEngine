@@ -123,18 +123,14 @@ namespace
             return result;
         }
 
-        // CreateDevice returns a new RHIDevice stub on first call, nullptr
-        // on subsequent calls — exercising the single-device rule.
-        RHIDevice* CreateDevice(RHIAdapter& adapter, const RHIDeviceDesc& desc = RHIDeviceDesc{}) override
+        // CreateDeviceImpl is the backend hook for the base-class NVI wrapper.
+        // The wrapper enforces single-device + feature negotiation; this stub
+        // simply constructs a StubDevice on demand.
+        std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter& adapter, const RHIDeviceDesc& desc) override
         {
             (void)adapter;
             (void)desc;
-            if (m_Device)
-            {
-                return nullptr;
-            }
-            m_Device = std::make_unique<StubDevice>(*this);
-            return m_Device.get();
+            return std::make_unique<StubDevice>(*this);
         }
 
         int CreateDeviceCallCount = 0;
@@ -150,13 +146,15 @@ namespace
             {
             }
             RHIAdapterInfo GetInfo() const override { return m_Info; }
+            RHIFeature GetSupportedFeatures() const noexcept override { return m_SupportedFeatures; }
             bool SupportsRequiredCapabilities(const RHICapabilities&) const override { return true; }
+
+            void SetSupportedFeatures(RHIFeature f) noexcept { m_SupportedFeatures = f; }
         private:
             RHIAdapterInfo m_Info;
+            RHIFeature m_SupportedFeatures = RHIFeature::None;
         };
 
-        // Local device stub — derives from RHIDevice so the base-class
-        // unique_ptr<RHIDevice> can hold it. Constructed via the protected
         // Local device stub — derives from RHIDevice so the base-class
         // unique_ptr<RHIDevice> can hold it. M3 expanded RHIDevice with
         // 5 pure virtuals; M4 added CreateBufferImpl.
@@ -169,6 +167,7 @@ namespace
             RHIBackend GetBackend() const noexcept override { return RHIBackend::Vulkan; }
             const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
             u32 GetMaxFramesInFlight() const noexcept override { return 2; }
+            RHIFeature GetEnabledFeatures() const noexcept override { return m_EnabledFeatures; }
             RHIQueue* GetQueue(RHIQueueType) const override { return nullptr; }
             RHIBuffer* CreateBufferImpl(const RHIBufferDesc&) override { return nullptr; }
             RHITexture* CreateTextureImpl(const RHITextureDesc&) override { return nullptr; }
@@ -178,8 +177,10 @@ namespace
             RHISemaphore* CreateSemaphoreImpl(const RHISemaphoreDesc&) override { return nullptr; }
             RHICommandList* CreateCommandListImpl(const RHICommandListDesc&) override { return nullptr; }
 
+            void SetEnabledFeatures(RHIFeature f) noexcept { m_EnabledFeatures = f; }
         private:
             RHICapabilities m_Caps;
+            RHIFeature m_EnabledFeatures = RHIFeature::None;
         };
 
         std::vector<RHIAdapterInfo> m_AdapterInfos;

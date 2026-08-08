@@ -17,17 +17,14 @@
 #include <XEngine/RHI/RHIObject.h>
 #include <XEngine/RHI/RHIEnums.h>
 #include <XEngine/RHI/RHIDescriptors.h>
-#include <XEngine/RHI/RHIAdapter.h>  // RHIAdapterInfo + RHIAdapter full definition needed by vector<unique_ptr<RHIAdapter>> return type
 #include <XEngine/RHI/RHIDevice.h>
+#include <XEngine/Logging/Log.h>
 
 #include <memory>
 #include <vector>
 
 namespace XEngine
 {
-    // Forward declarations — RHIAdapter / RHIAdapterInfo are defined in
-    // RHIAdapter.h. Forward decls here keep RHIInstance.h small and avoid
-    // a circular include (RHIAdapter.h also forward-declares RHIInstance).
     class RHIAdapter;
     struct RHIAdapterInfo;
 
@@ -35,18 +32,12 @@ namespace XEngine
     class RHIInstance : public RHIObject
     {
     public:
-        // Static factory. M2 returns nullptr because no backend target is
-        // built yet. M3 dispatches to VulkanRHI / D3D12RHI / MetalRHI based
-        // on the desc and the platform's available backends.
+        // Static factory.
         static std::unique_ptr<RHIInstance> Create(const RHIInstanceDesc& desc);
 
         // Enumerate all physical GPUs visible to this instance. The caller
         // stores the returned vector; adapters outlive any device created
         // from them.
-        //
-        // Non-const because the implementation allocates new RHIAdapter
-        // wrappers (heap side effect), even though it does not change the
-        // logical instance state.
         virtual std::vector<std::unique_ptr<RHIAdapter>> EnumerateAdapters() = 0;
 
         // Pick the best adapter per preference, filtering by required caps.
@@ -62,11 +53,17 @@ namespace XEngine
             RHIAdapterPreference preference,
             const RHICapabilities& required = RHICapabilities{});
 
-        // Single-device rule. Returns nullptr if a device already exists.
-        // Otherwise creates and OWNS the device; user gets a non-owning pointer.
-        virtual RHIDevice* CreateDevice(
+        // NVI wrapper around CreateDeviceImpl. Enforces:
+        //   1. Single-device rule: returns nullptr if m_Device is set.
+        //   2. RequiredFeatures ⊆ adapter.GetSupportedFeatures().
+        //   3. On success, stores the device in m_Device and returns a
+        //      non-owning pointer; the caller does NOT free the device
+        //      (the instance owns it).
+        //
+        // Backends override CreateDeviceImpl, not CreateDevice.
+        RHIDevice* CreateDevice(
             RHIAdapter& adapter,
-            const RHIDeviceDesc& desc = RHIDeviceDesc{}) = 0;
+            const RHIDeviceDesc& desc = RHIDeviceDesc{});
 
         RHIDevice* GetDevice() const noexcept { return m_Device.get(); }
         const RHIInstanceDesc& GetDesc() const noexcept { return m_Desc; }
@@ -83,6 +80,14 @@ namespace XEngine
             , m_Desc(desc)
         {
         }
+
+        // Backend hook. Returns nullptr on failure (e.g. feature mismatch
+        // surfaced at a layer the NVI wrapper cannot pre-check). The wrapper
+        // stores the returned unique_ptr in m_Device; backends must NOT
+        // keep their own copy.
+        virtual std::unique_ptr<RHIDevice> CreateDeviceImpl(
+            RHIAdapter& adapter,
+            const RHIDeviceDesc& desc) = 0;
 
         RHIInstanceDesc m_Desc;
         std::unique_ptr<RHIDevice> m_Device;

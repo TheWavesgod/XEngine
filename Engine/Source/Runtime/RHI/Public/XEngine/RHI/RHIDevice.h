@@ -43,10 +43,17 @@ namespace XEngine
     class RHISemaphore;    // forward
 
     // RHICapabilities — device capability set.
+    //
+    // Legacy mirror surface (the 11 SupportsXxx bools): retained for backward
+    // compatibility with existing call sites / tests. The canonical source of
+    // truth for feature support is RHIAdapter::GetSupportedFeatures() /
+    // RHIDevice::GetEnabledFeatures(). Backends should derive the bools from
+    // the RHIFeature bitmask in a single spot rather than maintain both
+    // independently.
     struct RHICapabilities
     {
         u32 MaxTextureSize2D             = 0;
-        u32 MaxBufferSize                = 0;
+        u64 MaxBufferSize                = 0;  // u64 — was u32 (truncated ~0ull on Vulkan)
         u32 MaxSamplerAnisotropy         = 0;
         u32 MaxSampleCount               = 0;
         u32 MaxViewports                 = 1;
@@ -86,6 +93,12 @@ namespace XEngine
         virtual const RHICapabilities& GetCapabilities() const noexcept = 0;
         virtual u32 GetMaxFramesInFlight() const noexcept = 0;
 
+        // The set of features actually enabled on this device after feature
+        // negotiation. Invariant: GetEnabledFeatures() ⊆ SupportedFeatures
+        // of the adapter used to create this device, and ⊇ RequiredFeatures
+        // from the RHIDeviceDesc.
+        virtual RHIFeature GetEnabledFeatures() const noexcept = 0;
+
         // ---------- Queues ----------
         virtual RHIQueue* GetQueue(RHIQueueType type) const = 0;
 
@@ -110,6 +123,11 @@ namespace XEngine
         RHIDevice& operator=(const RHIDevice&) = delete;
 
     protected:
+        // Default constructor — available to backends that build the device
+        // in a static factory and need an uninitialized object (e.g. to
+        // release the unique_ptr early on failure).
+        RHIDevice() noexcept = default;
+
         explicit RHIDevice(RHIInstance& owner) noexcept
             : RHIObject()
         {

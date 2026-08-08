@@ -25,7 +25,7 @@ namespace XEngine
     // triple is the explicit signal that an ABI-incompatible change has
     // landed in the backend.
     inline constexpr std::uint32_t VulkanRHIVersionMajor = 0;
-    inline constexpr std::uint32_t VulkanRHIVersionMinor = 0;
+    inline constexpr std::uint32_t VulkanRHIVersionMinor = 3;
     inline constexpr std::uint32_t VulkanRHIVersionPatch = 0;
 } // namespace XEngine
 
