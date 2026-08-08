@@ -29,6 +29,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # -----------------------------------------------------------------------------
 
 option(XENGINE_BUILD_RHI            "Build the new XEngineRHI target"             ON)
+option(XENGINE_BUILD_RHI_LOADER     "Build the new XEngineRHILoader target"        ON)
 option(XENGINE_BUILD_VULKAN_RHI     "Build the new XEngineVulkanRHI target"       ON)
 option(XENGINE_BUILD_TESTS          "Build the RHI / VulkanRHI test tree"          ON)
 

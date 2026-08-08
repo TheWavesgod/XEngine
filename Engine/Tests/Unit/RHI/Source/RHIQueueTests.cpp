@@ -69,8 +69,6 @@ namespace XEngine
         RHICapabilities m_Caps;
     };
 
-    // (No duplicate impls after Cleanup)
-
     class QueueStub : public RHIQueue
     {
     public:
@@ -106,6 +104,11 @@ namespace XEngine
         RHIFence* GetLastSignalFence() const noexcept { return m_LastSignalFence; }
         const std::vector<RHISemaphore*>& GetLastWaitSemaphores() const noexcept { return m_LastWaitSemaphores; }
         const std::vector<RHISemaphore*>& GetLastSignalSemaphores() const noexcept { return m_LastSignalSemaphores; }
+
+        void TestPush(RHISemaphore* semaphore)
+        {
+            m_LastWaitSemaphores.push_back(semaphore);
+        }
 
     private:
         RHIQueueType m_Type;
@@ -185,16 +188,105 @@ namespace
         EXPECT_EQ(base->GetOwnerDevice(), &device);
     }
 
-    // M6: Submit tests
-    //
-    // NOTE: These three tests are temporarily DISABLED_ because they trip a
-    // pre-existing MSVC debug-runtime check failure (RTC #2 "Stack around
-    // the variable 'fence' was corrupted") inside the QueueStub's Submit
-    // implementation. The failure surfaces when the stub pushes semaphore
-    // pointers into std::vector members that grow on the heap next to the
-    // local StubFence. Root-cause analysis is filed as a separate PR —
-    // for Phase 1, these tests are skipped to keep the build green.
-    TEST(RHIQueue, DISABLED_SubmitWithAllArgsRecordsThem)
+    TEST(RHIQueue, SemaphoreOnly)
+    {
+        QueueTestInstance instance;
+        QueueTestDevice device(instance);
+
+        StubSemaphore sem1(device);
+        StubSemaphore sem2(device);
+        StubSemaphore sem3(device);
+    }
+
+    TEST(RHIQueue, SpanOnly)
+    {
+        QueueTestInstance instance;
+        QueueTestDevice device(instance);
+
+        StubSemaphore sem1(device);
+        StubSemaphore sem2(device);
+        StubSemaphore sem3(device);
+
+        RHISemaphore* waits[] = {
+            &sem1,
+            &sem2
+        };
+
+        RHISemaphore* signals[] = {
+            &sem3
+        };
+
+        std::span<RHISemaphore*> waitSpan{waits};
+        std::span<RHISemaphore*> signalSpan{signals};
+
+        EXPECT_EQ(waitSpan.size(), 2u);
+        EXPECT_EQ(signalSpan.size(), 1u);
+    }
+
+    TEST(RHIQueue, VectorPushOnly)
+    {
+        QueueTestInstance instance;
+        QueueTestDevice device(instance);
+        QueueStub queue(
+            device,
+            RHIBackend::Vulkan,
+            RHIQueueType::Graphics
+        );
+
+        StubSemaphore sem(device);
+
+        queue.TestPush(&sem);
+
+        EXPECT_EQ(
+            queue.GetLastWaitSemaphores()[0],
+            &sem
+        );
+    }
+
+    TEST(RHIQueue, CommandListOnly)
+    {
+        QueueTestInstance instance;
+        QueueTestDevice device(instance);
+
+        auto* cmdList = new StubCommandList(device);
+
+        (void)cmdList;
+    }
+
+    TEST(RHIQueue, SubmitWithOnlyCmdList)
+    {
+        QueueTestInstance instance;
+        QueueTestDevice device(instance);
+        QueueStub queue(device, RHIBackend::Vulkan, RHIQueueType::Graphics);
+
+        StubCommandList cmdList(device);
+
+        queue.Submit(&cmdList);
+
+        EXPECT_EQ(queue.GetLastCmdList(), &cmdList);
+        EXPECT_EQ(queue.GetLastSignalFence(), nullptr);
+        EXPECT_TRUE(queue.GetLastWaitSemaphores().empty());
+        EXPECT_TRUE(queue.GetLastSignalSemaphores().empty());
+    }
+
+    TEST(RHIQueue, SubmitWithFenceOnly)
+    {
+        QueueTestInstance instance;
+        QueueTestDevice device(instance);
+        QueueStub queue(device, RHIBackend::Vulkan, RHIQueueType::Graphics);
+
+        StubCommandList cmdList(device);
+        StubFence fence(device);
+
+        queue.Submit(&cmdList, &fence);
+
+        EXPECT_EQ(queue.GetLastCmdList(), &cmdList);
+        EXPECT_EQ(queue.GetLastSignalFence(), &fence);
+        EXPECT_TRUE(queue.GetLastWaitSemaphores().empty());
+        EXPECT_TRUE(queue.GetLastSignalSemaphores().empty());
+    }
+
+    TEST(RHIQueue, SubmitWithAllArgsRecordsThem)
     {
         QueueTestInstance instance;
         QueueTestDevice device(instance);
@@ -223,39 +315,6 @@ namespace
         const auto& signals = queue.GetLastSignalSemaphores();
         EXPECT_EQ(signals.size(), 1u);
         EXPECT_EQ(signals[0], &signalSem);
-    }
-
-    TEST(RHIQueue, DISABLED_SubmitWithOnlyCmdList)
-    {
-        QueueTestInstance instance;
-        QueueTestDevice device(instance);
-        QueueStub queue(device, RHIBackend::Vulkan, RHIQueueType::Graphics);
-
-        StubCommandList cmdList(device);
-
-        queue.Submit(&cmdList);
-
-        EXPECT_EQ(queue.GetLastCmdList(), &cmdList);
-        EXPECT_EQ(queue.GetLastSignalFence(), nullptr);
-        EXPECT_TRUE(queue.GetLastWaitSemaphores().empty());
-        EXPECT_TRUE(queue.GetLastSignalSemaphores().empty());
-    }
-
-    TEST(RHIQueue, DISABLED_SubmitWithFenceOnly)
-    {
-        QueueTestInstance instance;
-        QueueTestDevice device(instance);
-        QueueStub queue(device, RHIBackend::Vulkan, RHIQueueType::Graphics);
-
-        StubCommandList cmdList(device);
-        StubFence fence(device);
-
-        queue.Submit(&cmdList, &fence);
-
-        EXPECT_EQ(queue.GetLastCmdList(), &cmdList);
-        EXPECT_EQ(queue.GetLastSignalFence(), &fence);
-        EXPECT_TRUE(queue.GetLastWaitSemaphores().empty());
-        EXPECT_TRUE(queue.GetLastSignalSemaphores().empty());
     }
 
     TEST(RHIQueueType, ValuesAreContiguous)

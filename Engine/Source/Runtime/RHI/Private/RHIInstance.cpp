@@ -1,9 +1,13 @@
 // RHIInstance — base class implementation file.
 //
-// M2 contains only the static factory stub and the adapter scoring
-// algorithm. The base-class virtual services (EnumerateAdapters,
+// M2 contains the adapter scoring algorithm and the NVI CreateDevice
+// wrapper. The base-class virtual services (EnumerateAdapters,
 // CreateDeviceImpl) are pure virtual — concrete backends (VulkanRHI /
 // D3D12RHI / MetalRHI) implement them in later milestones.
+//
+// The static RHIInstance::Create() factory was removed in the M2 multi-
+// backend rework (see plan §13 / M2). Backend dispatch is now in
+// XEngine::RHIRuntime::CreateInstance (see <XEngine/RHI/RHIRuntime.h>).
 
 #include <XEngine/RHI/RHIInstance.h>
 #include <XEngine/RHI/RHIAdapter.h>  // RHIAdapterInfo + RHIAdapter needed by ScoreAdapter + RequestAdapter bodies
@@ -13,14 +17,6 @@
 
 namespace XEngine
 {
-    // M2 stub — no backend target exists yet. M3 dispatches to the
-    // appropriate backend factory based on RHIInstanceDesc + platform.
-    std::unique_ptr<RHIInstance> RHIInstance::Create(const RHIInstanceDesc& desc)
-    {
-        (void)desc;
-        return nullptr;
-    }
-
     // Default RequestAdapter implementation: enumerate, score, pick best.
     // Backends can override if they have a more efficient backend-specific
     // path (e.g., fusing the score computation with vkEnumeratePhysicalDevices).

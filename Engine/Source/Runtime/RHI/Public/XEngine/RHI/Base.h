@@ -27,10 +27,15 @@ namespace XEngine
     enum class RHIBackend : std::uint8_t
     {
         None = 0,
-        Vulkan,
-        // D3D12 / Metal are intentionally not yet enumerated here; they
-        // will only land once a real backend target exists. See
-        // Docs/AI helper/prompts.md for the strict "no empty stubs" rule.
+        Vulkan = 1,
+        // D3D12 / Metal are reserved protocol values. No concrete backend
+        // target exists yet for them; a future commit will add the
+        // XEngineD3D12RHI / XEngineMetalRHI targets and the corresponding
+        // RHIRuntime::RegisterBackend(...) entry. Until then, ParseBackend
+        // maps "D3D12" / "Metal" to these enum values, but no factory will
+        // be registered and CreateInstance(preference=D3D12) returns nullptr.
+        D3D12 = 2,
+        Metal = 3,
     };
 
     using RHIResult = XEngine::Result;

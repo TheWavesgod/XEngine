@@ -2,16 +2,13 @@
 #
 # Pure-logic tests that must NOT depend on the Vulkan SDK, SDL3, or any
 # runtime component (Renderer, Asset, Editor, Sandbox). Allowed:
-#   XEngineFoundation, XEngineRHI, XEngineTestSupport, GoogleTest.
+#   XEngineFoundation, XEngineRHI, XEngineRHILoader, XEngineTestSupport,
+#   GoogleTest.
 #
-# After the RHI rebuild the public surface of XEngineRHI is intentionally
-# minimal (XEngine/RHI/Base.h). The unit test below verifies that:
-#
-#   1. GoogleTest is correctly wired up via Tests/CMakeLists.txt.
-#   2. XEngineRHI headers are visible and linkable from a unit test target.
-#   3. XEngineFoundation is visible and linkable.
-#   4. The version probe defined in XEngineRHI/Private/RHI.cpp resolves at
-#      link time.
+# XEngineRHILoader is backend-agnostic — it implements the XEngine::RHIRuntime
+# registry and contains zero Vulkan / volk / VMA references — so it is
+# safe to link from unit tests. Adding RHIRuntime tests here lets the
+# registry be exercised without spinning up a real GPU.
 
 file(GLOB_RECURSE XENGINE_RHI_UNIT_SOURCES CONFIGURE_DEPENDS
     Source/*.cpp
@@ -30,6 +27,7 @@ target_link_libraries(XEngineRHIUnitTests
     PRIVATE
         XEngineFoundation
         XEngineRHI
+        XEngineRHILoader
         XEngineTestSupport
         GTest::gtest
         GTest::gtest_main

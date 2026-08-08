@@ -25,8 +25,16 @@ if(XENGINE_BUILD_RHI)
     add_subdirectory(Source/Runtime/RHI)
 endif()
 
-# New XEngineVulkanRHI target. PUBLIC depends on XEngineRHI; PRIVATE
-# depends on Vulkan SDK + volk + VMA (wired inside its own CMakeLists).
+# New XEngineRHILoader target — implements XEngine::RHIRuntime
+# (backend factory registry). Depends PUBLIC on XEngineRHI; PRIVATE no
+# backend headers. Sits between RHI and the backends, MUST be added
+# BEFORE any backend so that backend CMakeLists can PUBLIC-link it.
+if(XENGINE_BUILD_RHI_LOADER)
+    add_subdirectory(Source/Runtime/RHILoader)
+endif()
+
+# New XEngineVulkanRHI target. PUBLIC depends on XEngineRHI + XEngineRHILoader;
+# PRIVATE depends on Vulkan SDK + volk + VMA (wired inside its own CMakeLists).
 if(XENGINE_BUILD_VULKAN_RHI)
     add_subdirectory(Source/Runtime/VulkanRHI)
 endif()

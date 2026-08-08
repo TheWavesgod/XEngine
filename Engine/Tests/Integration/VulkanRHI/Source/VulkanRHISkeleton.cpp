@@ -7,7 +7,14 @@
 //   * Per-family queue retrieval
 //   * Capabilities population (M3 audit)
 //
-// Phase 2+ will add buffer roundtrip and fence/semaphore tests.
+// Phase 2 (M2 multi-backend runtime selection): all entry points go through
+// XEngine::RHIRuntime::CreateInstance. Tests also exercise the registry:
+//   * ParseBackend round-trip
+//   * EnumerateBackends sees the Vulkan entry
+//   * RHIRuntime::CreateInstance with RHIBackend::Vulkan routes to the
+//     same factory as the legacy VulkanRHI::CreateInstance shortcut.
+//
+// Phase 3+ will add buffer roundtrip and fence/semaphore tests.
 
 #include <gtest/gtest.h>
 
@@ -17,6 +24,7 @@
 #include <XEngine/RHI/RHIAdapter.h>
 #include <XEngine/RHI/RHIDevice.h>
 #include <XEngine/RHI/RHIQueue.h>
+#include <XEngine/RHI/RHIRuntime.h>
 #include <XEngine/Test/TestSupport.h>
 #include <XEngine/VulkanRHI/Base.h>
 #include <XEngine/VulkanRHI/Backend.h>
@@ -31,6 +39,23 @@ namespace XEngine
         static_assert(sizeof(XEngine::VulkanRHIVersionMajor) == sizeof(std::uint32_t),
                       "RHI version sentinel must be 32-bit.");
     } // namespace
+
+    // Register the Vulkan backend exactly once for all tests in this binary.
+    // Google's gtest runs all TEST() bodies from the same process, so the
+    // RHIRuntime registry is shared. Registering once at static-init time
+    // mimics what an App does during startup and avoids every test calling
+    // Register / Unregister individually.
+    namespace
+    {
+        struct VulkanAutoRegisterForTests
+        {
+            VulkanAutoRegisterForTests()
+            {
+                VulkanRHI::Register();
+            }
+        };
+        static VulkanAutoRegisterForTests g_Register;
+    } // namespace
 } // namespace XEngine
 
 TEST(VulkanRHIIntegration, LinkTimeProbeResolves)
@@ -42,7 +67,49 @@ TEST(VulkanRHIIntegration, LinkTimeProbeResolves)
     EXPECT_EQ(XEngineVulkanRHI_GetVersionPatch(), XEngine::VulkanRHIVersionPatch);
 }
 
-TEST(VulkanRHIIntegration, CreateInstanceSucceeds)
+// --- RHIRuntime wiring (M2) ----------------------------------------------------
+
+TEST(VulkanRHIIntegration, RHIRuntimeEnumerateBackendsIncludesVulkan)
+{
+    // g_Register already added Vulkan at static init.
+    const auto entries = XEngine::RHIRuntime::EnumerateBackends();
+    bool foundVulkan = false;
+    for (const auto& e : entries)
+    {
+        if (e.Backend == XEngine::RHIBackend::Vulkan)
+        {
+            foundVulkan = true;
+            EXPECT_EQ(e.Name, "Vulkan");
+            EXPECT_NE(e.Factory, nullptr);
+        }
+    }
+    EXPECT_TRUE(foundVulkan);
+}
+
+TEST(VulkanRHIIntegration, RHIRuntimeParseBackendRoundTrips)
+{
+    EXPECT_EQ(XEngine::RHIRuntime::ParseBackend("Vulkan"),  XEngine::RHIBackend::Vulkan);
+    EXPECT_EQ(XEngine::RHIRuntime::ParseBackend("vulkan"),  XEngine::RHIBackend::Vulkan);
+    EXPECT_EQ(XEngine::RHIRuntime::ParseBackend("VK"),      XEngine::RHIBackend::Vulkan);
+    EXPECT_EQ(XEngine::RHIRuntime::GetBackendName(XEngine::RHIBackend::Vulkan),
+              "vulkan");
+}
+
+TEST(VulkanRHIIntegration, RHIRuntimeCreateInstancePrefersVulkan)
+{
+    XEngine::RHIInstanceDesc desc;
+    desc.ApplicationName = "VulkanRHIIntegrationTest";
+    desc.EnableValidation = false;
+    desc.EnableDebugMarkers = true;
+
+    auto instance = XEngine::RHIRuntime::CreateInstance(desc, XEngine::RHIBackend::Vulkan);
+    ASSERT_NE(instance, nullptr);
+    EXPECT_EQ(instance->GetBackend(), XEngine::RHIBackend::Vulkan);
+}
+
+// --- Existing direct-VulkanRHI path (kept for behavioral parity) -------------
+
+TEST(VulkanRHIIntegration, DirectCreateInstanceSucceeds)
 {
     XEngine::RHIInstanceDesc desc;
     desc.ApplicationName = "VulkanRHIIntegrationTest";

@@ -526,6 +526,27 @@ Buffer + offset + size
 * adapter selection
 * 单 Device 创建约束
 
+M2 阶段必做 —— backend 注册层（multi-backend runtime selection）：
+
+* 新建 `XEngineRHILoader` target；实现 `XEngine::RHIRuntime` 注册表。位置：
+  `Engine/Source/Runtime/RHILoader/`，PUBLIC 依赖 `XEngineRHI`，PRIVATE 无任何 backend 头。
+* 扩展 `RHIBackend` 为 4 个值：`None / Vulkan / D3D12 / Metal`。`D3D12` / `Metal` 是预留
+  协议位——对应 backend target 实现时再补 `RegisterBackend`。
+* `XEngineVulkanRHI` 导出 `RHIBackendFactoryFn GetFactory()` 与 `void Register()`，并 PUBLIC link `XEngineRHILoader`。
+  CMake 同时暴露 `XENGINE_HAS_VULKAN_BACKEND` 宏给消费者，让 App 用 `#if defined(...)` 决定要不要注册。
+* `XEngineRHI` 公共头声明 `RHIRuntime`（无 impl）。XEngineRHI **不**依赖任何 backend。
+* `XEngineRHI::RHIInstance::Create()` stub 改为 `= delete`，编译期禁用统一入口。
+* App 在启动早期显式调用 `VulkanRHI::Register()`，然后通过 `RHIRuntime::CreateInstance(desc, preference)` 拿到 instance。
+* 不修改 `EngineConfig.h`（Engine 模块当前 `XENGINE_BUILD_RENDERER=OFF`，属 frozen 范围）。
+  backend 选择由 App 负责（命令行 / 环境变量 / 本地 struct 皆可）。
+* 设计预留 DLL 加载空间：
+  * `RHIBackendFactoryFn` 是普通函数指针（未来可直接 `dlsym`）。
+  * `XEngineRHIBackendFactoryC` 是 `extern "C"` 类型别名（参数为 POD 指针，匹配 C ABI）。
+  * `RHIBackendFactoryEntry` 全 POD（enum / string_view / u32 / 函数指针），无构造/析构/虚函数。
+  * `RHIRuntime::RegisterBackend` / `UnregisterBackend` / `CreateInstance` 全是静态方法，
+    没有单例构造顺序依赖——DLL 加载完后再 Register 都行。
+  * DLL 阶段只需新增 `RHIRuntime::LoadDynamicLibrary(path)`，不用改协议。
+
 ### M3：Device、Queue 与 Capabilities
 
 * RHIDevice
@@ -640,10 +661,12 @@ Buffer
 
 ## 14. 当前非目标
 
+> 修订说明：原 §14 中 "RHILoader 独立模块" 与 "BackendRegistry" 两条已由 M2 multi-backend runtime selection 工作撤回（详见 §13 / M2 段）。其余条目仍然有效。
+
 目前明确不做：
 
-* RHILoader 独立模块；
-* BackendRegistry；
+* ~~RHILoader 独立模块；~~（已撤回；见 §13 M2）
+* ~~BackendRegistry；~~（已撤回；见 §13 M2）
 * 动态后端插件；
 * stable C ABI；
 * DLL ABI 设计；
@@ -660,9 +683,9 @@ Buffer
 * Vulkan 函数级 mock；
 * 为旧 Renderer 保留兼容接口。
 
-后端当前可以作为独立静态 target。
+后端当前作为独立静态 target。
 
-未来若确有动态链接需求，再在已稳定的模块边界上增加 loader 和 ABI 层。
+未来若确有动态链接需求（DLL/SO/DYLIB），可直接基于现有 `XEngine::RHIRuntime` 与 `XEngineRHIBackendFactoryC` 扩展——协议已为 DLL 预留空间，无需重写。
 
 ---
 
@@ -684,7 +707,7 @@ Claude Code 在每个阶段开始前应：
 * 不因旧代码存在而保留错误协议；
 * 不修改无关模块；
 * 不进行无关格式化；
-* 不自行引入 loader、registry 或插件系统；
+* 不自行引入 loader、registry 或插件系统（**M2 阶段已撤回此条**：`XEngineRHILoader` 与 `XEngine::RHIRuntime` 已落地，详见 §13 / M2；后续 DLL 加载按 §14 末尾"未来若确有动态链接需求"段执行）；
 * 不为了“全引擎编译成功”修改上层；
 * 每个阶段增加对应测试；
 * 每个阶段输出构建和测试结果；

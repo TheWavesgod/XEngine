@@ -1,7 +1,8 @@
 // RHIInstance — top-level RHI entry point. One per process.
 //
 // M2 surface (after split: RHIAdapter lives in its own header):
-//   * Create()                 — static factory (M2 stub returns nullptr)
+//   * (no Create() — use XEngine::RHIRuntime::CreateInstance instead;
+//      see <XEngine/RHI/RHIRuntime.h>)
 //   * EnumerateAdapters()      — virtual, backend-specific
 //   * RequestAdapter()         — virtual with default implementation
 //   * CreateDevice()           — virtual, single-device rule
@@ -11,6 +12,11 @@
 // The single-device rule is enforced physically by holding m_Device inside
 // the instance. RHIInstance::CreateDevice is the only path that creates a
 // device, and it returns nullptr if m_Device is already populated.
+//
+// Per plan §4 and §13 / M2, XEngineRHI does NOT provide a backend-dispatching
+// factory. Apps must include the concrete backend's header
+// (e.g. <XEngine/VulkanRHI/Backend.h>) and call its Register(), then route
+// construction through XEngine::RHIRuntime::CreateInstance(desc, preference).
 
 #pragma once
 
@@ -32,8 +38,14 @@ namespace XEngine
     class RHIInstance : public RHIObject
     {
     public:
-        // Static factory.
-        static std::unique_ptr<RHIInstance> Create(const RHIInstanceDesc& desc);
+        // [plan §4 / §13 M2] Backend selection lives in XEngine::RHIRuntime,
+        // not here. Use:
+        //     auto instance = RHIRuntime::CreateInstance(desc, preference);
+        // after the App has called VulkanRHI::Register() (or equivalent).
+        // Calling RHIInstance::Create(...) is a compile-time error — it
+        // would have to either pick a backend (violating plan §4) or
+        // return nullptr silently (a footgun, see prior RHIInstance.cpp).
+        static std::unique_ptr<RHIInstance> Create(const RHIInstanceDesc&) = delete;
 
         // Enumerate all physical GPUs visible to this instance. The caller
         // stores the returned vector; adapters outlive any device created
@@ -63,7 +75,7 @@ namespace XEngine
         // Backends override CreateDeviceImpl, not CreateDevice.
         RHIDevice* CreateDevice(
             RHIAdapter& adapter,
-            const RHIDeviceDesc& desc = RHIDeviceDesc{});
+            const RHIDeviceDesc& desc);
 
         RHIDevice* GetDevice() const noexcept { return m_Device.get(); }
         const RHIInstanceDesc& GetDesc() const noexcept { return m_Desc; }

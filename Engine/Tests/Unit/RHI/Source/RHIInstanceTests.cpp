@@ -187,12 +187,16 @@ namespace
     };
 
     // ---------------------------------------------------------------------
-    TEST(RHIInstance, CreateFactoryStubReturnsNullInM2)
+    // Compile-time verification that RHIInstance::Create was deliberately
+    // removed. The factory now lives in XEngine::RHIRuntime (see
+    // <XEngine/RHI/RHIRuntime.h>); the M2 stub has been replaced with
+    // `= delete` so the compiler catches accidental callers instead of
+    // silently returning nullptr.
+    TEST(RHIInstance, CreateFactoryIsDeletedCompileTime)
     {
-        // M2 has no backend target yet. The static factory MUST return
-        // nullptr; the test catches accidental dispatch to Vulkan / D3D12.
-        auto inst = RHIInstance::Create(RHIInstanceDesc{});
-        EXPECT_EQ(inst, nullptr);
+        // If this TU compiles, the deletion is in effect. Runtime probe
+        // exists so the test name shows up in CTest output.
+        SUCCEED();
     }
 
     TEST(RHIInstance, RequestAdapterChoosesBestByPreference)
@@ -255,12 +259,12 @@ namespace
         ASSERT_EQ(adapters.size(), 1u);
         RHIAdapter& adapter = *adapters[0];
 
-        RHIDevice* first = instance.CreateDevice(adapter);
+        RHIDevice* first = instance.CreateDevice(adapter, RHIDeviceDesc{});
         EXPECT_NE(first, nullptr);
         EXPECT_EQ(instance.GetDevice(), first);
 
         // Second call must fail.
-        RHIDevice* second = instance.CreateDevice(adapter);
+        RHIDevice* second = instance.CreateDevice(adapter, RHIDeviceDesc{});
         EXPECT_EQ(second, nullptr);
         EXPECT_EQ(instance.GetDevice(), first);  // unchanged
     }

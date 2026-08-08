@@ -50,8 +50,17 @@ target_compile_definitions(XEngineVulkanRHI
 target_link_libraries(XEngineVulkanRHI
     PUBLIC
         XEngineRHI
+        XEngineRHILoader
     PRIVATE
         XEngineFoundation
+)
+
+# Expose a has-backend macro to consumers (App, tests). Match the naming
+# convention used by the multi-backend runtime selection (plan §13 / M2).
+# INTERFACE means consumers (anything that PUBLIC-links this target) see it.
+target_compile_definitions(XEngineVulkanRHI
+    INTERFACE
+        XENGINE_HAS_VULKAN_BACKEND
 )
 
 # Optional Vulkan SDK + volk + VMA wiring. The new XEngineVulkanRHI
