@@ -47,6 +47,9 @@ namespace XEngine
     class D3D12Instance : public RHIInstance
     {
     public:
+        // Used by XEngine::CheckedCast<T> to reject cross-backend casts.
+        static constexpr RHIBackend ExpectedBackend = RHIBackend::D3D12;
+
         // Factory: creates an IDXGIFactory4 via CreateDXGIFactory1 and
         // constructs a D3D12Instance. Returns nullptr if the factory
         // creation fails (typically no DXGI runtime, e.g. on pre-Win7 or

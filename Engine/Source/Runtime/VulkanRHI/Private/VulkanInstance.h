@@ -25,6 +25,9 @@ namespace XEngine
     class VulkanInstance : public RHIInstance
     {
     public:
+        // Used by XEngine::CheckedCast<T> to reject cross-backend casts.
+        static constexpr RHIBackend ExpectedBackend = RHIBackend::Vulkan;
+
         // Factory: creates a VkInstance via volkInitialize + vkCreateInstance.
         // Returns nullptr if Vulkan SDK is unavailable or instance creation fails.
         static std::unique_ptr<VulkanInstance> CreateInstance(const RHIInstanceDesc& desc);

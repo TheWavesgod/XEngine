@@ -9,6 +9,7 @@
 #include "D3D12Adapter.h"
 #include "D3D12Device.h"
 
+#include <XEngine/RHI/RHICast.h>
 #include <XEngine/Logging/Log.h>
 
 #include <wrl/client.h>
@@ -100,7 +101,7 @@ namespace XEngine
         RHIAdapter& adapter,
         const RHIDeviceDesc& desc)
     {
-        auto& d3d12Adapter = static_cast<D3D12Adapter&>(adapter);
+        auto& d3d12Adapter = XEngine::CheckedCast<D3D12Adapter>(adapter);
         return D3D12Device::Create(d3d12Adapter, desc);
     }
 }

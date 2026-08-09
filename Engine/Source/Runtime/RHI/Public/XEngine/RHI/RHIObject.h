@@ -6,7 +6,7 @@
 //   * a (nullable) back-pointer to the owning RHIDevice — null for objects
 //     that exist before any device is created (RHIInstance, RHIAdapter),
 //   * a RHIBackend tag so backend-specific casts can be safely rejected via
-//     CheckedVulkanCast / CheckedD3D12Cast, and
+//     XEngine::CheckedCast<T> (see RHICast.h), and
 //   * a virtual SetDebugName hook that backends override to forward the
 //     name to the native debug API (vkSetDebugUtilsObjectNameEXT,
 //     ID3D12Object::SetName, setLabel).
@@ -41,8 +41,8 @@ namespace XEngine
         RHIDevice*       GetOwnerDevice()       noexcept { return m_OwnerDevice; }
         const RHIDevice* GetOwnerDevice() const noexcept { return m_OwnerDevice; }
 
-        // Backend tag — used by CheckedVulkanCast / future CheckedD3D12Cast
-        // to reject cross-backend casts at runtime.
+        // Backend tag — used by XEngine::CheckedCast<T> (see RHICast.h) to
+        // reject cross-backend casts at runtime in debug builds.
         RHIBackend GetBackend() const noexcept { return m_Backend; }
 
         // Runtime debug naming. Default is no-op; backends override.

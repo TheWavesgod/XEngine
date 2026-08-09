@@ -26,6 +26,9 @@ namespace XEngine
     class D3D12Adapter : public RHIAdapter
     {
     public:
+        // Used by XEngine::CheckedCast<T> to reject cross-backend casts.
+        static constexpr RHIBackend ExpectedBackend = RHIBackend::D3D12;
+
         D3D12Adapter(D3D12Instance& instance,
                      Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter);
         ~D3D12Adapter() override;

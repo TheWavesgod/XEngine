@@ -24,6 +24,9 @@ namespace XEngine
     class VulkanDevice : public RHIDevice
     {
     public:
+        // Used by XEngine::CheckedCast<T> to reject cross-backend casts.
+        static constexpr RHIBackend ExpectedBackend = RHIBackend::Vulkan;
+
         // Backend factory. Returns nullptr when the adapter doesn't expose
         // any graphics-capable queue family or VkDevice creation fails.
         // Constructed via private ctor — only this factory may produce one.
@@ -41,7 +44,6 @@ namespace XEngine
         RHIFeature GetEnabledFeatures() const noexcept override { return m_EnabledFeatures; }
         RHIQueue* GetQueue(RHIQueueType type) const override;
 
-        // M4-M6 hooks (Phase 2+)
         RHIBuffer* CreateBufferImpl(const RHIBufferDesc&) override { return nullptr; }
         RHITexture* CreateTextureImpl(const RHITextureDesc&) override { return nullptr; }
         RHITextureView* CreateTextureViewImpl(const RHITextureViewDesc&) override { return nullptr; }

@@ -20,6 +20,9 @@ namespace XEngine
     class VulkanAdapter : public RHIAdapter
     {
     public:
+        // Used by XEngine::CheckedCast<T> to reject cross-backend casts.
+        static constexpr RHIBackend ExpectedBackend = RHIBackend::Vulkan;
+
         VulkanAdapter(VulkanInstance& instance, VkPhysicalDevice physicalDevice);
         ~VulkanAdapter() override;
 

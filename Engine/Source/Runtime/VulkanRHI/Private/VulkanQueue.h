@@ -19,6 +19,9 @@ namespace XEngine
     class VulkanQueue : public RHIQueue
     {
     public:
+        // Used by XEngine::CheckedCast<T> to reject cross-backend casts.
+        static constexpr RHIBackend ExpectedBackend = RHIBackend::Vulkan;
+
         VulkanQueue(VulkanDevice& device, VkQueue queue, RHIQueueType type);
         ~VulkanQueue() override;
 

@@ -4,6 +4,8 @@
 #include "VulkanAdapter.h"
 #include "VulkanDevice.h"
 
+#include <XEngine/RHI/RHICast.h>
+
 #include <volk.h>
 #include <cstring>
 
@@ -98,7 +100,7 @@ namespace XEngine
         RHIAdapter& adapter,
         const RHIDeviceDesc& desc)
     {
-        auto& vAdapter = static_cast<VulkanAdapter&>(adapter);
+        auto& vAdapter = XEngine::CheckedCast<VulkanAdapter>(adapter);
         return VulkanDevice::Create(vAdapter, desc);
     }
 }
