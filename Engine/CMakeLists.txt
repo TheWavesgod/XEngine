@@ -33,10 +33,28 @@ if(XENGINE_BUILD_RHI_LOADER)
     add_subdirectory(Source/Runtime/RHILoader)
 endif()
 
+# D3D12RHI gating note: XENGINE_BUILD_D3D12_RHI itself is honored only on
+# WIN32. Off-Windows builds skip the target entirely. We still need to
+# explicitly no-op the gate here so other CMakeLists additions remain
+# aware that D3D12RHI exists as an optional path.
+if(XENGINE_BUILD_D3D12_RHI AND NOT WIN32)
+    message(STATUS
+        "XENGINE_BUILD_D3D12_RHI=ON but platform is not WIN32 — "
+        "skipping XEngineD3D12RHI target (D3D12 is Windows-only).")
+endif()
+
 # New XEngineVulkanRHI target. PUBLIC depends on XEngineRHI + XEngineRHILoader;
 # PRIVATE depends on Vulkan SDK + volk + VMA (wired inside its own CMakeLists).
 if(XENGINE_BUILD_VULKAN_RHI)
     add_subdirectory(Source/Runtime/VulkanRHI)
+endif()
+
+# New XEngineD3D12RHI target. PUBLIC depends on XEngineRHI + XEngineRHILoader;
+# PRIVATE depends on d3d12.lib / dxgi.lib from the Windows SDK (wired inside
+# its own CMakeLists). The target is gated by both XENGINE_BUILD_D3D12_RHI
+# and the WIN32 platform — there is no D3D12 backend on other OSes.
+if(XENGINE_BUILD_D3D12_RHI AND WIN32)
+    add_subdirectory(Source/Runtime/D3D12RHI)
 endif()
 
 # Tests: gated by XENGINE_BUILD_TESTS. The Tests/CMakeLists tree already

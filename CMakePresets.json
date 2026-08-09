@@ -26,6 +26,17 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+    {
+      "name": "debug-asan",
+      "displayName": "Debug with MSVC AddressSanitizer",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/Build/debug-asan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS_DEBUG": "/Ob0 /Od",
+        "XENGINE_ENABLE_ASAN": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -40,6 +51,11 @@
     {
       "name": "release",
       "configurePreset": "release"
+    },
+    {
+      "name": "debug-asan",
+      "configurePreset": "debug-asan",
+      "configuration": "Debug"
     }
   ]
 }

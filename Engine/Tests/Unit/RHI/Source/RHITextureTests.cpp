@@ -12,38 +12,20 @@
 #include <XEngine/RHI/RHITexture.h>
 #include <XEngine/RHI/RHIDevice.h>
 #include <XEngine/RHI/RHIBuffer.h>
-#include <XEngine/RHI/RHIQueue.h>
 #include <XEngine/RHI/RHIInstance.h>
 #include <XEngine/RHI/RHIDescriptors.h>
 #include <XEngine/RHI/RHIEnums.h>
 #include <XEngine/RHI/RHIFlags.h>
+
+#include "RHITestStubs.h"
 
 #include <memory>
 #include <vector>
 
 namespace XEngine
 {
-    // Minimal RHIInstance stub for texture tests.
-    class TextureTestInstance : public RHIInstance
-    {
-    public:
-        TextureTestInstance()
-            : RHIInstance(RHIInstanceDesc{}, RHIBackend::Vulkan)
-        {
-        }
-
-        std::vector<std::unique_ptr<RHIAdapter>> EnumerateAdapters() override
-        {
-            return {};
-        }
-
-        std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter&, const RHIDeviceDesc&) override
-        {
-            return nullptr;
-        }
-    };
-
-    // Stub texture — records info from desc.
+    // Stub texture — records info from desc. Local because it carries
+    // test-specific stored desc state.
     class StubTexture : public RHITexture
     {
     public:
@@ -66,23 +48,15 @@ namespace XEngine
         RHITextureDesc m_Desc;
     };
 
-    // TextureTestDevice — implements CreateTextureImpl + M3/M4 surface.
-    class TextureTestDevice : public RHIDevice
+    // TextureTestDevice — derives from the shared Test::StubDevice and
+    // only overrides the texture factory hook.
+    class TextureTestDevice final : public Test::StubDevice
     {
     public:
         explicit TextureTestDevice(RHIInstance& owner)
-            : RHIDevice(owner, RHIBackend::Vulkan)
+            : Test::StubDevice(owner)
         {
         }
-
-        void WaitIdle() override {}
-        RHIBackend GetBackend() const noexcept override { return RHIBackend::Vulkan; }
-        const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
-        u32 GetMaxFramesInFlight() const noexcept override { return 2; }
-        RHIFeature GetEnabledFeatures() const noexcept override { return RHIFeature::None; }
-        RHIQueue* GetQueue(RHIQueueType) const override { return nullptr; }
-
-        RHIBuffer* CreateBufferImpl(const RHIBufferDesc&) override { return nullptr; }
 
         RHITexture* CreateTextureImpl(const RHITextureDesc& desc) override
         {
@@ -90,16 +64,9 @@ namespace XEngine
             return m_LastTexture.get();
         }
 
-        RHITextureView* CreateTextureViewImpl(const RHITextureViewDesc&) override { return nullptr; }
-        RHISampler* CreateSamplerImpl(const RHISamplerDesc&) override { return nullptr; }
-        RHIFence* CreateFenceImpl(const RHIFenceDesc&) override { return nullptr; }
-        RHISemaphore* CreateSemaphoreImpl(const RHISemaphoreDesc&) override { return nullptr; }
-        RHICommandList* CreateCommandListImpl(const RHICommandListDesc&) override { return nullptr; }
-
         StubTexture* GetLastTexture() noexcept { return m_LastTexture.get(); }
 
     private:
-        RHICapabilities m_Caps;
         std::unique_ptr<StubTexture> m_LastTexture;
     };
 }
@@ -107,20 +74,14 @@ namespace XEngine
 namespace
 {
     using namespace XEngine;
+    using StubInstance = Test::StubInstance;
 
     static_assert(std::is_polymorphic_v<RHITexture>,
                   "RHITexture must be polymorphic");
 
-    // NOTE: All four RHITexture tests below are DISABLED because the
-// StubTexture's m_Desc reads back wrong values for Format/Usage/MipLevels
-// (observed at offset 24/28 of the desc struct). The root cause appears
-// to be a layout or copy-ctor interaction between RHITextureDesc and the
-// stub class. Tracked as a separate PR — for Phase 1, these tests are
-// skipped to keep the build clean. Validation passes (tex is non-null),
-// but stored Format/Usage values are wrong.
-    TEST(RHITexture, DISABLED_GettersReflectDesc)
+    TEST(RHITexture, GettersReflectDesc)
     {
-        TextureTestInstance instance;
+        StubInstance instance;
         TextureTestDevice device(instance);
 
         RHITextureDesc desc{
@@ -148,7 +109,7 @@ namespace
 
     TEST(RHITexture, OwnerDeviceIsTheDeviceItCameFrom)
     {
-        TextureTestInstance instance;
+        StubInstance instance;
         TextureTestDevice device(instance);
 
         RHITexture* tex = device.CreateTexture({
@@ -162,10 +123,10 @@ namespace
         EXPECT_EQ(tex->GetBackend(), RHIBackend::Vulkan);
     }
 
-    TEST(RHITexture, DISABLED_CubeArrayDimension)
+    TEST(RHITexture, CubeArrayDimension)
     {
         // Audit 3.10 — TextureCubeArray must be supported.
-        TextureTestInstance instance;
+        StubInstance instance;
         TextureTestDevice device(instance);
 
         RHITexture* tex = device.CreateTexture({
@@ -181,9 +142,9 @@ namespace
         EXPECT_EQ(tex->GetArrayLayers(), 12u);
     }
 
-    TEST(RHITexture, DISABLED_MipLevelsAndArrayLayersCorrect)
+    TEST(RHITexture, MipLevelsAndArrayLayersCorrect)
     {
-        TextureTestInstance instance;
+        StubInstance instance;
         TextureTestDevice device(instance);
 
         RHITexture* tex = device.CreateTexture({
@@ -199,9 +160,9 @@ namespace
         EXPECT_EQ(tex->GetArrayLayers(), 4u);
     }
 
-    TEST(RHITexture, DISABLED_IsPolymorphicThroughBasePointer)
+    TEST(RHITexture, IsPolymorphicThroughBasePointer)
     {
-        TextureTestInstance instance;
+        StubInstance instance;
         TextureTestDevice device(instance);
 
         RHITexture* tex = device.CreateTexture({

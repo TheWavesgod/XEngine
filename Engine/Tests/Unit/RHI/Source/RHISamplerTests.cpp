@@ -12,38 +12,19 @@
 #include <XEngine/RHI/RHIObject.h>
 #include <XEngine/RHI/RHISampler.h>
 #include <XEngine/RHI/RHIDevice.h>
-#include <XEngine/RHI/RHIBuffer.h>
-#include <XEngine/RHI/RHITexture.h>
-#include <XEngine/RHI/RHIQueue.h>
 #include <XEngine/RHI/RHIInstance.h>
 #include <XEngine/RHI/RHIDescriptors.h>
 #include <XEngine/RHI/RHIEnums.h>
+
+#include "RHITestStubs.h"
 
 #include <memory>
 #include <vector>
 
 namespace XEngine
 {
-    class SamplerTestInstance : public RHIInstance
-    {
-    public:
-        SamplerTestInstance()
-            : RHIInstance(RHIInstanceDesc{}, RHIBackend::Vulkan)
-        {
-        }
-
-        std::vector<std::unique_ptr<RHIAdapter>> EnumerateAdapters() override
-        {
-            return {};
-        }
-
-        std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter&, const RHIDeviceDesc&) override
-        {
-            return nullptr;
-        }
-    };
-
-    // Stub sampler — captures desc at creation, returns it via GetDesc() (audit 3.1).
+    // Stub sampler — captures desc at creation, returns it via GetDesc()
+    // (audit 3.1). Local because it carries test-specific stored desc state.
     class StubSampler : public RHISampler
     {
     public:
@@ -59,36 +40,25 @@ namespace XEngine
         RHISamplerDesc m_Desc;
     };
 
-    class SamplerTestDevice : public RHIDevice
+    // SamplerTestDevice — derives from the shared Test::StubDevice and
+    // only overrides the sampler factory hook.
+    class SamplerTestDevice final : public Test::StubDevice
     {
     public:
         explicit SamplerTestDevice(RHIInstance& owner)
-            : RHIDevice(owner, RHIBackend::Vulkan)
+            : Test::StubDevice(owner)
         {
         }
 
-        void WaitIdle() override {}
-        RHIBackend GetBackend() const noexcept override { return RHIBackend::Vulkan; }
-        const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
-        u32 GetMaxFramesInFlight() const noexcept override { return 2; }
-        RHIFeature GetEnabledFeatures() const noexcept override { return RHIFeature::None; }
-        RHIQueue* GetQueue(RHIQueueType) const override { return nullptr; }
-        RHIBuffer* CreateBufferImpl(const RHIBufferDesc&) override { return nullptr; }
-        RHITexture* CreateTextureImpl(const RHITextureDesc&) override { return nullptr; }
-        RHITextureView* CreateTextureViewImpl(const RHITextureViewDesc&) override { return nullptr; }
         RHISampler* CreateSamplerImpl(const RHISamplerDesc& desc) override
         {
             m_LastSampler = std::make_unique<StubSampler>(*this, desc);
             return m_LastSampler.get();
         }
-        RHIFence* CreateFenceImpl(const RHIFenceDesc&) override { return nullptr; }
-        RHISemaphore* CreateSemaphoreImpl(const RHISemaphoreDesc&) override { return nullptr; }
-        RHICommandList* CreateCommandListImpl(const RHICommandListDesc&) override { return nullptr; }
 
         StubSampler* GetLastSampler() noexcept { return m_LastSampler.get(); }
 
     private:
-        RHICapabilities m_Caps;
         std::unique_ptr<StubSampler> m_LastSampler;
     };
 }
@@ -96,13 +66,14 @@ namespace XEngine
 namespace
 {
     using namespace XEngine;
+    using StubInstance = Test::StubInstance;
 
     static_assert(std::is_polymorphic_v<RHISampler>,
                   "RHISampler must be polymorphic");
 
     TEST(RHISampler, GetDescReturnsConstructedDesc)
     {
-        SamplerTestInstance instance;
+        StubInstance instance;
         SamplerTestDevice device(instance);
 
         RHISamplerDesc desc{
@@ -142,7 +113,7 @@ namespace
 
     TEST(RHISampler, DefaultDescMatchesRHISamplerDescDefaults)
     {
-        SamplerTestInstance instance;
+        StubInstance instance;
         SamplerTestDevice device(instance);
 
         RHISampler* sampler = device.CreateSampler(RHISamplerDesc{});
@@ -157,7 +128,7 @@ namespace
 
     TEST(RHISampler, OwnerDeviceAndBackend)
     {
-        SamplerTestInstance instance;
+        StubInstance instance;
         SamplerTestDevice device(instance);
 
         RHISampler* sampler = device.CreateSampler({});
@@ -169,7 +140,7 @@ namespace
 
     TEST(RHISampler, IsPolymorphicThroughBasePointer)
     {
-        SamplerTestInstance instance;
+        StubInstance instance;
         SamplerTestDevice device(instance);
 
         RHISampler* sampler = device.CreateSampler({});

@@ -12,37 +12,14 @@
 #include <XEngine/RHI/RHIAdapter.h>   // brings RHIAdapter, RHIAdapterInfo
 #include <XEngine/RHI/RHIDevice.h>    // brings RHIDevice, RHICapabilities
 
+#include "RHITestStubs.h"
+
 #include <string_view>
-
-namespace XEngine
-{
-    // Minimal RHIInstance stub for RHIAdapter tests. Provides the bare
-    // minimum to instantiate an RHIAdapter (just the constructor works).
-    // The real RHIInstance surface (EnumerateAdapters, CreateDevice, ...)
-    // is exercised in RHIInstanceTests.cpp.
-    class RHIInstanceStub : public RHIInstance
-    {
-    public:
-        RHIInstanceStub()
-            : RHIInstance(RHIInstanceDesc{}, RHIBackend::Vulkan)
-        {
-        }
-
-        std::vector<std::unique_ptr<RHIAdapter>> EnumerateAdapters() override
-        {
-            return {};
-        }
-
-        std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter&, const RHIDeviceDesc&) override
-        {
-            return nullptr;
-        }
-    };
-}
 
 namespace
 {
     using namespace XEngine;
+    using StubInstance = Test::StubInstance;
 
     // Concrete adapter stub that records the info it was constructed with
     // and lets tests toggle the capability filter.
@@ -81,7 +58,7 @@ namespace
     TEST(RHIAdapter, OwnerDeviceIsNull)
     {
         // RHIAdapter has no device owner — its owner is the instance.
-        RHIInstanceStub instance;
+        StubInstance instance;
         RHIAdapterInfo info{ .Type = RHIAdapterType::Discrete };
         StubAdapter adapter(instance, info);
 
@@ -91,7 +68,7 @@ namespace
 
     TEST(RHIAdapter, GetInfoReturnsConstructedValues)
     {
-        RHIInstanceStub instance;
+        StubInstance instance;
         RHIAdapterInfo info{
             .VendorName   = "NVIDIA",
             .AdapterName  = "RTX 4090",
@@ -110,7 +87,7 @@ namespace
 
     TEST(RHIAdapter, SupportsRequiredCapabilitiesControlledByStub)
     {
-        RHIInstanceStub instance;
+        StubInstance instance;
         RHIAdapterInfo info;
         StubAdapter adapter(instance, info);
 
@@ -131,7 +108,7 @@ namespace
         static_assert(std::is_polymorphic_v<RHIAdapter>,
                       "RHIAdapter must be polymorphic");
 
-        RHIInstanceStub instance;
+        StubInstance instance;
         RHIAdapterInfo info;
         StubAdapter adapter(instance, info);
 

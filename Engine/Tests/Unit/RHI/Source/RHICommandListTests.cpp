@@ -9,58 +9,27 @@
 #include <XEngine/RHI/Base.h>
 #include <XEngine/RHI/RHIObject.h>
 #include <XEngine/RHI/RHICommandList.h>
-#include <XEngine/RHI/RHIDevice.h>
-#include <XEngine/RHI/RHIQueue.h>
-#include <XEngine/RHI/RHIInstance.h>
-#include <XEngine/RHI/RHIDescriptors.h>
-#include <XEngine/RHI/RHIBuffer.h>
 #include <XEngine/RHI/RHITexture.h>
-#include <XEngine/RHI/RHISampler.h>
-#include <XEngine/RHI/RHIFence.h>
-#include <XEngine/RHI/RHISemaphore.h>
 #include <XEngine/RHI/RHIEnums.h>
 
-#include <memory>
-#include <vector>
+#include "RHITestStubs.h"
 
-namespace XEngine
+namespace XEngine { namespace
 {
-    class CListTestInstance : public RHIInstance
+    // Local specialization: count Begin/End/TransitionTexture calls and
+    // capture the last TransitionTexture arguments. Inherits the layout-
+    // neutral body from Test::StubCommandList.
+    class RecordingCommandList final : public Test::StubCommandList
     {
     public:
-        CListTestInstance() : RHIInstance(RHIInstanceDesc{}, RHIBackend::Vulkan) {}
-        std::vector<std::unique_ptr<RHIAdapter>> EnumerateAdapters() override { return {}; }
-        std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter&, const RHIDeviceDesc&) override { return nullptr; }
-    };
+        explicit RecordingCommandList(RHIDevice& owner)
+            : Test::StubCommandList(owner)
+        {
+        }
 
-    class CListTestDevice : public RHIDevice
-    {
-    public:
-        CListTestDevice(RHIInstance& owner) : RHIDevice(owner, RHIBackend::Vulkan) {}
-        void WaitIdle() override {}
-        RHIBackend GetBackend() const noexcept override { return RHIBackend::Vulkan; }
-        const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
-        u32 GetMaxFramesInFlight() const noexcept override { return 2; }
-        RHIFeature GetEnabledFeatures() const noexcept override { return RHIFeature::None; }
-        RHIQueue* GetQueue(RHIQueueType) const override { return nullptr; }
-        RHIBuffer* CreateBufferImpl(const RHIBufferDesc&) override { return nullptr; }
-        RHITexture* CreateTextureImpl(const RHITextureDesc&) override { return nullptr; }
-        RHITextureView* CreateTextureViewImpl(const RHITextureViewDesc&) override { return nullptr; }
-        RHISampler* CreateSamplerImpl(const RHISamplerDesc&) override { return nullptr; }
-        RHIFence* CreateFenceImpl(const RHIFenceDesc&) override { return nullptr; }
-        RHISemaphore* CreateSemaphoreImpl(const RHISemaphoreDesc&) override { return nullptr; }
-        RHICommandList* CreateCommandListImpl(const RHICommandListDesc&) override { return nullptr; }
-    private:
-        RHICapabilities m_Caps;
-    };
+        void Begin() override { ++m_BeginCount; }
+        void End()   override { ++m_EndCount; }
 
-    class StubCommandList : public RHICommandList
-    {
-    public:
-        StubCommandList(RHIDevice& owner) : RHICommandList(owner, owner.GetBackend()) {}
-
-        void Begin() override { m_BeginCount++; }
-        void End() override { m_EndCount++; }
         void TransitionTexture(
             RHITexture* texture,
             RHIImageLayout oldLayout,
@@ -68,63 +37,66 @@ namespace XEngine
             RHIAccessFlags srcAccess,
             RHIAccessFlags dstAccess) override
         {
-            m_TransitionCount++;
-            m_LastTexture = texture;
-            m_LastOldLayout = oldLayout;
-            m_LastNewLayout = newLayout;
-            m_LastSrcAccess = srcAccess;
-            m_LastDstAccess = dstAccess;
+            ++m_TransitionCount;
+            m_LastTexture    = texture;
+            m_LastOldLayout  = oldLayout;
+            m_LastNewLayout  = newLayout;
+            m_LastSrcAccess  = srcAccess;
+            m_LastDstAccess  = dstAccess;
         }
 
-        u32 GetBeginCount() const noexcept { return m_BeginCount; }
-        u32 GetEndCount() const noexcept { return m_EndCount; }
-        u32 GetTransitionCount() const noexcept { return m_TransitionCount; }
-        RHITexture* GetLastTexture() const noexcept { return m_LastTexture; }
-        RHIImageLayout GetLastOldLayout() const noexcept { return m_LastOldLayout; }
-        RHIImageLayout GetLastNewLayout() const noexcept { return m_LastNewLayout; }
-        RHIAccessFlags GetLastSrcAccess() const noexcept { return m_LastSrcAccess; }
-        RHIAccessFlags GetLastDstAccess() const noexcept { return m_LastDstAccess; }
+        u32              GetBeginCount()     const noexcept { return m_BeginCount; }
+        u32              GetEndCount()       const noexcept { return m_EndCount; }
+        u32              GetTransitionCount() const noexcept { return m_TransitionCount; }
+        RHITexture*      GetLastTexture()    const noexcept { return m_LastTexture; }
+        RHIImageLayout   GetLastOldLayout()  const noexcept { return m_LastOldLayout; }
+        RHIImageLayout   GetLastNewLayout()  const noexcept { return m_LastNewLayout; }
+        RHIAccessFlags   GetLastSrcAccess()  const noexcept { return m_LastSrcAccess; }
+        RHIAccessFlags   GetLastDstAccess()  const noexcept { return m_LastDstAccess; }
 
     private:
-        u32 m_BeginCount = 0;
-        u32 m_EndCount = 0;
-        u32 m_TransitionCount = 0;
-        RHITexture* m_LastTexture = nullptr;
-        RHIImageLayout m_LastOldLayout = RHIImageLayout::Undefined;
-        RHIImageLayout m_LastNewLayout = RHIImageLayout::Undefined;
-        RHIAccessFlags m_LastSrcAccess = RHIAccessFlags::None;
-        RHIAccessFlags m_LastDstAccess = RHIAccessFlags::None;
+        u32            m_BeginCount     = 0;
+        u32            m_EndCount       = 0;
+        u32            m_TransitionCount = 0;
+        RHITexture*    m_LastTexture    = nullptr;
+        RHIImageLayout m_LastOldLayout  = RHIImageLayout::Undefined;
+        RHIImageLayout m_LastNewLayout  = RHIImageLayout::Undefined;
+        RHIAccessFlags m_LastSrcAccess  = RHIAccessFlags::None;
+        RHIAccessFlags m_LastDstAccess  = RHIAccessFlags::None;
     };
 
-    // Forward stub for testing only.
+    // Fixed-value StubTexture used as a TransitionTexture target.
+    // Remains local because it carries test-specific hardcoded properties.
     class StubTexture : public RHITexture
     {
     public:
         StubTexture(RHIDevice& owner) : RHITexture(owner, owner.GetBackend()) {}
 
         RHIFormat          GetFormat()      const noexcept override { return RHIFormat::D32_FLOAT; }
-        RHITextureDimension GetDimension() const noexcept override { return RHITextureDimension::Texture2D; }
-        u32                GetWidth()      const noexcept override { return 1920; }
-        u32                GetHeight()     const noexcept override { return 1080; }
-        u32                GetDepth()      const noexcept override { return 1; }
-        u32                GetMipLevels()  const noexcept override { return 1; }
+        RHITextureDimension GetDimension()   const noexcept override { return RHITextureDimension::Texture2D; }
+        u32                GetWidth()       const noexcept override { return 1920; }
+        u32                GetHeight()      const noexcept override { return 1080; }
+        u32                GetDepth()       const noexcept override { return 1; }
+        u32                GetMipLevels()   const noexcept override { return 1; }
         u32                GetArrayLayers() const noexcept override { return 1; }
-        RHITextureUsage    GetUsage()      const noexcept override { return RHITextureUsage::DepthStencil; }
+        RHITextureUsage    GetUsage()       const noexcept override { return RHITextureUsage::DepthStencil; }
     };
-}
+}}
 
 namespace
 {
     using namespace XEngine;
+    using StubInstance = Test::StubInstance;
+    using StubDevice   = Test::StubDevice;
 
     static_assert(std::is_polymorphic_v<RHICommandList>,
                   "RHICommandList must be polymorphic");
 
     TEST(RHICommandList, BeginEndAreCallable)
     {
-        CListTestInstance instance;
-        CListTestDevice device(instance);
-        StubCommandList cmdList(device);
+        StubInstance instance;
+        StubDevice device(instance);
+        RecordingCommandList cmdList(device);
 
         EXPECT_EQ(cmdList.GetBeginCount(), 0u);
         EXPECT_EQ(cmdList.GetEndCount(), 0u);
@@ -139,9 +111,9 @@ namespace
     TEST(RHICommandList, TransitionTextureRecordsArgs)
     {
         // Audit 3.7: explicit texture layout transition
-        CListTestInstance instance;
-        CListTestDevice device(instance);
-        StubCommandList cmdList(device);
+        StubInstance instance;
+        StubDevice device(instance);
+        RecordingCommandList cmdList(device);
         StubTexture texture(device);
 
         cmdList.TransitionTexture(
@@ -161,9 +133,9 @@ namespace
 
     TEST(RHICommandList, OwnerDeviceIsTheDeviceItCameFrom)
     {
-        CListTestInstance instance;
-        CListTestDevice device(instance);
-        StubCommandList cmdList(device);
+        StubInstance instance;
+        StubDevice device(instance);
+        RecordingCommandList cmdList(device);
 
         EXPECT_EQ(cmdList.GetOwnerDevice(), &device);
         EXPECT_EQ(cmdList.GetBackend(), RHIBackend::Vulkan);
@@ -171,9 +143,9 @@ namespace
 
     TEST(RHICommandList, IsPolymorphicThroughBasePointer)
     {
-        CListTestInstance instance;
-        CListTestDevice device(instance);
-        StubCommandList cmdList(device);
+        StubInstance instance;
+        StubDevice device(instance);
+        RecordingCommandList cmdList(device);
 
         RHICommandList* base = &cmdList;
         base->Begin();

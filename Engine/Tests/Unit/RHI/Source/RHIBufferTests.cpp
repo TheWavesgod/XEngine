@@ -16,32 +16,15 @@
 #include <XEngine/RHI/RHIEnums.h>
 #include <XEngine/RHI/RHIFlags.h>
 
+#include "RHITestStubs.h"
+
 #include <memory>
 #include <vector>
 
 namespace XEngine
 {
-    // Minimal RHIInstance stub for buffer tests.
-    class BufferTestInstance : public RHIInstance
-    {
-    public:
-        BufferTestInstance()
-            : RHIInstance(RHIInstanceDesc{}, RHIBackend::Vulkan)
-        {
-        }
-
-        std::vector<std::unique_ptr<RHIAdapter>> EnumerateAdapters() override
-        {
-            return {};
-        }
-
-        std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter&, const RHIDeviceDesc&) override
-        {
-            return nullptr;
-        }
-    };
-
-    // Minimal StubBuffer — records size/usage from desc.
+    // Minimal StubBuffer — records size/usage from desc. Local because it
+    // owns test-specific counters.
     class StubBuffer : public RHIBuffer
     {
     public:
@@ -68,21 +51,15 @@ namespace XEngine
         u32 m_UnmapCount = 0;
     };
 
-    // BufferTestDevice — implements CreateBufferImpl + M3 surface.
-    class BufferTestDevice : public RHIDevice
+    // BufferTestDevice — derives from the shared Test::StubDevice and only
+    // overrides the buffer factory hook.
+    class BufferTestDevice final : public Test::StubDevice
     {
     public:
         explicit BufferTestDevice(RHIInstance& owner)
-            : RHIDevice(owner, RHIBackend::Vulkan)
+            : Test::StubDevice(owner)
         {
         }
-
-        void WaitIdle() override {}
-        RHIBackend GetBackend() const noexcept override { return RHIBackend::Vulkan; }
-        const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
-        u32 GetMaxFramesInFlight() const noexcept override { return 2; }
-        RHIFeature GetEnabledFeatures() const noexcept override { return RHIFeature::None; }
-        RHIQueue* GetQueue(RHIQueueType) const override { return nullptr; }
 
         RHIBuffer* CreateBufferImpl(const RHIBufferDesc& desc) override
         {
@@ -90,17 +67,9 @@ namespace XEngine
             return m_LastBuffer.get();
         }
 
-        RHITexture* CreateTextureImpl(const RHITextureDesc&) override { return nullptr; }
-        RHITextureView* CreateTextureViewImpl(const RHITextureViewDesc&) override { return nullptr; }
-        RHISampler* CreateSamplerImpl(const RHISamplerDesc&) override { return nullptr; }
-        RHIFence* CreateFenceImpl(const RHIFenceDesc&) override { return nullptr; }
-        RHISemaphore* CreateSemaphoreImpl(const RHISemaphoreDesc&) override { return nullptr; }
-        RHICommandList* CreateCommandListImpl(const RHICommandListDesc&) override { return nullptr; }
-
         StubBuffer* GetLastBuffer() noexcept { return m_LastBuffer.get(); }
 
     private:
-        RHICapabilities m_Caps;
         std::unique_ptr<StubBuffer> m_LastBuffer;
     };
 }
@@ -108,13 +77,14 @@ namespace XEngine
 namespace
 {
     using namespace XEngine;
+    using StubInstance = Test::StubInstance;
 
     static_assert(std::is_polymorphic_v<RHIBuffer>,
                   "RHIBuffer must be polymorphic (virtual dtor + virtual methods)");
 
     TEST(RHIBuffer, GetSizeAndUsageReflectDesc)
     {
-        BufferTestInstance instance;
+        StubInstance instance;
         BufferTestDevice device(instance);
 
         RHIBufferDesc desc{
@@ -130,7 +100,7 @@ namespace
 
     TEST(RHIBuffer, OwnerDeviceIsTheDeviceItCameFrom)
     {
-        BufferTestInstance instance;
+        StubInstance instance;
         BufferTestDevice device(instance);
 
         RHIBuffer* buffer = device.CreateBuffer({
@@ -145,7 +115,7 @@ namespace
 
     TEST(RHIBuffer, UpdateIsCallable)
     {
-        BufferTestInstance instance;
+        StubInstance instance;
         BufferTestDevice device(instance);
 
         RHIBuffer* buffer = device.CreateBuffer({
@@ -166,7 +136,7 @@ namespace
     TEST(RHIBuffer, MapReturnsNullptrInStub)
     {
         // Stub returns nullptr (Device-local would yield nullptr in real backend).
-        BufferTestInstance instance;
+        StubInstance instance;
         BufferTestDevice device(instance);
 
         RHIBuffer* buffer = device.CreateBuffer({
@@ -186,7 +156,7 @@ namespace
 
     TEST(RHIBuffer, IsPolymorphicThroughBasePointer)
     {
-        BufferTestInstance instance;
+        StubInstance instance;
         BufferTestDevice device(instance);
 
         RHIBuffer* buffer = device.CreateBuffer({

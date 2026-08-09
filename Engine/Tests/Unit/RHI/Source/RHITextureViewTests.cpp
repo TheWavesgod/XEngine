@@ -11,37 +11,19 @@
 #include <XEngine/RHI/RHIObject.h>
 #include <XEngine/RHI/RHITexture.h>
 #include <XEngine/RHI/RHIDevice.h>
-#include <XEngine/RHI/RHIBuffer.h>
-#include <XEngine/RHI/RHIQueue.h>
 #include <XEngine/RHI/RHIInstance.h>
 #include <XEngine/RHI/RHIDescriptors.h>
 #include <XEngine/RHI/RHIEnums.h>
+
+#include "RHITestStubs.h"
 
 #include <memory>
 #include <vector>
 
 namespace XEngine
 {
-    class TextureViewTestInstance : public RHIInstance
-    {
-    public:
-        TextureViewTestInstance()
-            : RHIInstance(RHIInstanceDesc{}, RHIBackend::Vulkan)
-        {
-        }
-
-        std::vector<std::unique_ptr<RHIAdapter>> EnumerateAdapters() override
-        {
-            return {};
-        }
-
-        std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter&, const RHIDeviceDesc&) override
-        {
-            return nullptr;
-        }
-    };
-
-    // Stub texture view — records fields from desc.
+    // Stub texture view — records fields from desc. Local because it
+    // owns test-specific stored desc state.
     class StubTextureView : public RHITextureView
     {
     public:
@@ -82,36 +64,25 @@ namespace XEngine
         RHITextureUsage    GetUsage()      const noexcept override { return RHITextureUsage::ShaderRead; }
     };
 
-    class TextureViewTestDevice : public RHIDevice
+    // TextureViewTestDevice — derives from the shared Test::StubDevice and
+    // only overrides the texture-view factory hook.
+    class TextureViewTestDevice final : public Test::StubDevice
     {
     public:
         explicit TextureViewTestDevice(RHIInstance& owner)
-            : RHIDevice(owner, RHIBackend::Vulkan)
+            : Test::StubDevice(owner)
         {
         }
 
-        void WaitIdle() override {}
-        RHIBackend GetBackend() const noexcept override { return RHIBackend::Vulkan; }
-        const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
-        u32 GetMaxFramesInFlight() const noexcept override { return 2; }
-        RHIFeature GetEnabledFeatures() const noexcept override { return RHIFeature::None; }
-        RHIQueue* GetQueue(RHIQueueType) const override { return nullptr; }
-        RHIBuffer* CreateBufferImpl(const RHIBufferDesc&) override { return nullptr; }
-        RHITexture* CreateTextureImpl(const RHITextureDesc&) override { return nullptr; }
         RHITextureView* CreateTextureViewImpl(const RHITextureViewDesc& desc) override
         {
             m_LastView = std::make_unique<StubTextureView>(*this, desc);
             return m_LastView.get();
         }
-        RHISampler* CreateSamplerImpl(const RHISamplerDesc&) override { return nullptr; }
-        RHIFence* CreateFenceImpl(const RHIFenceDesc&) override { return nullptr; }
-        RHISemaphore* CreateSemaphoreImpl(const RHISemaphoreDesc&) override { return nullptr; }
-        RHICommandList* CreateCommandListImpl(const RHICommandListDesc&) override { return nullptr; }
 
         StubTextureView* GetLastView() noexcept { return m_LastView.get(); }
 
     private:
-        RHICapabilities m_Caps;
         std::unique_ptr<StubTextureView> m_LastView;
     };
 }
@@ -119,13 +90,14 @@ namespace XEngine
 namespace
 {
     using namespace XEngine;
+    using StubInstance = Test::StubInstance;
 
     static_assert(std::is_polymorphic_v<RHITextureView>,
                   "RHITextureView must be polymorphic");
 
     TEST(RHITextureView, GettersReflectDesc)
     {
-        TextureViewTestInstance instance;
+        StubInstance instance;
         TextureViewTestDevice device(instance);
         StubTexture source(device);
 
@@ -154,7 +126,7 @@ namespace
     {
         // Vulkan convention: 0 in MipLevelCount / ArrayLayerCount means
         // all remaining from BaseMipLevel / BaseArrayLayer.
-        TextureViewTestInstance instance;
+        StubInstance instance;
         TextureViewTestDevice device(instance);
         StubTexture source(device);
 
@@ -177,7 +149,7 @@ namespace
 
     TEST(RHITextureView, OwnerDeviceIsTheDeviceItCameFrom)
     {
-        TextureViewTestInstance instance;
+        StubInstance instance;
         TextureViewTestDevice device(instance);
         StubTexture source(device);
 
@@ -193,7 +165,7 @@ namespace
 
     TEST(RHITextureView, IsPolymorphicThroughBasePointer)
     {
-        TextureViewTestInstance instance;
+        StubInstance instance;
         TextureViewTestDevice device(instance);
         StubTexture source(device);
 

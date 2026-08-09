@@ -15,6 +15,8 @@
 #include <XEngine/RHI/RHIInstance.h>
 #include <XEngine/RHI/RHIRuntime.h>
 
+#include "RHITestStubs.h"
+
 #include <string>
 #include <vector>
 
@@ -22,25 +24,15 @@ namespace
 {
     using namespace XEngine;
 
-    // A trivial "instance" used only to satisfy RHIInstance's ctor signature.
-    // We never call virtual methods on it; the factory functions below exist
-    // purely to give RHIRuntime a non-null pointer to invoke.
-    class FakeRHIInstance : public RHIInstance
+    // TaggedInstance — derives from the shared Test::StubInstance and adds
+    // an integer tag so tests can verify which factory was invoked.
+    class TaggedInstance final : public Test::StubInstance
     {
     public:
-        explicit FakeRHIInstance(int tag) noexcept
-            : RHIInstance(RHIInstanceDesc{}, RHIBackend::None)
+        explicit TaggedInstance(int tag)
+            : Test::StubInstance(RHIBackend::None)
             , m_Tag(tag)
         {
-        }
-
-        std::vector<std::unique_ptr<RHIAdapter>> EnumerateAdapters() override
-        {
-            return {};
-        }
-        std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter&, const RHIDeviceDesc&) override
-        {
-            return nullptr;
         }
 
         int Tag() const noexcept { return m_Tag; }
@@ -49,11 +41,11 @@ namespace
         int m_Tag = 0;
     };
 
-    // Factory helpers — each creates a FakeRHIInstance tagged with a known
+    // Factory helpers — each creates a TaggedInstance tagged with a known
     // integer so the test can verify "this exact factory was called".
     std::unique_ptr<RHIInstance> MakeTagged(int tag)
     {
-        return std::unique_ptr<RHIInstance>(new FakeRHIInstance(tag));
+        return std::unique_ptr<RHIInstance>(new TaggedInstance(tag));
     }
 
     std::unique_ptr<RHIInstance> Factory_42(const RHIInstanceDesc&) { return MakeTagged(42); }
@@ -166,7 +158,7 @@ namespace
         // Verify the *new* factory is what's stored.
         const auto instance = RHIRuntime::CreateInstance({}, RHIBackend::Vulkan);
         ASSERT_NE(instance, nullptr);
-        EXPECT_EQ(static_cast<FakeRHIInstance*>(instance.get())->Tag(), 99);
+        EXPECT_EQ(static_cast<TaggedInstance*>(instance.get())->Tag(), 99);
     }
 
     TEST_F(RHIRuntimeTest, UnregisterBackendRemoves)
@@ -222,7 +214,7 @@ namespace
 
         auto instance = RHIRuntime::CreateInstance({}, RHIBackend::Vulkan);
         ASSERT_NE(instance, nullptr);
-        EXPECT_EQ(static_cast<FakeRHIInstance*>(instance.get())->Tag(), 42);
+        EXPECT_EQ(static_cast<TaggedInstance*>(instance.get())->Tag(), 42);
     }
 
     TEST_F(RHIRuntimeTest, CreateInstanceExactPreferenceNoSilentFallback)
@@ -249,7 +241,7 @@ namespace
         auto instance = RHIRuntime::CreateInstance({}, RHIBackend::None);
         ASSERT_NE(instance, nullptr);
         // D3D12 (Priority 200) should win over Vulkan (Priority 50).
-        EXPECT_EQ(static_cast<FakeRHIInstance*>(instance.get())->Tag(), 99);
+        EXPECT_EQ(static_cast<TaggedInstance*>(instance.get())->Tag(), 99);
     }
 
     TEST_F(RHIRuntimeTest, CreateInstanceAutoSkipsNullFactories)
@@ -265,7 +257,7 @@ namespace
 
         auto instance = RHIRuntime::CreateInstance({}, RHIBackend::None);
         ASSERT_NE(instance, nullptr);
-        EXPECT_EQ(static_cast<FakeRHIInstance*>(instance.get())->Tag(), 42);
+        EXPECT_EQ(static_cast<TaggedInstance*>(instance.get())->Tag(), 42);
     }
 
     TEST_F(RHIRuntimeTest, CreateInstanceAutoReturnsNullWhenAllFail)
@@ -291,6 +283,6 @@ namespace
 
         auto instance = RHIRuntime::CreateInstance({}, RHIBackend::None);
         ASSERT_NE(instance, nullptr);
-        EXPECT_EQ(static_cast<FakeRHIInstance*>(instance.get())->Tag(), 42);
+        EXPECT_EQ(static_cast<TaggedInstance*>(instance.get())->Tag(), 42);
     }
 }

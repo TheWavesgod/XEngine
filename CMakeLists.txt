@@ -31,7 +31,22 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(XENGINE_BUILD_RHI            "Build the new XEngineRHI target"             ON)
 option(XENGINE_BUILD_RHI_LOADER     "Build the new XEngineRHILoader target"        ON)
 option(XENGINE_BUILD_VULKAN_RHI     "Build the new XEngineVulkanRHI target"       ON)
-option(XENGINE_BUILD_TESTS          "Build the RHI / VulkanRHI test tree"          ON)
+option(XENGINE_BUILD_D3D12_RHI      "Build the new XEngineD3D12RHI target (Windows only)" ON)
+option(XENGINE_BUILD_TESTS          "Build the RHI / VulkanRHI / D3D12RHI test tree"     ON)
+option(XENGINE_ENABLE_ASAN          "Enable AddressSanitizer for supported test targets" OFF)
+
+# MSVC's ASan-enabled STL changes its object annotations, so every C++ target
+# in the link graph must be compiled consistently (including GoogleTest and
+# static engine libraries). The debug-asan preset removes /RTC1, which is not
+# compatible with AddressSanitizer.
+if(MSVC AND XENGINE_ENABLE_ASAN)
+    add_compile_options(
+        $<$<COMPILE_LANGUAGE:CXX>:/fsanitize=address>
+        $<$<COMPILE_LANGUAGE:CXX>:/Zi>
+        $<$<COMPILE_LANGUAGE:CXX>:/FS>
+    )
+    add_link_options(/INCREMENTAL:NO)
+endif()
 
 option(XENGINE_BUILD_RENDERER       "Build the Renderer module (frozen for now)"  OFF)
 option(XENGINE_BUILD_EDITOR         "Build the Editor module (frozen for now)"    OFF)
@@ -51,7 +66,7 @@ enable_testing()
 
 add_subdirectory(ThirdParty)
 
-if(XENGINE_BUILD_RHI OR XENGINE_BUILD_VULKAN_RHI OR XENGINE_BUILD_TESTS
+if(XENGINE_BUILD_RHI OR XENGINE_BUILD_VULKAN_RHI OR XENGINE_BUILD_D3D12_RHI OR XENGINE_BUILD_TESTS
    OR XENGINE_BUILD_RENDERER OR XENGINE_BUILD_EDITOR OR XENGINE_BUILD_APPS)
     add_subdirectory(Engine)
 endif()

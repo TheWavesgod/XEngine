@@ -21,6 +21,8 @@
 #include <XEngine/RHI/RHIAdapter.h>   // brings RHIAdapter, RHIAdapterInfo
 #include <XEngine/RHI/RHIDevice.h>    // brings RHIDevice, RHICapabilities, RHIDeviceDesc
 
+#include "RHITestStubs.h"
+
 #include <memory>
 #include <vector>
 
@@ -99,15 +101,13 @@ namespace
     // RequestAdapter / Single-device rule — needs a stub RHIInstance.
     // ---------------------------------------------------------------------
 
-    // A stub RHIInstance that exposes canned adapters and reports a single
-    // failed-CreateDevice / two-calls test. We multiply-inherit from
-    // RHIInstance so we get the default RequestAdapter impl that uses
-    // EnumerateAdapters + ScoreAdapter.
-    class StubInstance : public RHIInstance
+    // StubInstance — derives from the shared Test::StubInstance and adds
+    // canned adapter enumeration + CreateDeviceImpl returning a local device.
+    class StubInstance : public Test::StubInstance
     {
     public:
         explicit StubInstance(std::vector<RHIAdapterInfo> infos)
-            : RHIInstance(RHIInstanceDesc{}, RHIBackend::Vulkan)
+            : Test::StubInstance(RHIBackend::Vulkan)
             , m_AdapterInfos(std::move(infos))
         {
         }
@@ -123,13 +123,11 @@ namespace
             return result;
         }
 
-        // CreateDeviceImpl is the backend hook for the base-class NVI wrapper.
-        // The wrapper enforces single-device + feature negotiation; this stub
-        // simply constructs a StubDevice on demand.
         std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter& adapter, const RHIDeviceDesc& desc) override
         {
             (void)adapter;
             (void)desc;
+            ++CreateDeviceCallCount;
             return std::make_unique<StubDevice>(*this);
         }
 
@@ -155,31 +153,15 @@ namespace
             RHIFeature m_SupportedFeatures = RHIFeature::None;
         };
 
-        // Local device stub — derives from RHIDevice so the base-class
-        // unique_ptr<RHIDevice> can hold it. M3 expanded RHIDevice with
-        // 5 pure virtuals; M4 added CreateBufferImpl.
-        class StubDevice : public RHIDevice
+        // Local device stub — derives from the shared Test::StubDevice.
+        class StubDevice final : public Test::StubDevice
         {
         public:
-            explicit StubDevice(RHIInstance& owner) : RHIDevice(owner) {}
-
-            void WaitIdle() override {}
-            RHIBackend GetBackend() const noexcept override { return RHIBackend::Vulkan; }
-            const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
-            u32 GetMaxFramesInFlight() const noexcept override { return 2; }
-            RHIFeature GetEnabledFeatures() const noexcept override { return m_EnabledFeatures; }
-            RHIQueue* GetQueue(RHIQueueType) const override { return nullptr; }
-            RHIBuffer* CreateBufferImpl(const RHIBufferDesc&) override { return nullptr; }
-            RHITexture* CreateTextureImpl(const RHITextureDesc&) override { return nullptr; }
-            RHITextureView* CreateTextureViewImpl(const RHITextureViewDesc&) override { return nullptr; }
-            RHISampler* CreateSamplerImpl(const RHISamplerDesc&) override { return nullptr; }
-            RHIFence* CreateFenceImpl(const RHIFenceDesc&) override { return nullptr; }
-            RHISemaphore* CreateSemaphoreImpl(const RHISemaphoreDesc&) override { return nullptr; }
-            RHICommandList* CreateCommandListImpl(const RHICommandListDesc&) override { return nullptr; }
+            explicit StubDevice(RHIInstance& owner) : Test::StubDevice(owner) {}
 
             void SetEnabledFeatures(RHIFeature f) noexcept { m_EnabledFeatures = f; }
         private:
-            RHICapabilities m_Caps;
+            // Override the shared base's default with test-specific state.
             RHIFeature m_EnabledFeatures = RHIFeature::None;
         };
 
@@ -271,12 +253,6 @@ namespace
 
     TEST(RHIInstance, GetDescReturnsDesc)
     {
-        RHIInstanceDesc desc{
-            .ApplicationName    = "MyApp",
-            .ApplicationVersion = 42,
-            .EnableValidation   = true,
-            .EnableDebugMarkers = false,
-        };
         StubInstance instance({});
         // The desc was passed via the base constructor; we just verify the
         // accessor matches what was passed.
@@ -288,6 +264,5 @@ namespace
         EXPECT_EQ(got.ApplicationVersion, 1u);
         EXPECT_FALSE(got.EnableValidation);
         EXPECT_TRUE(got.EnableDebugMarkers);
-        (void)desc;  // exercised above is enough; the desc is opaque for now
     }
 }

@@ -8,6 +8,8 @@
 
 #include <gtest/gtest.h>
 
+#include <gtest/gtest.h>
+
 #include <XEngine/Core/Types.h>
 #include <XEngine/RHI/Base.h>
 #include <XEngine/RHI/RHIObject.h>
@@ -20,32 +22,15 @@
 #include <XEngine/RHI/RHIEnums.h>
 #include <XEngine/RHI/RHIFlags.h>
 
+#include "RHITestStubs.h"
+
 #include <memory>
 #include <vector>
 
 namespace XEngine
 {
-    // Minimal RHIInstance stub for device tests.
-    class DeviceTestInstance : public RHIInstance
-    {
-    public:
-        DeviceTestInstance()
-            : RHIInstance(RHIInstanceDesc{}, RHIBackend::Vulkan)
-        {
-        }
-
-        std::vector<std::unique_ptr<RHIAdapter>> EnumerateAdapters() override
-        {
-            return {};
-        }
-
-        std::unique_ptr<RHIDevice> CreateDeviceImpl(RHIAdapter&, const RHIDeviceDesc&) override
-        {
-            return nullptr;
-        }
-    };
-
-    // Stub RHIQueue — used to confirm device returns the right queue.
+    // Local StubQueue — used to confirm device returns the right queue.
+    // Local because the device needs type-specific queue lookup semantics.
     class StubQueue : public RHIQueue
     {
     public:
@@ -155,22 +140,24 @@ namespace XEngine
         RHISamplerDesc m_Desc;
     };
 
-    // Stub RHIDevice — exposes settable caps / max frames / queue type.
-    class StubDevice : public RHIDevice
+    // StubDevice — derives from the shared Test::StubDevice and overrides
+    // the device-info / queue-lookup / resource-factory hooks with rich,
+    // test-specific behavior.
+    class StubDevice final : public Test::StubDevice
     {
     public:
         explicit StubDevice(RHIInstance& owner, RHIQueueType qType = RHIQueueType::Graphics)
-            : RHIDevice(owner)
+            : Test::StubDevice(owner)
             , m_QueueType(qType)
             , m_Queue(std::make_unique<StubQueue>(*this, qType))
         {
         }
 
         void WaitIdle() override { m_WaitIdleCount++; }
-        RHIBackend GetBackend() const noexcept override { return RHIBackend::Vulkan; }
-        const RHICapabilities& GetCapabilities() const noexcept override { return m_Caps; }
+
         u32 GetMaxFramesInFlight() const noexcept override { return m_MaxFramesInFlight; }
         RHIFeature GetEnabledFeatures() const noexcept override { return m_EnabledFeatures; }
+
         RHIQueue* GetQueue(RHIQueueType type) const override
         {
             return (type == m_QueueType) ? m_Queue.get() : nullptr;
@@ -200,10 +187,6 @@ namespace XEngine
             return m_LastSampler.get();
         }
 
-        RHIFence* CreateFenceImpl(const RHIFenceDesc&) override { return nullptr; }
-        RHISemaphore* CreateSemaphoreImpl(const RHISemaphoreDesc&) override { return nullptr; }
-        RHICommandList* CreateCommandListImpl(const RHICommandListDesc&) override { return nullptr; }
-
         // Test harness
         void SetMaxFramesInFlight(u32 v) noexcept { m_MaxFramesInFlight = v; }
         void SetCapabilities(RHICapabilities caps) noexcept { m_Caps = caps; }
@@ -218,7 +201,6 @@ namespace XEngine
         RHIQueueType m_QueueType;
         u32 m_MaxFramesInFlight = 2;
         u32 m_WaitIdleCount = 0;
-        RHICapabilities m_Caps;
         RHIFeature m_EnabledFeatures = RHIFeature::None;
         std::unique_ptr<StubQueue> m_Queue;
         std::unique_ptr<StubBuffer> m_LastBuffer;
@@ -231,6 +213,7 @@ namespace XEngine
 namespace
 {
     using namespace XEngine;
+    using StubInstance = Test::StubInstance;
 
     static_assert(std::is_polymorphic_v<RHIDevice>,
                   "RHIDevice must be polymorphic (virtual dtor + virtual methods)");
@@ -241,7 +224,7 @@ namespace
 
     TEST(RHIDevice, WaitIdleIsCallable)
     {
-        DeviceTestInstance instance;
+        StubInstance instance;
         StubDevice device(instance);
 
         EXPECT_EQ(device.GetWaitIdleCount(), 0u);
@@ -258,7 +241,7 @@ namespace
 
     TEST(RHIDevice, GetBackendReturnsBackendTag)
     {
-        DeviceTestInstance instance;
+        StubInstance instance;
         StubDevice device(instance);
 
         EXPECT_EQ(device.GetBackend(), RHIBackend::Vulkan);
@@ -266,7 +249,7 @@ namespace
 
     TEST(RHIDevice, GetCapabilitiesReturnsStorageReference)
     {
-        DeviceTestInstance instance;
+        StubInstance instance;
         StubDevice device(instance);
 
         // GetCapabilities returns const& — modifications via the reference
@@ -288,7 +271,7 @@ namespace
 
     TEST(RHIDevice, GetMaxFramesInFlightReturnsBackendValue)
     {
-        DeviceTestInstance instance;
+        StubInstance instance;
         StubDevice device(instance);
 
         EXPECT_EQ(device.GetMaxFramesInFlight(), 2u);
@@ -306,7 +289,7 @@ namespace
 
     TEST(RHIDevice, GetQueueReturnsQueueForMatchingType)
     {
-        DeviceTestInstance instance;
+        StubInstance instance;
         StubDevice device(instance, RHIQueueType::Compute);
 
         RHIQueue* q = device.GetQueue(RHIQueueType::Compute);
@@ -317,7 +300,7 @@ namespace
 
     TEST(RHIDevice, GetQueueReturnsNullForNonMatchingType)
     {
-        DeviceTestInstance instance;
+        StubInstance instance;
         StubDevice device(instance, RHIQueueType::Graphics);
 
         EXPECT_EQ(device.GetQueue(RHIQueueType::Compute), nullptr);
@@ -329,7 +312,7 @@ namespace
     {
         // A more elaborate stub could expose 3 queues; the M3 minimum
         // is "one queue per type lookup". Verifying the simple case here.
-        DeviceTestInstance instance;
+        StubInstance instance;
         StubDevice device(instance, RHIQueueType::Graphics);
 
         RHIQueue* q = device.GetQueue(RHIQueueType::Graphics);
@@ -343,7 +326,7 @@ namespace
 
     TEST(RHIDevice, CreateBufferReturnsStubBuffer)
     {
-        DeviceTestInstance instance;
+        StubInstance instance;
         StubDevice device(instance);
 
         RHIBufferDesc desc{
@@ -365,7 +348,7 @@ namespace
 
     TEST(RHIDevice, CreateBufferSizeZeroIsNull)
     {
-        DeviceTestInstance instance;
+        StubInstance instance;
         StubDevice device(instance);
 
         RHIBufferDesc desc{
@@ -379,7 +362,7 @@ namespace
 
     TEST(RHIDevice, CreateBufferUsageNoneIsNull)
     {
-        DeviceTestInstance instance;
+        StubInstance instance;
         StubDevice device(instance);
 
         RHIBufferDesc desc{

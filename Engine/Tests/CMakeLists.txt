@@ -85,12 +85,19 @@ endif()
 #   VulkanRHI  -> Vulkan-specific integration tests, links XEngineRHI +
 #                 XEngineVulkanRHI. Only available when both RHI and VulkanRHI
 #                 are enabled.
+#   D3D12RHI   -> D3D12-specific integration tests, links XEngineRHI +
+#                 XEngineD3D12RHI. Only available when both RHI and D3D12RHI
+#                 are enabled (D3D12RHI is gated to WIN32 by its own
+#                 CMakeLists).
 if(XENGINE_BUILD_INTEGRATION_TESTS)
     if(TARGET XEngineRHI)
         add_subdirectory(Integration/RHI)
     endif()
     if(TARGET XEngineRHI AND TARGET XEngineVulkanRHI AND XENGINE_BUILD_VULKAN_TESTS)
         add_subdirectory(Integration/VulkanRHI)
+    endif()
+    if(TARGET XEngineRHI AND TARGET XEngineD3D12RHI)
+        add_subdirectory(Integration/D3D12RHI)
     endif()
 endif()
 
