@@ -81,17 +81,30 @@ if(XENGINE_BUILD_UNIT_TESTS AND TARGET XEngineRHI)
 endif()
 
 # Integration layer is split into:
-#   RHI        -> backend-agnostic contract tests, links XEngineRHI only.
-#   VulkanRHI  -> Vulkan-specific integration tests, links XEngineRHI +
-#                 XEngineVulkanRHI. Only available when both RHI and VulkanRHI
-#                 are enabled.
-#   D3D12RHI   -> D3D12-specific integration tests, links XEngineRHI +
-#                 XEngineD3D12RHI. Only available when both RHI and D3D12RHI
-#                 are enabled (D3D12RHI is gated to WIN32 by its own
-#                 CMakeLists).
+#   RHI              -> backend-agnostic build probe, links XEngineRHI only.
+#   RHIBackendContract -> backend-parameterized contract tests; the same
+#                         test body runs against every backend that's
+#                         actually linked (Vulkan / D3D12 / Metal). Lives
+#                         in its own subdirectory because it links backend
+#                         targets — the Integration/RHI target above
+#                         disallows them.
+#   VulkanRHI        -> Vulkan-specific integration tests, links XEngineRHI +
+#                       XEngineVulkanRHI. Only available when both RHI and VulkanRHI
+#                       are enabled.
+#   D3D12RHI         -> D3D12-specific integration tests, links XEngineRHI +
+#                       XEngineD3D12RHI. Only available when both RHI and D3D12RHI
+#                       are enabled (D3D12RHI is gated to WIN32 by its own
+#                       CMakeLists).
 if(XENGINE_BUILD_INTEGRATION_TESTS)
     if(TARGET XEngineRHI)
         add_subdirectory(Integration/RHI)
+    endif()
+    # Backend-parameterized contract tests need at least one backend
+    # to exercise. If neither Vulkan nor D3D12 is built the target
+    # will have nothing to test and gtest_discover_tests expands to
+    # only the skipped Metal case — still useful as a build probe.
+    if(TARGET XEngineRHI AND (TARGET XEngineVulkanRHI OR TARGET XEngineD3D12RHI))
+        add_subdirectory(Integration/RHIBackendContract)
     endif()
     if(TARGET XEngineRHI AND TARGET XEngineVulkanRHI AND XENGINE_BUILD_VULKAN_TESTS)
         add_subdirectory(Integration/VulkanRHI)
