@@ -44,7 +44,7 @@ namespace XEngine
         RHIFeature GetEnabledFeatures() const noexcept override { return m_EnabledFeatures; }
         RHIQueue* GetQueue(RHIQueueType type) const override;
 
-        RHIBuffer* CreateBufferImpl(const RHIBufferDesc&) override { return nullptr; }
+        RHIBuffer* CreateBufferImpl(const RHIBufferDesc&) override;
         RHITexture* CreateTextureImpl(const RHITextureDesc&) override { return nullptr; }
         RHITextureView* CreateTextureViewImpl(const RHITextureViewDesc&) override { return nullptr; }
         RHISampler* CreateSamplerImpl(const RHISamplerDesc&) override { return nullptr; }

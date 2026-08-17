@@ -2,6 +2,7 @@
 
 #include "D3D12Device.h"
 #include "D3D12Adapter.h"
+#include "D3D12Buffer.h"
 
 #include <XEngine/Logging/Log.h>
 
@@ -134,5 +135,14 @@ namespace XEngine
     {
         // M6 will return a D3D12Queue wrapper around ID3D12CommandQueue.
         return nullptr;
+    }
+
+    RHIBuffer* D3D12Device::CreateBufferImpl(const RHIBufferDesc& desc)
+    {
+        if (m_Device == nullptr)
+        {
+            return nullptr;
+        }
+        return D3D12Buffer::Create(*this, desc).release();
     }
 }

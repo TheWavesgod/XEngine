@@ -4,6 +4,7 @@
 #include "VulkanAdapter.h"
 #include "VulkanInstance.h"
 #include "VulkanQueue.h"
+#include "VulkanBuffer.h"
 
 // VMA is header-only. Define the implementation macro in exactly one TU
 // so its static-inline functions get emitted.
@@ -15,6 +16,7 @@
 #include <cstring>
 #include <vector>
 
+#include <XEngine/Logging/Log.h>
 #include <XEngine/RHI/RHIFlags.h>
 
 namespace XEngine
@@ -263,5 +265,18 @@ namespace XEngine
         m_Caps.SupportsRayTracing           = HasFlag(m_EnabledFeatures, RHIFeature::RayTracing);
         m_Caps.SupportsGeometryShader       = false;  // no RHIFeature bit yet
         m_Caps.SupportsTessellationShader   = false;  // no RHIFeature bit yet
+    }
+
+    RHIBuffer* VulkanDevice::CreateBufferImpl(const RHIBufferDesc& desc)
+    {
+        // ValidateBufferDesc is already enforced by the NVI wrapper; the
+        // factory's defensive re-check is enough to keep this safe in
+        // case of a future direct-Impl caller.
+        if (m_VmaAllocator == VK_NULL_HANDLE)
+        {
+            XENGINE_LOG_WARN("VulkanDevice::CreateBufferImpl: VMA allocator not initialised; returning nullptr.");
+            return nullptr;
+        }
+        return VulkanBuffer::Create(*this, desc).release();
     }
 }

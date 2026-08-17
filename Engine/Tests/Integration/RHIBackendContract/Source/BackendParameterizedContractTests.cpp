@@ -458,6 +458,11 @@ TEST_P(BackendContract, Contract_CreateBufferWithValidDesc)
     EXPECT_TRUE(XEngine::HasFlag(buffer->GetUsage(),
                                  XEngine::RHIBufferUsage::Vertex));
     EXPECT_EQ(buffer->GetOwnerDevice(), Device());
+    // RHIDevice is the single-device rule owner; on dtor it destroys
+    // its device which transitively tears down the VMA allocator /
+    // ID3D12Device. To keep that path leak-clean (VMA asserts in
+    // debug on leaked allocations), explicitly free the buffer here.
+    delete buffer;
 }
 
 TEST_P(BackendContract, Contract_CreateFenceRoundTrips)
